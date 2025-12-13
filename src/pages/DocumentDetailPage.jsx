@@ -158,7 +158,7 @@ const DocumentDetailPage = () => {
     {
       headerName: 'Miktar',
       field: 'quantity',
-      width: 110,
+      width: 120,
       cellClass: 'text-center',
       cellStyle: (params) => {
         if (params.node.rowPinned === 'bottom') {
@@ -166,23 +166,27 @@ const DocumentDetailPage = () => {
             backgroundColor: '#dbeafe', 
             color: '#1e40af', 
             fontWeight: 'bold',
-            fontSize: '16px',
+            fontSize: '15px',
             padding: '8px'
           }
         }
         return { 
           fontWeight: 'bold',
-          fontSize: '15px',
+          fontSize: '13px',
           color: '#1f2937',
-          backgroundColor: '#f3f4f6',
-          padding: '6px'
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '6px',
+          padding: '4px 8px',
+          margin: '4px',
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
         }
       }
     },
     {
       headerName: 'Okutulan',
       field: 'okutulan',
-      width: 110,
+      width: 120,
       cellClass: 'text-center',
       cellStyle: (params) => {
         if (params.node.rowPinned === 'bottom') {
@@ -190,7 +194,7 @@ const DocumentDetailPage = () => {
             backgroundColor: '#dcfce7', 
             color: '#15803d', 
             fontWeight: 'bold',
-            fontSize: '16px',
+            fontSize: '15px',
             padding: '8px'
           }
         }
@@ -198,26 +202,33 @@ const DocumentDetailPage = () => {
         if (okutulan > 0) {
           return { 
             fontWeight: 'bold',
-            fontSize: '15px',
-            color: '#ffffff',
-            backgroundColor: '#22c55e',
-            padding: '6px',
-            borderRadius: '4px'
+            fontSize: '13px',
+            color: '#15803d',
+            backgroundColor: '#f0fdf4',
+            border: '1px solid #86efac',
+            borderRadius: '6px',
+            padding: '4px 8px',
+            margin: '4px',
+            boxShadow: '0 1px 2px 0 rgba(34, 197, 94, 0.1)'
           }
         }
         return { 
           fontWeight: 'bold',
-          fontSize: '15px',
+          fontSize: '13px',
           color: '#9ca3af',
-          backgroundColor: '#f9fafb',
-          padding: '6px'
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '6px',
+          padding: '4px 8px',
+          margin: '4px',
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
         }
       }
     },
     {
       headerName: 'Kalan',
       field: 'kalan',
-      width: 110,
+      width: 120,
       valueGetter: (params) => {
         if (params.node.rowPinned === 'bottom') return params.data.kalan
         return (params.data.quantity || 0) - (params.data.okutulan || 0)
@@ -229,7 +240,7 @@ const DocumentDetailPage = () => {
             backgroundColor: '#fef3c7', 
             color: '#92400e', 
             fontWeight: 'bold',
-            fontSize: '16px',
+            fontSize: '15px',
             padding: '8px'
           }
         }
@@ -237,20 +248,26 @@ const DocumentDetailPage = () => {
         if (kalan > 0) {
           return { 
             fontWeight: 'bold',
-            fontSize: '15px',
-            color: '#ffffff',
-            backgroundColor: '#f59e0b',
-            padding: '6px',
-            borderRadius: '4px'
+            fontSize: '13px',
+            color: '#ea580c',
+            backgroundColor: '#fff7ed',
+            border: '1px solid #fdba74',
+            borderRadius: '6px',
+            padding: '4px 8px',
+            margin: '4px',
+            boxShadow: '0 1px 2px 0 rgba(245, 158, 11, 0.1)'
           }
         }
         return { 
           fontWeight: 'bold',
-          fontSize: '15px',
-          color: '#ffffff',
-          backgroundColor: '#10b981',
-          padding: '6px',
-          borderRadius: '4px'
+          fontSize: '13px',
+          color: '#059669',
+          backgroundColor: '#ecfdf5',
+          border: '1px solid #6ee7b7',
+          borderRadius: '6px',
+          padding: '4px 8px',
+          margin: '4px',
+          boxShadow: '0 1px 2px 0 rgba(16, 185, 129, 0.1)'
         }
       }
     }
@@ -346,23 +363,20 @@ const DocumentDetailPage = () => {
     // Tamamı okutulan → Yeşil
     if (okutulan > 0 && okutulan >= quantity) {
       return { 
-        backgroundColor: '#f0fdf4', 
-        borderLeft: '3px solid #10b981'
+        backgroundColor: '#f0fdf4'
       }
     }
     
     // Kısmen okutulan → Sarı
     if (okutulan > 0 && okutulan < quantity) {
       return { 
-        backgroundColor: '#fef9e7', 
-        borderLeft: '3px solid #f59e0b'
+        backgroundColor: '#fef9e7'
       }
     }
     
     // Hiç okutulmayan → Normal (beyaz)
     return { 
-      backgroundColor: '#ffffff',
-      borderLeft: '3px solid transparent'
+      backgroundColor: '#ffffff'
     }
   }
 
