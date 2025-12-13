@@ -253,6 +253,15 @@ const DocumentDetailPage = () => {
     console.log('Warning beep!')
   }
 
+  // Tamamlanma yüzdesini miktar bazında hesapla (Hook'lar early return'den ÖNCE olmalı)
+  const completionPercentage = useMemo(() => {
+    const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+    const totalOkutulan = items.reduce((sum, item) => sum + (item.okutulan || 0), 0)
+    
+    if (totalQuantity === 0) return 0
+    return Math.round((totalOkutulan / totalQuantity) * 100)
+  }, [items])
+
   // Row Style
   const getRowStyle = (params) => {
     if (params.data.isPrepared) {
@@ -288,15 +297,6 @@ const DocumentDetailPage = () => {
       </div>
     )
   }
-
-  // Tamamlanma yüzdesini miktar bazında hesapla
-  const completionPercentage = useMemo(() => {
-    const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0)
-    const totalOkutulan = items.reduce((sum, item) => sum + (item.okutulan || 0), 0)
-    
-    if (totalQuantity === 0) return 0
-    return Math.round((totalOkutulan / totalQuantity) * 100)
-  }, [items])
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
