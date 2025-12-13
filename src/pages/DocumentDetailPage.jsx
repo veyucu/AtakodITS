@@ -64,68 +64,95 @@ const DocumentDetailPage = () => {
     setStats({ total, prepared, remaining })
   }
 
-  // Status Badge Component
-  const StatusBadge = ({ isPrepared }) => {
-    return isPrepared ? (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        <CheckCircle className="w-3.5 h-3.5" />
-        Hazırlandı
-      </span>
-    ) : (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-        <AlertTriangle className="w-3.5 h-3.5" />
-        Bekliyor
-      </span>
-    )
-  }
+  // Calculate totals for footer
+  const totals = useMemo(() => {
+    const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+    const totalOkutulan = items.reduce((sum, item) => sum + (item.okutulan || 0), 0)
+    const totalKalan = totalQuantity - totalOkutulan
+    
+    return {
+      rowNumber: items.length,
+      turu: '',
+      barcode: '',
+      productName: 'Toplam',
+      quantity: totalQuantity,
+      okutulan: totalOkutulan,
+      kalan: totalKalan
+    }
+  }, [items])
 
   // Column Definitions
   const columnDefs = useMemo(() => [
     {
-      headerName: '',
-      field: 'isPrepared',
+      headerName: '#',
+      valueGetter: 'node.rowIndex + 1',
       width: 60,
-      cellRenderer: (params) => (
-        <div className="flex items-center justify-center h-full">
-          {params.value ? (
-            <CheckCircle className="w-5 h-5 text-green-500" />
-          ) : (
-            <XCircle className="w-5 h-5 text-gray-300" />
-          )}
-        </div>
-      ),
-      pinned: 'left'
+      cellClass: 'text-center font-semibold text-gray-600',
+      pinned: 'left',
+      cellClassRules: {
+        'font-bold text-gray-900 bg-gray-100': (params) => params.node.rowPinned === 'bottom'
+      }
     },
     {
-      headerName: 'Barkod',
+      headerName: 'Türü',
+      field: 'turu',
+      width: 80,
+      cellClass: 'text-center font-semibold',
+      cellStyle: (params) => {
+        if (params.node.rowPinned === 'bottom') return { backgroundColor: '#f3f4f6' }
+        if (params.value === 'ITS') return { color: '#2563eb', fontWeight: 'bold' }
+        if (params.value === 'UTS') return { color: '#dc2626', fontWeight: 'bold' }
+        return { color: '#6b7280', fontWeight: 'bold' }
+      }
+    },
+    {
+      headerName: 'Stok Kodu',
       field: 'barcode',
       width: 150,
       cellClass: 'font-mono font-semibold',
-      pinned: 'left'
+      cellClassRules: {
+        'bg-gray-100': (params) => params.node.rowPinned === 'bottom'
+      }
     },
     {
       headerName: 'Ürün Adı',
       field: 'productName',
       flex: 1,
-      minWidth: 250
+      minWidth: 300,
+      cellClassRules: {
+        'font-bold text-right bg-gray-100': (params) => params.node.rowPinned === 'bottom'
+      }
     },
     {
       headerName: 'Miktar',
       field: 'quantity',
       width: 100,
-      cellClass: 'text-center font-semibold'
+      cellClass: 'text-center font-semibold',
+      cellClassRules: {
+        'font-bold bg-blue-50 text-blue-700': (params) => params.node.rowPinned === 'bottom'
+      }
     },
     {
-      headerName: 'Birim',
-      field: 'unit',
+      headerName: 'Okutulan',
+      field: 'okutulan',
       width: 100,
-      cellClass: 'text-center'
+      cellClass: 'text-center font-semibold',
+      cellClassRules: {
+        'font-bold bg-green-50 text-green-700': (params) => params.node.rowPinned === 'bottom'
+      }
     },
     {
-      headerName: 'Durum',
-      field: 'isPrepared',
-      width: 140,
-      cellRenderer: (params) => <StatusBadge isPrepared={params.value} />
+      headerName: 'Kalan',
+      field: 'kalan',
+      width: 100,
+      valueGetter: (params) => {
+        if (params.node.rowPinned === 'bottom') return params.data.kalan
+        return (params.data.quantity || 0) - (params.data.okutulan || 0)
+      },
+      cellClass: 'text-center font-semibold',
+      cellClassRules: {
+        'font-bold bg-yellow-50 text-yellow-700': (params) => params.node.rowPinned === 'bottom'
+      }
     }
   ], [])
 
@@ -239,163 +266,99 @@ const DocumentDetailPage = () => {
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-4">
+        <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/documents')}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{order.orderNo}</h1>
-                <p className="text-sm text-gray-500">Belge Detayları ve Hazırlama</p>
+                <h1 className="text-xl font-bold text-gray-900">{order.orderNo}</h1>
+              </div>
+            </div>
+            
+            {/* Customer Info - Center */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-gray-500" />
+                <div>
+                  <p className="text-xs text-gray-500">Müşteri</p>
+                  <p className="text-sm font-semibold text-gray-900">{order.customerName}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Hash className="w-4 h-4 text-gray-500" />
+                <div>
+                  <p className="text-xs text-gray-500">Müşteri Kodu</p>
+                  <p className="text-sm font-semibold text-gray-900">{order.customerCode}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-gray-500" />
+                <div>
+                  <p className="text-xs text-gray-500">Şehir</p>
+                  <p className="text-sm font-semibold text-gray-900">{order.city}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <div>
+                  <p className="text-xs text-gray-500">Belge Tarihi</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {order.orderDate ? new Date(order.orderDate).toLocaleDateString('tr-TR') : '-'}
+                  </p>
+                </div>
               </div>
             </div>
             
             <div className="text-right">
-              <div className="text-3xl font-bold text-primary-600">{completionPercentage}%</div>
-              <div className="text-sm text-gray-500">Tamamlanma</div>
+              <div className="text-2xl font-bold text-primary-600">{completionPercentage}%</div>
+              <div className="text-xs text-gray-500">Tamamlanma</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Order Info */}
-      <div className="px-6 py-4 bg-white border-b border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <User className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Müşteri</p>
-              <p className="text-sm font-semibold text-gray-900">{order.customerName}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Hash className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Müşteri Kodu</p>
-              <p className="text-sm font-semibold text-gray-900">{order.customerCode}</p>
-            </div>
-
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Şehir</p>
-              <p className="text-sm font-semibold text-gray-900">{order.city}</p>
-            </div>
-
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Belge Tarihi</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {order.orderDate ? new Date(order.orderDate).toLocaleDateString('tr-TR') : '-'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Barcode Scanner */}
-      <div className="px-6 py-4 bg-gradient-to-r from-primary-500 to-primary-600">
-        <form onSubmit={handleBarcodeScan} className="max-w-2xl mx-auto">
-          <div className="flex gap-3">
+      {/* Barcode Scanner - Compact */}
+      <div className="px-6 py-2 bg-gradient-to-r from-primary-500 to-primary-600">
+        <form onSubmit={handleBarcodeScan}>
+          <div className="flex gap-3 items-center">
             <div className="flex-1 relative">
-              <Barcode className="absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-white/70" />
+              <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/70" />
               <input
                 ref={barcodeInputRef}
                 type="text"
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
                 placeholder="Barkod okutun veya girin..."
-                className="w-full pl-14 pr-4 py-4 text-lg bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-xl text-white placeholder-white/70 focus:bg-white/30 focus:border-white focus:outline-none transition-all"
+                className="w-full pl-11 pr-4 py-2.5 text-base bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-lg text-white placeholder-white/70 focus:bg-white/30 focus:border-white focus:outline-none transition-all"
                 autoComplete="off"
               />
             </div>
             <button
               type="submit"
-              className="px-8 py-4 bg-white text-primary-600 font-semibold rounded-xl hover:bg-gray-100 transition-colors"
+              className="px-6 py-2.5 bg-white text-primary-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
               Onayla
             </button>
+            {/* Message - Inline */}
+            {message && (
+              <div className={`px-4 py-2.5 rounded-lg font-medium ${
+                message.type === 'success' ? 'bg-green-500 text-white' :
+                message.type === 'error' ? 'bg-red-500 text-white' :
+                'bg-yellow-500 text-white'
+              }`}>
+                {message.text}
+              </div>
+            )}
           </div>
         </form>
-
-        {/* Message */}
-        {message && (
-          <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-lg font-medium ${
-            message.type === 'success' ? 'bg-green-500 text-white' :
-            message.type === 'error' ? 'bg-red-500 text-white' :
-            'bg-yellow-500 text-white'
-          }`}>
-            {message.text}
-          </div>
-        )}
-      </div>
-
-      {/* Statistics */}
-      <div className="px-6 py-4 bg-white border-b border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600 font-medium">Toplam Kalem</p>
-                <p className="text-3xl font-bold text-blue-700 mt-1">{stats.total}</p>
-              </div>
-              <Package className="w-10 h-10 text-blue-600/30" />
-            </div>
-          </div>
-
-          <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600 font-medium">Hazırlanan</p>
-                <p className="text-3xl font-bold text-green-700 mt-1">{stats.prepared}</p>
-              </div>
-              <CheckCircle className="w-10 h-10 text-green-600/30" />
-            </div>
-          </div>
-
-          <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-yellow-600 font-medium">Kalan</p>
-                <p className="text-3xl font-bold text-yellow-700 mt-1">{stats.remaining}</p>
-              </div>
-              <AlertTriangle className="w-10 h-10 text-yellow-600/30" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="px-6 py-3 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-          <span className="text-sm font-bold text-gray-700 min-w-[60px]">
-            {stats.prepared}/{stats.total}
-          </span>
-        </div>
       </div>
 
       {/* AG Grid */}
@@ -409,6 +372,7 @@ const DocumentDetailPage = () => {
             getRowStyle={getRowStyle}
             enableCellTextSelection={true}
             suppressCellFocus={true}
+            pinnedBottomRowData={[totals]}
           />
         </div>
       </div>
