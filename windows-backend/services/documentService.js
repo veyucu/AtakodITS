@@ -237,6 +237,7 @@ const documentService = {
   // Belirli bir belgeyi getir
   async getDocumentById(subeKodu, ftirsip, fatirs_no) {
     try {
+      console.log('📄 getDocumentById çağrıldı:', { subeKodu, ftirsip, fatirs_no })
       const pool = await getConnection()
       
       // Belge detayı için sorgu
@@ -313,15 +314,19 @@ const documentService = {
       request.input('fatirs_no', fatirs_no)
       
       const result = await request.query(detailQuery)
+      console.log('📊 SQL Sonuç sayısı:', result.recordset.length)
       
       if (result.recordset.length === 0) {
+        console.log('❌ Belge bulunamadı')
         return null
       }
       
       const row = result.recordset[0]
+      console.log('✅ Belge bulundu:', { FATIRS_NO: row.FATIRS_NO, CARI_ISIM: row.CARI_ISIM })
       
       // Belge kalemlerini getir
       const items = await this.getDocumentItems(subeKodu, ftirsip, fatirs_no, row.CARI_KODU)
+      console.log('📦 Kalem sayısı:', items.length)
       
       // Türkçe karakterleri düzelt
       const fixedRow = {

@@ -65,9 +65,10 @@ const apiService = {
       }
       
       const response = await apiClient.get(`/documents?date=${date}`)
+      // Backend { success: true, documents: [...] } formatında dönüyor
       return { 
         success: true, 
-        data: response.data.documents || response.data 
+        data: response.data.documents || []
       }
     } catch (error) {
       console.error('Get documents error:', error)
@@ -82,13 +83,16 @@ const apiService = {
   // Get document by ID
   getDocumentById: async (id) => {
     try {
+      console.log('🔍 API İsteği - Belge ID:', id)
+      console.log('🌐 API URL:', `${API_BASE_URL}/documents/${id}`)
       const response = await apiClient.get(`/documents/${id}`)
-      return { 
-        success: true, 
-        data: response.data 
-      }
+      console.log('✅ API Yanıtı:', response.data)
+      // Backend zaten { success: true, data: document } formatında dönüyor
+      // Tekrar wrap etmeye gerek yok
+      return response.data
     } catch (error) {
-      console.error('Get document error:', error)
+      console.error('❌ Get document error:', error)
+      console.error('❌ Error response:', error.response?.data)
       return { 
         success: false, 
         message: error.message || 'Döküman alınamadı' 

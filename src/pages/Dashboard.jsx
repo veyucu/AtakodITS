@@ -33,7 +33,9 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const response = await apiService.getDocuments()
+      // Bugünün tarihini al
+      const today = new Date().toISOString().split('T')[0]
+      const response = await apiService.getDocuments(today)
       
       if (response.success && response.data) {
         const docs = response.data
