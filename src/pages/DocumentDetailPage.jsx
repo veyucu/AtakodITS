@@ -88,7 +88,7 @@ const DocumentDetailPage = () => {
       valueGetter: (params) => {
         // Footer için toplam satır sayısını göster
         if (params.node.rowPinned === 'bottom') {
-          return params.api.getDisplayedRowCount() - 1 // -1 çünkü footer'ı saymamalıyız
+          return items.length
         }
         return params.node.rowIndex + 1
       },
@@ -160,7 +160,7 @@ const DocumentDetailPage = () => {
         'font-bold bg-yellow-50 text-yellow-700': (params) => params.node.rowPinned === 'bottom'
       }
     }
-  ], [])
+  ], [items])
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
