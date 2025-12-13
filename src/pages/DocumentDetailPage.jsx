@@ -21,6 +21,25 @@ const DocumentDetailPage = () => {
   const [stats, setStats] = useState({ total: 0, prepared: 0, remaining: 0 })
   const [loading, setLoading] = useState(true)
 
+  // Belge tipini belirle
+  const getDocumentTypeName = (docType, tipi) => {
+    // docType: FTIRSIP değeri ('1', '2', '6')
+    // tipi: TIPI değeri (Alış/Satış bilgisi)
+    if (docType === '6') {
+      return 'Sipariş'
+    } else if (docType === '1' || docType === '2') {
+      // TIPI alanına göre Alış veya Satış faturası
+      if (tipi && tipi.toLowerCase().includes('aliş')) {
+        return 'Alış Faturası'
+      } else if (tipi && tipi.toLowerCase().includes('satiş')) {
+        return 'Satış Faturası'
+      }
+      // Eğer TIPI bilgisi yoksa, FTIRSIP'e göre varsayılan
+      return docType === '1' ? 'Alış Faturası' : 'Satış Faturası'
+    }
+    return 'Belge'
+  }
+
   // Load order and items from API
   useEffect(() => {
     const fetchDocument = async () => {
@@ -271,61 +290,90 @@ const DocumentDetailPage = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-3">
+      <div className="bg-gradient-to-r from-white to-gray-50 border-b-2 border-primary-100 shadow-md">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
+            {/* Left - Back Button & Document Info */}
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/documents')}
-                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 transition-all shadow-sm hover:shadow"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-5 h-5 text-gray-700" />
               </button>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">{order.orderNo}</h1>
-              </div>
-            </div>
-            
-            {/* Customer Info - Center */}
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-gray-500" />
-                <div>
-                  <p className="text-xs text-gray-500">Müşteri</p>
-                  <p className="text-sm font-semibold text-gray-900">{order.customerName}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Hash className="w-4 h-4 text-gray-500" />
-                <div>
-                  <p className="text-xs text-gray-500">Müşteri Kodu</p>
-                  <p className="text-sm font-semibold text-gray-900">{order.customerCode}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-gray-500" />
-                <div>
-                  <p className="text-xs text-gray-500">Şehir</p>
-                  <p className="text-sm font-semibold text-gray-900">{order.city}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <div>
-                  <p className="text-xs text-gray-500">Belge Tarihi</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {order.orderDate ? new Date(order.orderDate).toLocaleDateString('tr-TR') : '-'}
-                  </p>
+              <div className="bg-primary-50 px-5 py-2.5 rounded-xl border border-primary-200 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="text-xs text-primary-600 font-medium mb-0.5">
+                      {getDocumentTypeName(order.docType, order.tipi)}
+                    </p>
+                    <h1 className="text-xl font-bold text-primary-900">{order.orderNo}</h1>
+                  </div>
                 </div>
               </div>
             </div>
             
-            <div className="text-right">
-              <div className="text-2xl font-bold text-primary-600">{completionPercentage}%</div>
-              <div className="text-xs text-gray-500">Tamamlanma</div>
+            {/* Center - Customer Info Cards */}
+            <div className="flex items-center gap-3">
+              <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <User className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Müşteri</p>
+                    <p className="text-sm font-bold text-gray-900">{order.customerName}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Hash className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Müşteri Kodu</p>
+                    <p className="text-sm font-bold text-gray-900">{order.customerCode}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">İlçe / Şehir</p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {order.district ? `${order.district} / ${order.city}` : order.city}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="w-4 h-4 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Belge Tarihi</p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {order.orderDate ? new Date(order.orderDate).toLocaleDateString('tr-TR') : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Right - Completion Percentage */}
+            <div className="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-3 rounded-xl shadow-lg">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white">{completionPercentage}%</div>
+                <div className="text-xs text-primary-100 font-medium">Tamamlanma</div>
+              </div>
             </div>
           </div>
         </div>
