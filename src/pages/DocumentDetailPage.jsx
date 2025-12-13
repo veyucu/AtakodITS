@@ -300,66 +300,66 @@ const DocumentDetailPage = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header - Compact */}
+      {/* Header - Ultra Compact */}
       <div className="bg-gradient-to-r from-white to-gray-50 border-b border-primary-100 shadow-sm">
-        <div className="px-6 py-2">
+        <div className="px-4 py-1.5">
           <div className="flex items-center justify-between">
             {/* Left - Back Button & Document Info */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate('/documents')}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 transition-all shadow-sm"
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 transition-all shadow-sm"
               >
-                <ArrowLeft className="w-4 h-4 text-gray-700" />
+                <ArrowLeft className="w-3.5 h-3.5 text-gray-700" />
               </button>
-              <div className="bg-primary-50 px-4 py-1.5 rounded-lg border border-primary-200">
-                <p className="text-[10px] text-primary-600 font-medium leading-tight">
+              <div className="bg-primary-50 px-3 py-1 rounded-lg border border-primary-200">
+                <p className="text-[9px] text-primary-600 font-medium leading-tight">
                   {getDocumentTypeName(order.docType, order.tipi)}
                 </p>
-                <h1 className="text-base font-bold text-primary-900 leading-tight">{order.orderNo}</h1>
+                <h1 className="text-sm font-bold text-primary-900 leading-tight">{order.orderNo}</h1>
               </div>
             </div>
             
-            {/* Center - Customer Info Cards - Compact */}
-            <div className="flex items-center gap-2">
-              <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5 text-blue-600" />
+            {/* Center - Customer Info Cards - Ultra Compact */}
+            <div className="flex items-center gap-1.5">
+              <div className="bg-white px-2.5 py-1 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  <User className="w-3 h-3 text-blue-600" />
                   <div>
-                    <p className="text-[10px] text-gray-500 leading-tight">Müşteri</p>
-                    <p className="text-xs font-bold text-gray-900 leading-tight">{order.customerName}</p>
+                    <p className="text-[9px] text-gray-500 leading-tight">Müşteri</p>
+                    <p className="text-[11px] font-bold text-gray-900 leading-tight">{order.customerName}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Hash className="w-3.5 h-3.5 text-purple-600" />
+              <div className="bg-white px-2.5 py-1 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  <Hash className="w-3 h-3 text-purple-600" />
                   <div>
-                    <p className="text-[10px] text-gray-500 leading-tight">Müşteri Kodu</p>
-                    <p className="text-xs font-bold text-gray-900 leading-tight">{order.customerCode}</p>
+                    <p className="text-[9px] text-gray-500 leading-tight">Kod</p>
+                    <p className="text-[11px] font-bold text-gray-900 leading-tight">{order.customerCode}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-green-600" />
+              <div className="bg-white px-2.5 py-1 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-green-600" />
                   <div>
-                    <p className="text-[10px] text-gray-500 leading-tight">İlçe / Şehir</p>
-                    <p className="text-xs font-bold text-gray-900 leading-tight">
+                    <p className="text-[9px] text-gray-500 leading-tight">İlçe / Şehir</p>
+                    <p className="text-[11px] font-bold text-gray-900 leading-tight">
                       {order.district ? `${order.district} / ${order.city}` : order.city}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-orange-600" />
+              <div className="bg-white px-2.5 py-1 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3 text-orange-600" />
                   <div>
-                    <p className="text-[10px] text-gray-500 leading-tight">Belge Tarihi</p>
-                    <p className="text-xs font-bold text-gray-900 leading-tight">
+                    <p className="text-[9px] text-gray-500 leading-tight">Tarih</p>
+                    <p className="text-[11px] font-bold text-gray-900 leading-tight">
                       {order.orderDate ? new Date(order.orderDate).toLocaleDateString('tr-TR') : '-'}
                     </p>
                   </div>
@@ -367,14 +367,11 @@ const DocumentDetailPage = () => {
               </div>
             </div>
             
-            {/* Right - Completion Progress Bar */}
-            <div className="bg-gradient-to-br from-primary-500 to-primary-600 px-5 py-2 rounded-lg shadow-md">
-              <div className="flex items-center gap-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white leading-tight">{completionPercentage}%</div>
-                  <div className="text-[10px] text-primary-100 font-medium leading-tight">Tamamlanma</div>
-                </div>
-                <div className="w-16 bg-white/20 rounded-full h-2 overflow-hidden">
+            {/* Right - Completion - Ultra Compact */}
+            <div className="bg-gradient-to-br from-primary-500 to-primary-600 px-3 py-1 rounded-lg shadow-md">
+              <div className="flex items-center gap-2">
+                <div className="text-xl font-bold text-white leading-tight">{completionPercentage}%</div>
+                <div className="w-12 bg-white/20 rounded-full h-1.5 overflow-hidden">
                   <div 
                     className="h-full bg-white transition-all duration-500"
                     style={{ width: `${completionPercentage}%` }}
