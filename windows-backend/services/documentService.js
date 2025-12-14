@@ -119,7 +119,10 @@ const documentService = {
           CAST(V.KAYITTARIHI AS DATETIME) AS KAYIT_TARIHI,
           V.MIKTAR,
           ISNULL(V.OKUTULAN,0) AS OKUTULAN,
-          V.MIKTAR - ISNULL(V.OKUTULAN,0) AS KALAN
+          V.MIKTAR - ISNULL(V.OKUTULAN,0) AS KALAN,
+          V.ITS_COUNT,
+          V.UTS_COUNT,
+          V.DGR_COUNT
         FROM
         (
           SELECT 
@@ -133,7 +136,10 @@ const documentService = {
             A.KAYITTARIHI,
             (SELECT SUM(STHAR_GCMIK) FROM TBLSIPATRA X WITH (NOLOCK) WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS MIKTAR,
             (SELECT SUM(Y.MIKTAR) FROM TBLSIPATRA X WITH (NOLOCK) INNER JOIN TBLSERITRA Y WITH (NOLOCK) ON (X.FISNO = Y.BELGENO AND X.INCKEYNO = Y.STRA_INC AND X.STOK_KODU=Y.STOK_KODU AND X.STHAR_HTUR = Y.BELGETIP AND X.SUBE_KODU=Y.SUBE_KODU AND Y.KAYIT_TIPI='M' AND X.STHAR_GCKOD=Y.GCKOD)
-            WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN
+            WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN,
+            (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='BESERI') AS ITS_COUNT,
+            (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='UTS') AS UTS_COUNT,
+            (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND (S.KOD_5 IS NULL OR S.KOD_5 NOT IN ('BESERI','UTS'))) AS DGR_COUNT
           FROM 
             TBLSIPAMAS A WITH (NOLOCK)
           WHERE FTIRSIP='6' ${additionalWhere.replace('V.TARIH', 'A.TARIH')}
@@ -151,7 +157,10 @@ const documentService = {
             A.KAYITTARIHI,
             (SELECT SUM(STHAR_GCMIK) FROM TBLSTHAR X WITH (NOLOCK) WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS MIKTAR,
             (SELECT SUM(Y.MIKTAR) FROM TBLSTHAR X WITH (NOLOCK) INNER JOIN TBLSERITRA Y WITH (NOLOCK) ON (X.FISNO = Y.BELGENO AND X.INCKEYNO = Y.STRA_INC AND X.STOK_KODU=Y.STOK_KODU AND X.STHAR_HTUR = Y.BELGETIP AND X.SUBE_KODU=Y.SUBE_KODU AND Y.KAYIT_TIPI='A' AND X.STHAR_GCKOD=Y.GCKOD)
-            WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN
+            WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN,
+            (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='BESERI') AS ITS_COUNT,
+            (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='UTS') AS UTS_COUNT,
+            (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND (S.KOD_5 IS NULL OR S.KOD_5 NOT IN ('BESERI','UTS'))) AS DGR_COUNT
           FROM 
             TBLFATUIRS A WITH (NOLOCK)
           WHERE A.FTIRSIP IN ('1','2') ${additionalWhere.replace('V.TARIH', 'A.TARIH')}
@@ -195,7 +204,10 @@ const documentService = {
           KAYIT_TARIHI: row.KAYIT_TARIHI,
           MIKTAR: row.MIKTAR,
           OKUTULAN: row.OKUTULAN,
-          KALAN: row.KALAN
+          KALAN: row.KALAN,
+          ITS_COUNT: row.ITS_COUNT || 0,
+          UTS_COUNT: row.UTS_COUNT || 0,
+          DGR_COUNT: row.DGR_COUNT || 0
         }
         
         
@@ -207,6 +219,9 @@ const documentService = {
           orderNo: fixedRow.FATIRS_NO,
           orderDate: fixedRow.TARIH,
           totalItems: fixedRow.KALEM || 0,
+          itsCount: fixedRow.ITS_COUNT,
+          utsCount: fixedRow.UTS_COUNT,
+          dgrCount: fixedRow.DGR_COUNT,
           customerCode: fixedRow.CARI_KODU,
           customerName: fixedRow.CARI_ISIM,
           district: fixedRow.CARI_ILCE,
@@ -583,12 +598,53 @@ const documentService = {
         belgeTip,
         subeKodu,
         depoKod = '0',
-        ilcGtin       // Okutulan Barkod
+        ilcGtin,      // Okutulan Barkod
+        expectedQuantity  // Beklenen miktar (kalem miktarı)
       } = data
       
       console.log('💾 ITS Karekod Kaydediliyor:', data)
       
-      // Aynı seri numarasının daha önce okutulup okutulmadığını kontrol et
+      // 1. Mevcut okutulmuş miktarı kontrol et (miktar aşımı kontrolü)
+      if (expectedQuantity) {
+        const quantityCheckQuery = `
+          SELECT ISNULL(SUM(MIKTAR), 0) AS TOTAL_OKUTULAN
+          FROM TBLSERITRA WITH (NOLOCK)
+          WHERE BELGENO = @belgeNo
+            AND STRA_INC = @straInc
+            AND STOK_KODU = @stokKodu
+            AND BELGETIP = @belgeTip
+            AND SUBE_KODU = @subeKodu
+            AND KAYIT_TIPI = @kayitTipi
+            AND GCKOD = @gckod
+        `
+        
+        const quantityCheckRequest = pool.request()
+        quantityCheckRequest.input('belgeNo', belgeNo)
+        quantityCheckRequest.input('straInc', straInc)
+        quantityCheckRequest.input('stokKodu', stokKodu)
+        quantityCheckRequest.input('belgeTip', belgeTip)
+        quantityCheckRequest.input('subeKodu', subeKodu)
+        quantityCheckRequest.input('kayitTipi', kayitTipi)
+        quantityCheckRequest.input('gckod', gckod)
+        
+        const quantityCheckResult = await quantityCheckRequest.query(quantityCheckQuery)
+        const currentOkutulan = quantityCheckResult.recordset[0].TOTAL_OKUTULAN
+        
+        if (currentOkutulan >= expectedQuantity) {
+          console.log('⚠️⚠️⚠️ MİKTAR AŞIMI! ⚠️⚠️⚠️')
+          console.log('Stok Kodu:', stokKodu)
+          console.log('Beklenen Miktar:', expectedQuantity)
+          console.log('Mevcut Okutulan:', currentOkutulan)
+          return {
+            success: false,
+            error: 'QUANTITY_EXCEEDED',
+            message: `⚠️ Miktar aşımı! Bu üründen ${expectedQuantity} adet okutulması gerekiyor, ${currentOkutulan} adet zaten okutulmuş.`
+          }
+        }
+        console.log('✓ Miktar kontrolü geçti:', currentOkutulan, '/', expectedQuantity)
+      }
+      
+      // 2. Aynı seri numarasının daha önce okutulup okutulmadığını kontrol et
       const checkQuery = `
         SELECT COUNT(*) AS KAYIT_SAYISI
         FROM TBLSERITRA WITH (NOLOCK)
@@ -696,6 +752,196 @@ const documentService = {
       
     } catch (error) {
       console.error('❌ ITS Karekod Kaydetme Hatası:', error)
+      throw error
+    }
+  },
+
+  // DGR Barkod Kaydet (ITS olmayan normal ürünler)
+  async saveDGRBarcode(data) {
+    try {
+      const pool = await getConnection()
+      
+      const {
+        kayitTipi,    // 'M' veya 'A' (Sipariş = M, Fatura = A)
+        stokKodu,     // Stok Kodu
+        straInc,      // INCKEYNO
+        tarih,        // Belge Tarihi
+        gckod,        // STHAR_GCKOD
+        belgeNo,      // Belge No
+        belgeTip,     // STHAR_HTUR
+        subeKodu,     // Şube Kodu
+        ilcGtin,      // Okutulan Barkod
+        expectedQuantity  // Beklenen miktar (kalem miktarı)
+      } = data
+      
+      console.log('💾 DGR Barkod Kaydediliyor:', data)
+      
+      // Tarih formatı - saat bilgisi olmadan (YYYY-MM-DD)
+      const tarihDate = new Date(tarih)
+      const year = tarihDate.getFullYear()
+      const month = String(tarihDate.getMonth() + 1).padStart(2, '0')
+      const day = String(tarihDate.getDate()).padStart(2, '0')
+      const formattedTarih = `${year}-${month}-${day}`
+      
+      // Aynı kayıt var mı kontrol et
+      const checkQuery = `
+        SELECT MIKTAR
+        FROM TBLSERITRA WITH (NOLOCK)
+        WHERE KAYIT_TIPI = @kayitTipi
+          AND STOK_KODU = @stokKodu
+          AND STRA_INC = @straInc
+          AND BELGENO = @belgeNo
+          AND BELGETIP = @belgeTip
+          AND SUBE_KODU = @subeKodu
+          AND GCKOD = @gckod
+      `
+      
+      const checkRequest = pool.request()
+      checkRequest.input('kayitTipi', kayitTipi)
+      checkRequest.input('stokKodu', stokKodu)
+      checkRequest.input('straInc', straInc)
+      checkRequest.input('belgeNo', belgeNo)
+      checkRequest.input('belgeTip', belgeTip)
+      checkRequest.input('subeKodu', subeKodu)
+      checkRequest.input('gckod', gckod)
+      
+      const checkResult = await checkRequest.query(checkQuery)
+      
+      if (checkResult.recordset.length > 0) {
+        // Kayıt var, MIKTAR'ı +1 arttır (UPDATE)
+        const currentMiktar = checkResult.recordset[0].MIKTAR || 0
+        const newMiktar = currentMiktar + 1
+        
+        // Miktar kontrolü - beklenen miktarı aşmamalı
+        if (expectedQuantity && newMiktar > expectedQuantity) {
+          console.log('⚠️⚠️⚠️ MİKTAR AŞIMI! (DGR UPDATE) ⚠️⚠️⚠️')
+          console.log('Stok Kodu:', stokKodu)
+          console.log('Beklenen Miktar:', expectedQuantity)
+          console.log('Mevcut Miktar:', currentMiktar)
+          console.log('Yeni Miktar olacaktı:', newMiktar)
+          return {
+            success: false,
+            error: 'QUANTITY_EXCEEDED',
+            message: `⚠️ Miktar aşımı! Bu üründen ${expectedQuantity} adet okutulması gerekiyor, ${currentMiktar} adet zaten okutulmuş.`
+          }
+        }
+        
+        console.log(`✓ Kayıt bulundu, MIKTAR güncelleniyor: ${currentMiktar} -> ${newMiktar}`)
+        
+        const updateQuery = `
+          UPDATE TBLSERITRA
+          SET MIKTAR = @newMiktar
+          WHERE KAYIT_TIPI = @kayitTipi
+            AND STOK_KODU = @stokKodu
+            AND STRA_INC = @straInc
+            AND BELGENO = @belgeNo
+            AND BELGETIP = @belgeTip
+            AND SUBE_KODU = @subeKodu
+            AND GCKOD = @gckod
+        `
+        
+        const updateRequest = pool.request()
+        updateRequest.input('kayitTipi', kayitTipi)
+        updateRequest.input('stokKodu', stokKodu)
+        updateRequest.input('straInc', straInc)
+        updateRequest.input('belgeNo', belgeNo)
+        updateRequest.input('belgeTip', belgeTip)
+        updateRequest.input('subeKodu', subeKodu)
+        updateRequest.input('gckod', gckod)
+        updateRequest.input('newMiktar', newMiktar)
+        
+        await updateRequest.query(updateQuery)
+        
+        console.log('✅✅✅ DGR BARKOD BAŞARIYLA GÜNCELLENDİ! ✅✅✅')
+        console.log('Stok Kodu:', stokKodu)
+        console.log('Belge No:', belgeNo)
+        console.log('Yeni Miktar:', newMiktar)
+        
+        return {
+          success: true,
+          data: {
+            stokKodu,
+            miktar: newMiktar,
+            isUpdate: true
+          }
+        }
+      } else {
+        // Kayıt yok, yeni kayıt oluştur (INSERT)
+        
+        // Miktar kontrolü - ilk kayıt için de kontrol
+        if (expectedQuantity && expectedQuantity < 1) {
+          console.log('⚠️⚠️⚠️ MİKTAR AŞIMI! (DGR INSERT) ⚠️⚠️⚠️')
+          console.log('Stok Kodu:', stokKodu)
+          console.log('Beklenen Miktar:', expectedQuantity)
+          return {
+            success: false,
+            error: 'QUANTITY_EXCEEDED',
+            message: `⚠️ Miktar aşımı! Bu üründen ${expectedQuantity} adet okutulması gerekiyor, zaten tamamlanmış.`
+          }
+        }
+        
+        console.log('✓ Kayıt bulunamadı, yeni kayıt oluşturuluyor...')
+        
+        const insertQuery = `
+          INSERT INTO TBLSERITRA (
+            KAYIT_TIPI,
+            SERI_NO,
+            STOK_KODU,
+            STRA_INC,
+            TARIH,
+            GCKOD,
+            MIKTAR,
+            BELGENO,
+            BELGETIP,
+            SUBE_KODU,
+            DEPOKOD,
+            ILC_GTIN
+          ) VALUES (
+            @kayitTipi,
+            @stokKodu,
+            @stokKodu,
+            @straInc,
+            @tarih,
+            @gckod,
+            1,
+            @belgeNo,
+            @belgeTip,
+            @subeKodu,
+            '0',
+            @ilcGtin
+          )
+        `
+        
+        const insertRequest = pool.request()
+        insertRequest.input('kayitTipi', kayitTipi)
+        insertRequest.input('stokKodu', stokKodu)
+        insertRequest.input('straInc', straInc)
+        insertRequest.input('tarih', formattedTarih)
+        insertRequest.input('gckod', gckod)
+        insertRequest.input('belgeNo', belgeNo)
+        insertRequest.input('belgeTip', belgeTip)
+        insertRequest.input('subeKodu', subeKodu)
+        insertRequest.input('ilcGtin', ilcGtin)
+        
+        await insertRequest.query(insertQuery)
+        
+        console.log('✅✅✅ DGR BARKOD BAŞARIYLA KAYDEDİLDİ! ✅✅✅')
+        console.log('Stok Kodu:', stokKodu)
+        console.log('Belge No:', belgeNo)
+        console.log('Miktar:', 1)
+        
+        return {
+          success: true,
+          data: {
+            stokKodu,
+            miktar: 1,
+            isUpdate: false
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ DGR Barkod Kaydetme Hatası:', error)
       throw error
     }
   }

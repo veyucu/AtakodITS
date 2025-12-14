@@ -154,11 +154,34 @@ const DocumentsPage = () => {
     {
       headerName: 'Kalem',
       field: 'totalItems',
-      width: 110,
+      width: 140,
       cellClass: 'text-center',
       wrapHeaderText: true,
       autoHeaderHeight: true,
-      cellRenderer: (params) => <BadgeRenderer value={params.value} type="kalem" />
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellRenderer: (params) => {
+        const { itsCount, utsCount, dgrCount } = params.data
+        
+        return (
+          <div className="flex items-center justify-center gap-1">
+            {itsCount > 0 && (
+              <span className="px-2.5 py-1 rounded text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm min-w-[32px]" title="ITS">
+                {itsCount}
+              </span>
+            )}
+            {utsCount > 0 && (
+              <span className="px-2.5 py-1 rounded text-sm font-bold bg-red-100 text-red-700 border border-red-200 shadow-sm min-w-[32px]" title="UTS">
+                {utsCount}
+              </span>
+            )}
+            {dgrCount > 0 && (
+              <span className="px-2.5 py-1 rounded text-sm font-bold bg-gray-100 text-gray-700 border border-gray-200 shadow-sm min-w-[32px]" title="DGR">
+                {dgrCount}
+              </span>
+            )}
+          </div>
+        )
+      }
     },
     {
       headerName: 'Miktar',
@@ -219,6 +242,15 @@ const DocumentsPage = () => {
           } catch (error) {
             return params.value
           }
+        }
+        // Kalem sütunu için ITS/UTS/DGR detayı
+        if (params.column.colId === 'totalItems') {
+          const { itsCount, utsCount, dgrCount } = params.node.data
+          const parts = []
+          if (itsCount > 0) parts.push(`ITS:${itsCount}`)
+          if (utsCount > 0) parts.push(`UTS:${utsCount}`)
+          if (dgrCount > 0) parts.push(`DGR:${dgrCount}`)
+          return parts.length > 0 ? parts.join(' | ') : params.value
         }
         return params.value
       }

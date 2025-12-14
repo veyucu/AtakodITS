@@ -199,6 +199,22 @@ const apiService = {
         message: error.response?.data?.message || error.message || 'ITS kayıtları silinemedi'
       }
     }
+  },
+
+  // DGR Barkod Okut ve Kaydet (ITS olmayan normal ürünler)
+  saveDGRBarcode: async (data) => {
+    try {
+      console.log('📦 DGR Barkod gönderiliyor:', data)
+      const response = await apiClient.post('/documents/dgr-barcode', data)
+      console.log('✅ DGR Barkod yanıtı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ DGR Barkod hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'DGR barkod kaydedilemedi'
+      }
+    }
   }
 }
 

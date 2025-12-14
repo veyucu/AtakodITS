@@ -25,6 +25,7 @@ const DocumentDetailPage = () => {
   const [itsRecords, setItsRecords] = useState([])
   const [selectedRecords, setSelectedRecords] = useState([])
   const [itsLoading, setItsLoading] = useState(false)
+  const [deleteMode, setDeleteMode] = useState(false) // Silme modu
 
   // Belge tipini belirle
   const getDocumentTypeName = (docType, tipi) => {
@@ -41,7 +42,8 @@ const DocumentDetailPage = () => {
         return 'Satış Faturası'
       }
       // Eğer TIPI bilgisi yoksa, FTIRSIP'e göre varsayılan
-      return docType === '1' ? 'Alış Faturası' : 'Satış Faturası'
+      // FTIRSIP: '1' = Satış Faturası, '2' = Alış Faturası
+      return docType === '1' ? 'Satış Faturası' : 'Alış Faturası'
     }
     return 'Belge'
   }
@@ -385,45 +387,246 @@ const DocumentDetailPage = () => {
     
     if (isITSBarcode) {
       // ITS Karekod İşlemi
-      await handleITSBarcode(scannedBarcode)
+      if (deleteMode) {
+        await handleDeleteITSBarcode(scannedBarcode)
+      } else {
+        await handleITSBarcode(scannedBarcode)
+      }
     } else {
-      // Normal barkod işlemi
-      await handleNormalBarcode(scannedBarcode)
+      // Normal barkod işlemi (DGR/UTS)
+      if (deleteMode) {
+        await handleDeleteDGRBarcode(scannedBarcode)
+      } else {
+        await handleNormalBarcode(scannedBarcode)
+      }
     }
     
     setBarcodeInput('')
     barcodeInputRef.current?.focus()
   }
 
-  // Normal Barkod İşlemi
+  // Normal Barkod İşlemi (DGR Ürünleri)
   const handleNormalBarcode = async (scannedBarcode) => {
+    // Toplu okutma kontrolü: 100*Barkod formatı
+    let quantity = 1
+    let actualBarcode = scannedBarcode
+    
+    if (scannedBarcode.includes('*')) {
+      const parts = scannedBarcode.split('*')
+      if (parts.length === 2 && !isNaN(parts[0])) {
+        quantity = parseInt(parts[0])
+        actualBarcode = parts[1]
+        console.log(`📦 Toplu okutma: ${quantity} adet - Barkod: ${actualBarcode}`)
+      }
+    }
+    
     // Find item by barcode
-    const itemIndex = items.findIndex(item => item.barcode === scannedBarcode || item.stokKodu === scannedBarcode)
+    const itemIndex = items.findIndex(item => item.barcode === actualBarcode || item.stokKodu === actualBarcode)
     
     if (itemIndex === -1) {
-      showMessage(`❌ Bulunamadı: ${scannedBarcode}`, 'error')
+      showMessage(`❌ Bulunamadı: ${actualBarcode}`, 'error')
       playErrorSound()
       return
     }
     
     const item = items[itemIndex]
     
-    // Update okutulan count
-    const updatedItems = [...items]
-    updatedItems[itemIndex].okutulan = (updatedItems[itemIndex].okutulan || 0) + 1
-    updatedItems[itemIndex].isPrepared = updatedItems[itemIndex].okutulan >= updatedItems[itemIndex].quantity
-    setItems(updatedItems)
-    updateStats(updatedItems)
+    // Belge tarihini saat bilgisi olmadan formatla (YYYY-MM-DD) - Local time
+    let belgeTarihiFormatted
+    if (order.orderDate) {
+      const date = new Date(order.orderDate)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    } else {
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    }
     
-    showMessage(`✅ ${item.productName} (${updatedItems[itemIndex].okutulan}/${item.quantity})`, 'success')
-    playSuccessSound()
+    // Toplu okutma için döngü
+    for (let i = 0; i < quantity; i++) {
+      // Backend'e DGR barkod gönder (TBLSERITRA'ya kayıt)
+      const result = await apiService.saveDGRBarcode({
+        barcode: actualBarcode,
+        documentId: order.id,
+        itemId: item.itemId,
+        stokKodu: item.stokKodu,
+        belgeTip: item.stharHtur,     // STHAR_HTUR
+        gckod: item.stharGckod || '', // STHAR_GCKOD
+        belgeNo: order.orderNo,
+        belgeTarihi: belgeTarihiFormatted, // Belge tarihi (saat yok)
+        docType: order.docType,
+        expectedQuantity: item.quantity // Miktar kontrolü için
+      })
+      
+      if (!result.success) {
+        // Hata varsa döngüyü kır
+        if (result.error === 'QUANTITY_EXCEEDED') {
+          console.error('⚠️⚠️⚠️ MİKTAR AŞIMI! Bu üründen daha fazla okutulamaz!')
+          console.error('Ürün:', item.productName)
+          console.error('Miktar:', item.quantity)
+          
+          showMessage(`❌ MİKTAR AŞIMI! ${item.productName} - ${result.message}`, 'error')
+          playErrorSound()
+        } else {
+          showMessage(`❌ ${item.productName} - ${result.message}`, 'error')
+          playErrorSound()
+        }
+        break
+      }
+    }
     
-    // Check if all items are prepared
-    if (updatedItems.every(item => item.okutulan >= item.quantity)) {
-      setTimeout(() => {
-        showMessage('🎉 Tüm ürünler tamamlandı!', 'success')
+    // Tüm döngü başarılıysa, son güncellemeyi göster
+    // Backend'den son durumu al
+    const docResponse = await apiService.getDocumentById(order.id)
+    if (docResponse.success && docResponse.data) {
+      setItems(docResponse.data.items || [])
+      updateStats(docResponse.data.items || [])
+      
+      const updatedItem = docResponse.data.items.find(i => i.itemId === item.itemId)
+      if (updatedItem) {
+        if (quantity > 1) {
+          showMessage(`✅ ${item.productName} - ${quantity} adet eklendi (${updatedItem.okutulan}/${item.quantity})`, 'success')
+        } else {
+          showMessage(`✅ ${item.productName} (${updatedItem.okutulan}/${item.quantity})`, 'success')
+        }
         playSuccessSound()
-      }, 1000)
+        
+        // Check if all items are prepared
+        if (docResponse.data.items.every(item => item.okutulan >= item.quantity)) {
+          setTimeout(() => {
+            showMessage('🎉 Tüm ürünler tamamlandı!', 'success')
+            playSuccessSound()
+          }, 1000)
+        }
+      }
+    }
+  }
+
+  // ITS Barkod Silme İşlemi
+  const handleDeleteITSBarcode = async (itsBarcode) => {
+    try {
+      console.log('🗑️ ITS Barkod siliniyor:', itsBarcode.substring(0, 50) + '...')
+      showMessage('🗑️ Siliniyor...', 'info')
+      
+      // ITS karekoddan barkodu parse et
+      const barkodPart = itsBarcode.substring(3, 16) // 13 digit barkod
+      console.log('📦 Barkod parse edildi:', barkodPart)
+      
+      // Ürünü bul
+      const itemIndex = items.findIndex(item => item.barcode === barkodPart || item.stokKodu === barkodPart)
+      
+      if (itemIndex === -1) {
+        showMessage(`❌ Ürün bulunamadı: ${barkodPart}`, 'error')
+        playErrorSound()
+        return
+      }
+      
+      const item = items[itemIndex]
+      
+      // Sadece ITS ürünleri için karekod silinebilir
+      if (item.turu !== 'ITS') {
+        showMessage(`❌ ${item.productName} - ITS ürünü değil!`, 'error')
+        playErrorSound()
+        return
+      }
+      
+      // Seri numarasını karekoddan çıkar (21 ile başlayan kısım)
+      const seriMatch = itsBarcode.match(/21([^\x1D]+)/)
+      const seriNo = seriMatch ? seriMatch[1] : null
+      
+      if (!seriNo) {
+        showMessage(`❌ Seri numarası okunamadı!`, 'error')
+        playErrorSound()
+        return
+      }
+      
+      // Backend'e silme isteği gönder
+      const result = await apiService.deleteITSBarcodeRecords(
+        order.id,
+        item.itemId,
+        [seriNo]
+      )
+      
+      if (result.success) {
+        console.log('✅ ITS Barkod silindi!')
+        
+        // Grid'i yenile
+        const docResponse = await apiService.getDocumentById(order.id)
+        if (docResponse.success && docResponse.data) {
+          setItems(docResponse.data.items || [])
+          updateStats(docResponse.data.items || [])
+          
+          const updatedItem = docResponse.data.items.find(i => i.itemId === item.itemId)
+          if (updatedItem) {
+            showMessage(`🗑️ ${item.productName} - Silindi (${updatedItem.okutulan}/${item.quantity})`, 'success')
+            playSuccessSound()
+          }
+        }
+      } else {
+        showMessage(`❌ ${item.productName} - ${result.message}`, 'error')
+        playErrorSound()
+      }
+      
+    } catch (error) {
+      console.error('ITS Barkod Silme Hatası:', error)
+      showMessage(`❌ Hata: ${error.message}`, 'error')
+      playErrorSound()
+    }
+  }
+
+  // DGR Barkod Silme İşlemi
+  const handleDeleteDGRBarcode = async (scannedBarcode) => {
+    try {
+      console.log('🗑️ DGR Barkod siliniyor:', scannedBarcode)
+      showMessage('🗑️ Siliniyor...', 'info')
+      
+      // Ürünü bul
+      const itemIndex = items.findIndex(item => item.barcode === scannedBarcode || item.stokKodu === scannedBarcode)
+      
+      if (itemIndex === -1) {
+        showMessage(`❌ Bulunamadı: ${scannedBarcode}`, 'error')
+        playErrorSound()
+        return
+      }
+      
+      const item = items[itemIndex]
+      
+      // Backend'e silme isteği gönder (DGR için seri_no = stok_kodu)
+      const result = await apiService.deleteITSBarcodeRecords(
+        order.id,
+        item.itemId,
+        [item.stokKodu]  // DGR için SERI_NO = STOK_KODU
+      )
+      
+      if (result.success) {
+        console.log('✅ DGR Barkod silindi!')
+        
+        // Grid'i yenile
+        const docResponse = await apiService.getDocumentById(order.id)
+        if (docResponse.success && docResponse.data) {
+          setItems(docResponse.data.items || [])
+          updateStats(docResponse.data.items || [])
+          
+          const updatedItem = docResponse.data.items.find(i => i.itemId === item.itemId)
+          if (updatedItem) {
+            showMessage(`🗑️ ${item.productName} - Silindi (${updatedItem.okutulan}/${item.quantity})`, 'success')
+            playSuccessSound()
+          }
+        }
+      } else {
+        showMessage(`❌ ${item.productName} - ${result.message}`, 'error')
+        playErrorSound()
+      }
+      
+    } catch (error) {
+      console.error('DGR Barkod Silme Hatası:', error)
+      showMessage(`❌ Hata: ${error.message}`, 'error')
+      playErrorSound()
     }
   }
 
@@ -481,7 +684,8 @@ const DocumentDetailPage = () => {
         gckod: item.stharGckod || '', // STHAR_GCKOD
         belgeNo: order.orderNo,
         belgeTarihi: belgeTarihiFormatted, // Belge tarihi (saat yok)
-        docType: order.docType
+        docType: order.docType,
+        expectedQuantity: item.quantity // Miktar kontrolü için
       })
       
       if (result.success) {
@@ -523,6 +727,14 @@ const DocumentDetailPage = () => {
         
         showMessage(`❌ DUPLICATE! ${item.productName} - Seri: ${seriKisa}... - Bu karekod zaten okutulmuş!`, 'error')
         playErrorSound() // Warning yerine error sesi çal
+      } else if (result.error === 'QUANTITY_EXCEEDED') {
+        // Miktar aşımı uyarısı
+        console.error('⚠️⚠️⚠️ MİKTAR AŞIMI! Bu üründen daha fazla okutulamaz!')
+        console.error('Ürün:', item.productName)
+        console.error('Miktar:', item.quantity)
+        
+        showMessage(`❌ MİKTAR AŞIMI! ${item.productName} - ${result.message}`, 'error')
+        playErrorSound()
       } else {
         showMessage(`❌ ${item.productName} - ${result.message}`, 'error')
         playErrorSound()
@@ -765,11 +977,29 @@ const DocumentDetailPage = () => {
               >
                 <ArrowLeft className="w-3.5 h-3.5 text-gray-700" />
               </button>
-              <div className="bg-primary-50 px-3 py-1 rounded-lg border border-primary-200">
-                <p className="text-[9px] text-primary-600 font-medium leading-tight">
+              <div className={`px-3 py-1 rounded-lg border shadow-sm ${
+                order.docType === '6' 
+                  ? 'bg-purple-100 border-purple-300' 
+                  : order.docType === '1' 
+                  ? 'bg-green-100 border-green-300' 
+                  : 'bg-orange-100 border-orange-300'
+              }`}>
+                <p className={`text-[9px] font-medium leading-tight ${
+                  order.docType === '6' 
+                    ? 'text-purple-700' 
+                    : order.docType === '1' 
+                    ? 'text-green-700' 
+                    : 'text-orange-700'
+                }`}>
                   {getDocumentTypeName(order.docType, order.tipi)}
                 </p>
-                <h1 className="text-sm font-bold text-primary-900 leading-tight">{order.orderNo}</h1>
+                <h1 className={`text-sm font-bold leading-tight ${
+                  order.docType === '6' 
+                    ? 'text-purple-900' 
+                    : order.docType === '1' 
+                    ? 'text-green-900' 
+                    : 'text-orange-900'
+                }`}>{order.orderNo}</h1>
               </div>
             </div>
             
@@ -841,6 +1071,19 @@ const DocumentDetailPage = () => {
         <div className="px-6 py-2">
           <form onSubmit={handleBarcodeScan}>
             <div className="flex gap-3 items-center">
+              {/* Silme Modu Checkbox */}
+              <div className="flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer bg-white/20 backdrop-blur-sm px-3 py-2.5 rounded-lg border-2 border-white/30 hover:bg-white/30 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={deleteMode}
+                    onChange={(e) => setDeleteMode(e.target.checked)}
+                    className="w-5 h-5 cursor-pointer accent-red-600"
+                  />
+                  <span className="text-white font-semibold text-sm">Sil</span>
+                </label>
+              </div>
+              
               <div className="flex-1 relative">
                 <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/70" />
                 <input
@@ -848,16 +1091,24 @@ const DocumentDetailPage = () => {
                   type="text"
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
-                  placeholder="Barkod okutun veya girin..."
-                  className="w-full pl-11 pr-4 py-2.5 text-base bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-lg text-white placeholder-white/70 focus:bg-white/30 focus:border-white focus:outline-none transition-all"
+                  placeholder={deleteMode ? "Silmek için barkod okutun..." : "Barkod okutun veya girin (DGR için: 100*Barkod)"}
+                  className={`w-full pl-11 pr-4 py-2.5 text-base backdrop-blur-sm border-2 rounded-lg text-white placeholder-white/70 focus:border-white focus:outline-none transition-all ${
+                    deleteMode 
+                      ? 'bg-red-500/30 border-red-300/50 focus:bg-red-500/40' 
+                      : 'bg-white/20 border-white/30 focus:bg-white/30'
+                  }`}
                   autoComplete="off"
                 />
               </div>
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-white text-primary-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
+                className={`px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg ${
+                  deleteMode
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-white text-primary-600 hover:bg-gray-100'
+                }`}
               >
-                Onayla
+                {deleteMode ? 'Sil' : 'Onayla'}
               </button>
             </div>
           </form>
@@ -873,10 +1124,16 @@ const DocumentDetailPage = () => {
               : message.type === 'info'
               ? 'bg-blue-600'
               : 'bg-yellow-600'
+            : deleteMode 
+            ? 'bg-red-700'
             : 'bg-primary-700'
         }`}>
           <p className="text-white font-medium text-center text-sm h-5 leading-5 overflow-hidden text-ellipsis whitespace-nowrap">
-            {message ? message.text : 'Barkod okutmak için yukarıdaki alana okutun veya girin...'}
+            {message 
+              ? message.text 
+              : deleteMode 
+              ? '🗑️ SİLME MODU AKTİF - Silmek istediğiniz barkodu okutun' 
+              : 'Barkod okutmak için yukarıdaki alana okutun veya girin (DGR için toplu: 100*Barkod)'}
           </p>
         </div>
       </div>
@@ -931,9 +1188,9 @@ const DocumentDetailPage = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6">
+            <div className="p-6 flex flex-col" style={{ height: 'calc(80vh - 100px)' }}>
               {/* ITS Records Grid */}
-              <div className="ag-theme-alpine" style={{ height: '500px' }}>
+              <div className="ag-theme-alpine flex-1 mb-4">
                 {itsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
@@ -958,8 +1215,8 @@ const DocumentDetailPage = () => {
                 )}
               </div>
 
-              {/* Action Bar - Below Grid */}
-              <div className="flex items-center gap-3 mt-4">
+              {/* Action Bar - Fixed at Bottom */}
+              <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                 <button
                   onClick={handleDeleteITSRecords}
                   disabled={selectedRecords.length === 0}
@@ -982,6 +1239,13 @@ const DocumentDetailPage = () => {
 }
 
 export default DocumentDetailPage
+
+
+
+
+
+
+
 
 
 

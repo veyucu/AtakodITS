@@ -160,10 +160,11 @@ router.post('/its-barcode', async (req, res) => {
       gckod,        // STHAR_GCKOD
       belgeNo,
       belgeTarihi,
-      docType       // '6' = Sipariş, '1'/'2' = Fatura
+      docType,      // '6' = Sipariş, '1'/'2' = Fatura
+      expectedQuantity  // Beklenen miktar (kalem miktarı)
     } = req.body
     
-    console.log('📱 ITS Karekod İsteği:', { barcode, documentId, itemId })
+    console.log('📱 ITS Karekod İsteği:', { barcode, documentId, itemId, expectedQuantity })
     
     // 1. Karekodu parse et
     const parseResult = parseITSBarcode(barcode)
@@ -198,7 +199,8 @@ router.post('/its-barcode', async (req, res) => {
       belgeTip,
       subeKodu,
       depoKod: '0',
-      ilcGtin: parsedData.barkod    // Okutulan Barkod
+      ilcGtin: parsedData.barkod,  // Okutulan Barkod
+      expectedQuantity             // Miktar kontrolü için
     })
     
     // Duplicate kontrolü
@@ -224,6 +226,72 @@ router.post('/its-barcode', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'ITS karekod kaydedilemedi',
+      error: error.message
+    })
+  }
+})
+
+// POST /api/documents/dgr-barcode - DGR Barkod Okut ve Kaydet (ITS olmayan normal ürünler)
+router.post('/dgr-barcode', async (req, res) => {
+  try {
+    const {
+      barcode,      // Normal Barkod
+      documentId,   // Belge ID (SUBE_KODU-FTIRSIP-FATIRS_NO)
+      itemId,       // INCKEYNO
+      stokKodu,     // Stok Kodu
+      belgeTip,     // STHAR_HTUR
+      gckod,        // STHAR_GCKOD
+      belgeNo,      // Belge No
+      belgeTarihi,  // Belge Tarihi
+      docType,      // '6' = Sipariş, '1'/'2' = Fatura
+      expectedQuantity  // Beklenen miktar (kalem miktarı)
+    } = req.body
+    
+    console.log('📦 DGR Barkod İsteği:', { barcode, documentId, itemId, stokKodu, expectedQuantity })
+    
+    // Belge ID'sini parse et
+    const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
+    
+    // KAYIT_TIPI belirle (Sipariş = M, Fatura = A)
+    const kayitTipi = docType === '6' ? 'M' : 'A'
+    
+    // TBLSERITRA'ya kaydet veya güncelle
+    const saveResult = await documentService.saveDGRBarcode({
+      kayitTipi,
+      stokKodu,     // SERI_NO = Stok Kodu
+      straInc: itemId,
+      tarih: belgeTarihi,
+      gckod,
+      belgeNo,
+      belgeTip,
+      subeKodu,
+      ilcGtin: barcode,  // Okutulan Barkod
+      expectedQuantity   // Miktar kontrolü için
+    })
+    
+    if (!saveResult.success) {
+      console.log('⚠️ DGR Barkod kaydedilemedi:', saveResult.message)
+      return res.status(400).json(saveResult)
+    }
+    
+    console.log('✅ DGR Barkod başarıyla kaydedildi!')
+    res.json({
+      success: true,
+      message: saveResult.data.isUpdate 
+        ? `Barkod güncellendi (${saveResult.data.miktar} adet)` 
+        : 'Barkod başarıyla kaydedildi',
+      data: {
+        stokKodu: saveResult.data.stokKodu,
+        miktar: saveResult.data.miktar,
+        isUpdate: saveResult.data.isUpdate
+      }
+    })
+    
+  } catch (error) {
+    console.error('❌ DGR Barkod Kaydetme Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'DGR barkod kaydedilemedi',
       error: error.message
     })
   }
