@@ -469,8 +469,7 @@ const documentService = {
       console.error('Belge kalemleri getirme hatası:', error)
       throw error
     }
-  }
-}
+  },
 
   // ITS Karekod Kaydet
   async saveITSBarcode(data) {
