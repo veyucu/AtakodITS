@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AgGridReact } from 'ag-grid-react'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
-import { Package, Search, Filter, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { Package, Search, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import apiService from '../services/apiService'
 
 const DocumentsPage = () => {
@@ -84,7 +84,6 @@ const DocumentsPage = () => {
       field: 'docType',
       width: 140,
       cellRenderer: (params) => <DocTypeRenderer value={params.value} />,
-      filter: 'agSetColumnFilter',
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -94,7 +93,6 @@ const DocumentsPage = () => {
       width: 150,
       pinned: 'left',
       cellClass: 'font-semibold text-blue-600',
-      filter: 'agTextColumnFilter',
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -115,7 +113,6 @@ const DocumentsPage = () => {
           return '';
         }
       },
-      filter: false,
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -123,7 +120,6 @@ const DocumentsPage = () => {
       headerName: 'Cari Kodu',
       field: 'customerCode',
       width: 120,
-      filter: 'agTextColumnFilter',
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -131,7 +127,6 @@ const DocumentsPage = () => {
       headerName: 'Cari İsim',
       field: 'customerName',
       width: 220,
-      filter: 'agTextColumnFilter',
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -139,7 +134,6 @@ const DocumentsPage = () => {
       headerName: 'İlçe',
       field: 'district',
       width: 120,
-      filter: 'agTextColumnFilter',
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -147,7 +141,6 @@ const DocumentsPage = () => {
       headerName: 'Şehir',
       field: 'city',
       width: 110,
-      filter: 'agTextColumnFilter',
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -155,7 +148,6 @@ const DocumentsPage = () => {
       headerName: 'Telefon',
       field: 'phone',
       width: 130,
-      filter: 'agTextColumnFilter',
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
@@ -163,7 +155,6 @@ const DocumentsPage = () => {
       headerName: 'Kalem',
       field: 'totalItems',
       width: 110,
-      filter: 'agNumberColumnFilter',
       cellClass: 'text-center',
       wrapHeaderText: true,
       autoHeaderHeight: true,
@@ -173,7 +164,6 @@ const DocumentsPage = () => {
       headerName: 'Miktar',
       field: 'miktar',
       width: 110,
-      filter: 'agNumberColumnFilter',
       cellClass: 'text-center',
       wrapHeaderText: true,
       autoHeaderHeight: true,
@@ -183,7 +173,6 @@ const DocumentsPage = () => {
       headerName: 'Okutulan',
       field: 'okutulan',
       width: 120,
-      filter: 'agNumberColumnFilter',
       cellClass: 'text-center',
       wrapHeaderText: true,
       autoHeaderHeight: true,
@@ -193,7 +182,6 @@ const DocumentsPage = () => {
       headerName: 'Kalan',
       field: 'kalan',
       width: 110,
-      filter: 'agNumberColumnFilter',
       cellClass: 'text-center',
       wrapHeaderText: true,
       autoHeaderHeight: true,
@@ -205,7 +193,7 @@ const DocumentsPage = () => {
   const defaultColDef = useMemo(() => ({
     sortable: true,
     resizable: true,
-    filter: true
+    filter: false
   }), [])
 
   // Excel Export
@@ -582,14 +570,6 @@ const DocumentsPage = () => {
             </div>
 
             <button
-              onClick={handleFilter}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded shadow-lg hover:shadow-xl hover:bg-blue-700 transition-all"
-            >
-              <Filter className="w-3.5 h-3.5" />
-              Filtrele
-            </button>
-
-            <button
               onClick={handleReset}
               className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-600 text-white rounded shadow-lg hover:shadow-xl hover:bg-gray-700 transition-all"
             >
@@ -725,10 +705,7 @@ const DocumentsPage = () => {
               first: 'İlk',
               previous: 'Önceki',
               loadingOoo: 'Yükleniyor...',
-              noRowsToShow: 'Gösterilecek sipariş yok',
-              filterOoo: 'Filtrele...',
-              applyFilter: 'Filtre Uygula',
-              clearFilter: 'Filtreyi Temizle'
+              noRowsToShow: 'Gösterilecek sipariş yok'
             }}
           />
         </div>
