@@ -932,26 +932,8 @@ const DocumentDetailPage = () => {
 
             {/* Modal Body */}
             <div className="p-6">
-              {/* Toolbar */}
-              <div className="flex justify-between items-center mb-4">
-                <div className="text-sm text-gray-600">
-                  {selectedRecords.length > 0 && (
-                    <span className="font-semibold text-primary-600">
-                      {selectedRecords.length} kayıt seçildi
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={handleDeleteITSRecords}
-                  disabled={selectedRecords.length === 0}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
-                >
-                  Seçilenleri Sil
-                </button>
-              </div>
-
               {/* ITS Records Grid */}
-              <div className="ag-theme-alpine" style={{ height: '400px' }}>
+              <div className="ag-theme-alpine" style={{ height: '500px' }}>
                 {itsLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
@@ -975,6 +957,22 @@ const DocumentDetailPage = () => {
                   />
                 )}
               </div>
+
+              {/* Action Bar - Below Grid */}
+              <div className="flex items-center gap-3 mt-4">
+                <button
+                  onClick={handleDeleteITSRecords}
+                  disabled={selectedRecords.length === 0}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                >
+                  Seçilenleri Sil
+                </button>
+                {selectedRecords.length > 0 && (
+                  <span className="text-sm text-gray-600 font-semibold">
+                    {selectedRecords.length} kayıt seçildi
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -984,6 +982,7 @@ const DocumentDetailPage = () => {
 }
 
 export default DocumentDetailPage
+
 
 
 
