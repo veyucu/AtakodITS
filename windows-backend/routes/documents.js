@@ -1,5 +1,6 @@
 import express from 'express'
 import documentService from '../services/documentService.js'
+import { parseITSBarcode, formatMiad } from '../utils/itsParser.js'
 
 const router = express.Router()
 
@@ -69,6 +70,80 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Belge detayı alınamadı',
+      error: error.message
+    })
+  }
+})
+
+// POST /api/documents/its-barcode - ITS Karekod Okut ve Kaydet
+router.post('/its-barcode', async (req, res) => {
+  try {
+    const { 
+      barcode,      // ITS 2D Karekod
+      documentId,   // Belge ID (SUBE_KODU-FTIRSIP-FATIRS_NO)
+      itemId,       // INCKEYNO
+      stokKodu,
+      belgeTip,     // STHAR_HTUR
+      gckod,        // STHAR_GCKOD
+      belgeNo,
+      belgeTarihi,
+      docType       // '6' = Sipariş, '1'/'2' = Fatura
+    } = req.body
+    
+    console.log('📱 ITS Karekod İsteği:', { barcode, documentId, itemId })
+    
+    // 1. Karekodu parse et
+    const parseResult = parseITSBarcode(barcode)
+    
+    if (!parseResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: 'Karekod parse edilemedi: ' + parseResult.error
+      })
+    }
+    
+    const parsedData = parseResult.data
+    
+    // 2. Belge ID'sini parse et
+    const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
+    
+    // 3. KAYIT_TIPI belirle
+    const kayitTipi = docType === '6' ? 'M' : 'A' // Sipariş = M, Fatura = A
+    
+    // 4. TBLSERITRA'ya kaydet
+    await documentService.saveITSBarcode({
+      kayitTipi,
+      seriNo: parsedData.seriNo,
+      stokKodu,
+      straInc: itemId,
+      tarih: belgeTarihi,
+      acik1: parsedData.miad,      // Miad
+      acik2: parsedData.lot,        // Lot
+      gckod,
+      miktar: 1,
+      belgeNo,
+      belgeTip,
+      subeKodu,
+      depoKod: '0',
+      ilcGtin: parsedData.barkod    // Okutulan Barkod
+    })
+    
+    res.json({
+      success: true,
+      message: 'ITS karekod başarıyla kaydedildi',
+      data: {
+        barkod: parsedData.barkod,
+        seriNo: parsedData.seriNo,
+        miad: formatMiad(parsedData.miad),
+        lot: parsedData.lot
+      }
+    })
+    
+  } catch (error) {
+    console.error('❌ ITS Karekod Kaydetme Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'ITS karekod kaydedilemedi',
       error: error.message
     })
   }

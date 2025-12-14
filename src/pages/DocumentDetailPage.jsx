@@ -300,7 +300,7 @@ const DocumentDetailPage = () => {
   }), [])
 
   // Handle Barcode Scan
-  const handleBarcodeScan = (e) => {
+  const handleBarcodeScan = async (e) => {
     e.preventDefault()
     
     if (!barcodeInput.trim()) {
@@ -310,6 +310,23 @@ const DocumentDetailPage = () => {
 
     const scannedBarcode = barcodeInput.trim()
     
+    // ITS Karekod kontrolü (01 ile başlıyorsa ITS karekodudur)
+    const isITSBarcode = scannedBarcode.startsWith('01') && scannedBarcode.length > 30
+    
+    if (isITSBarcode) {
+      // ITS Karekod İşlemi
+      await handleITSBarcode(scannedBarcode)
+    } else {
+      // Normal barkod işlemi
+      await handleNormalBarcode(scannedBarcode)
+    }
+    
+    setBarcodeInput('')
+    barcodeInputRef.current?.focus()
+  }
+
+  // Normal Barkod İşlemi
+  const handleNormalBarcode = async (scannedBarcode) => {
     // Find item by barcode
     const itemIndex = items.findIndex(item => item.barcode === scannedBarcode)
     
@@ -336,9 +353,77 @@ const DocumentDetailPage = () => {
         }, 500)
       }
     }
-    
-    setBarcodeInput('')
-    barcodeInputRef.current?.focus()
+  }
+
+  // ITS Karekod İşlemi
+  const handleITSBarcode = async (itsBarcode) => {
+    try {
+      showMessage('📱 ITS Karekod işleniyor...', 'info')
+      
+      // ITS karekoddan barkodu parse et (basit parse - ilk 01'den sonraki 14 karakter)
+      const barkodPart = itsBarcode.substring(3, 16) // 13 digit barkod
+      
+      // Ürünü bul
+      const itemIndex = items.findIndex(item => item.barcode === barkodPart || item.stokKodu === barkodPart)
+      
+      if (itemIndex === -1) {
+        showMessage(`ITS Karekodda barkod bulunamadı: ${barkodPart}`, 'error')
+        playErrorSound()
+        return
+      }
+      
+      const item = items[itemIndex]
+      
+      // Sadece ITS ürünleri için karekod okutulabilir
+      if (item.turu !== 'ITS') {
+        showMessage(`Bu ürün ITS değil! Sadece ITS ürünleri için karekod okutabilirsiniz.`, 'error')
+        playErrorSound()
+        return
+      }
+      
+      // Backend'e ITS karekod gönder
+      const result = await apiService.saveITSBarcode({
+        barcode: itsBarcode,
+        documentId: order.id,
+        itemId: item.itemId,
+        stokKodu: item.stokKodu,
+        belgeTip: item.sthar_htur || order.docType,
+        gckod: item.gckod || '',
+        belgeNo: order.orderNo,
+        belgeTarihi: order.orderDate,
+        docType: order.docType
+      })
+      
+      if (result.success) {
+        // Ürünü hazırlandı olarak işaretle
+        const updatedItems = [...items]
+        updatedItems[itemIndex].isPrepared = true
+        updatedItems[itemIndex].okutulan = (updatedItems[itemIndex].okutulan || 0) + 1
+        setItems(updatedItems)
+        updateStats(updatedItems)
+        
+        showMessage(
+          `✓ ITS Karekod Kaydedildi!\nÜrün: ${item.productName}\nSeri: ${result.data.seriNo}\nMiad: ${result.data.miad}`, 
+          'success'
+        )
+        playSuccessSound()
+        
+        // Check if all items are prepared
+        if (updatedItems.every(item => item.isPrepared)) {
+          setTimeout(() => {
+            showMessage('🎉 Sipariş tamamlandı!', 'success')
+          }, 500)
+        }
+      } else {
+        showMessage(`❌ ITS Karekod Hatası: ${result.message}`, 'error')
+        playErrorSound()
+      }
+      
+    } catch (error) {
+      console.error('ITS Karekod Hatası:', error)
+      showMessage(`❌ ITS Karekod işlenemedi: ${error.message}`, 'error')
+      playErrorSound()
+    }
   }
 
   // Show message

@@ -152,6 +152,22 @@ const apiService = {
         message: error.message || 'Ürün bulunamadı' 
       }
     }
+  },
+
+  // ITS Karekod Okut ve Kaydet
+  saveITSBarcode: async (data) => {
+    try {
+      console.log('📱 ITS Karekod gönderiliyor:', data)
+      const response = await apiClient.post('/documents/its-barcode', data)
+      console.log('✅ ITS Karekod yanıtı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Karekod hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'ITS karekod kaydedilemedi'
+      }
+    }
   }
 }
 

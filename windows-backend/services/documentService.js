@@ -472,5 +472,91 @@ const documentService = {
   }
 }
 
+  // ITS Karekod Kaydet
+  async saveITSBarcode(data) {
+    try {
+      const pool = await getConnection()
+      
+      const {
+        kayitTipi,    // 'M' veya 'A'
+        seriNo,
+        stokKodu,
+        straInc,
+        tarih,
+        acik1,        // Miad
+        acik2,        // Lot
+        gckod,
+        miktar = 1,
+        belgeNo,
+        belgeTip,
+        subeKodu,
+        depoKod = '0',
+        ilcGtin       // Okutulan Barkod
+      } = data
+      
+      console.log('💾 ITS Karekod Kaydediliyor:', data)
+      
+      const query = `
+        INSERT INTO TBLSERITRA (
+          KAYIT_TIPI,
+          SERI_NO,
+          STOK_KODU,
+          STRA_INC,
+          TARIH,
+          ACIK1,
+          ACIK2,
+          GCKOD,
+          MIKTAR,
+          BELGENO,
+          BELGETIP,
+          SUBE_KODU,
+          DEPOKOD,
+          ILC_GTIN
+        ) VALUES (
+          @kayitTipi,
+          @seriNo,
+          @stokKodu,
+          @straInc,
+          @tarih,
+          @acik1,
+          @acik2,
+          @gckod,
+          @miktar,
+          @belgeNo,
+          @belgeTip,
+          @subeKodu,
+          @depoKod,
+          @ilcGtin
+        )
+      `
+      
+      const request = pool.request()
+      request.input('kayitTipi', kayitTipi)
+      request.input('seriNo', seriNo)
+      request.input('stokKodu', stokKodu)
+      request.input('straInc', straInc)
+      request.input('tarih', tarih)
+      request.input('acik1', acik1)
+      request.input('acik2', acik2)
+      request.input('gckod', gckod)
+      request.input('miktar', miktar)
+      request.input('belgeNo', belgeNo)
+      request.input('belgeTip', belgeTip)
+      request.input('subeKodu', subeKodu)
+      request.input('depoKod', depoKod)
+      request.input('ilcGtin', ilcGtin)
+      
+      await request.query(query)
+      
+      console.log('✅ ITS Karekod Başarıyla Kaydedildi')
+      return { success: true }
+      
+    } catch (error) {
+      console.error('❌ ITS Karekod Kaydetme Hatası:', error)
+      throw error
+    }
+  }
+}
+
 export default documentService
 
