@@ -75,6 +75,79 @@ router.get('/:id', async (req, res) => {
   }
 })
 
+// GET /api/documents/:documentId/item/:itemId/its-records - ITS Kayıtlarını Getir
+router.get('/:documentId/item/:itemId/its-records', async (req, res) => {
+  try {
+    const { documentId, itemId } = req.params
+    
+    // Document ID parse et
+    const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
+    
+    // Kayıt tipi belirle
+    const kayitTipi = ftirsip === '6' ? 'M' : 'A'
+    
+    const records = await documentService.getITSBarcodeRecords(
+      subeKodu,
+      fatirs_no,
+      itemId,
+      kayitTipi
+    )
+    
+    res.json({
+      success: true,
+      data: records,
+      count: records.length
+    })
+    
+  } catch (error) {
+    console.error('❌ ITS Kayıtları Getirme Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'ITS kayıtları alınamadı',
+      error: error.message
+    })
+  }
+})
+
+// DELETE /api/documents/:documentId/item/:itemId/its-records - ITS Kayıtlarını Sil
+router.delete('/:documentId/item/:itemId/its-records', async (req, res) => {
+  try {
+    const { documentId, itemId } = req.params
+    const { seriNos } = req.body // Array of seri numbers to delete
+    
+    if (!seriNos || !Array.isArray(seriNos) || seriNos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Silinecek seri numaraları belirtilmeli'
+      })
+    }
+    
+    // Document ID parse et
+    const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
+    
+    const result = await documentService.deleteITSBarcodeRecords(
+      seriNos,
+      subeKodu,
+      fatirs_no,
+      itemId
+    )
+    
+    res.json({
+      success: true,
+      message: `${result.deletedCount} kayıt silindi`,
+      deletedCount: result.deletedCount
+    })
+    
+  } catch (error) {
+    console.error('❌ ITS Kayıt Silme Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'ITS kayıtları silinemedi',
+      error: error.message
+    })
+  }
+})
+
 // POST /api/documents/its-barcode - ITS Karekod Okut ve Kaydet
 router.post('/its-barcode', async (req, res) => {
   try {
@@ -111,7 +184,7 @@ router.post('/its-barcode', async (req, res) => {
     const kayitTipi = docType === '6' ? 'M' : 'A' // Sipariş = M, Fatura = A
     
     // 4. TBLSERITRA'ya kaydet
-    await documentService.saveITSBarcode({
+    const saveResult = await documentService.saveITSBarcode({
       kayitTipi,
       seriNo: parsedData.seriNo,
       stokKodu,
@@ -128,6 +201,13 @@ router.post('/its-barcode', async (req, res) => {
       ilcGtin: parsedData.barkod    // Okutulan Barkod
     })
     
+    // Duplicate kontrolü
+    if (!saveResult.success) {
+      console.log('⚠️ ITS Karekod kaydedilemedi:', saveResult.error, saveResult.message)
+      return res.status(400).json(saveResult) // error ve message'ı frontend'e gönder
+    }
+    
+    console.log('✅ ITS Karekod başarıyla kaydedildi!')
     res.json({
       success: true,
       message: 'ITS karekod başarıyla kaydedildi',

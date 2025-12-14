@@ -20,6 +20,11 @@ const DocumentDetailPage = () => {
   const [message, setMessage] = useState(null)
   const [stats, setStats] = useState({ total: 0, prepared: 0, remaining: 0 })
   const [loading, setLoading] = useState(true)
+  const [showITSModal, setShowITSModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [itsRecords, setItsRecords] = useState([])
+  const [selectedRecords, setSelectedRecords] = useState([])
+  const [itsLoading, setItsLoading] = useState(false)
 
   // Belge tipini belirle
   const getDocumentTypeName = (docType, tipi) => {
@@ -231,6 +236,21 @@ const DocumentDetailPage = () => {
           )
         }
         const okutulan = params.value || 0
+        const item = params.data
+        
+        // ITS ürünleri için tıklanabilir badge
+        if (item.turu === 'ITS' && okutulan > 0) {
+          return (
+            <button
+              onClick={() => handleOpenITSModal(item)}
+              className="px-3 py-1 rounded text-sm font-bold bg-green-100 text-green-700 hover:bg-green-200 transition-colors cursor-pointer"
+              title="ITS karekod detaylarını görüntüle"
+            >
+              {okutulan} 🔍
+            </button>
+          )
+        }
+        
         if (okutulan > 0) {
           return (
             <span className="px-3 py-1 rounded text-sm font-bold bg-green-100 text-green-700">
@@ -299,12 +319,62 @@ const DocumentDetailPage = () => {
     filter: false
   }), [])
 
+  // ITS Modal Grid Column Definitions
+  const itsModalColumnDefs = useMemo(() => [
+    {
+      headerName: '',
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      width: 50,
+      pinned: 'left',
+      suppressMenu: true
+    },
+    {
+      headerName: '#',
+      valueGetter: 'node.rowIndex + 1',
+      width: 60,
+      cellClass: 'text-center font-semibold text-gray-600'
+    },
+    {
+      headerName: 'Barkod',
+      field: 'barkod',
+      width: 150,
+      cellClass: 'font-mono'
+    },
+    {
+      headerName: 'Seri No',
+      field: 'seriNo',
+      flex: 1,
+      minWidth: 250,
+      cellClass: 'font-mono font-bold text-primary-600'
+    },
+    {
+      headerName: 'Miad',
+      field: 'miad',
+      width: 120,
+      cellClass: 'text-center font-semibold'
+    },
+    {
+      headerName: 'Lot',
+      field: 'lot',
+      width: 150,
+      cellClass: 'font-mono'
+    }
+  ], [])
+
+  const itsModalDefaultColDef = useMemo(() => ({
+    sortable: true,
+    resizable: true,
+    filter: true
+  }), [])
+
   // Handle Barcode Scan
   const handleBarcodeScan = async (e) => {
     e.preventDefault()
     
     if (!barcodeInput.trim()) {
-      showMessage('Lütfen bir barkod girin!', 'error')
+      showMessage('⚠️ Barkod giriniz', 'warning')
+      playWarningSound()
       return
     }
 
@@ -328,46 +398,50 @@ const DocumentDetailPage = () => {
   // Normal Barkod İşlemi
   const handleNormalBarcode = async (scannedBarcode) => {
     // Find item by barcode
-    const itemIndex = items.findIndex(item => item.barcode === scannedBarcode)
+    const itemIndex = items.findIndex(item => item.barcode === scannedBarcode || item.stokKodu === scannedBarcode)
     
     if (itemIndex === -1) {
-      showMessage(`Barkod bulunamadı: ${scannedBarcode}`, 'error')
+      showMessage(`❌ Bulunamadı: ${scannedBarcode}`, 'error')
       playErrorSound()
-    } else if (items[itemIndex].isPrepared) {
-      showMessage(`Bu ürün zaten hazırlandı: ${items[itemIndex].productName}`, 'warning')
-      playWarningSound()
-    } else {
-      // Mark as prepared
-      const updatedItems = [...items]
-      updatedItems[itemIndex].isPrepared = true
-      setItems(updatedItems)
-      updateStats(updatedItems)
-      
-      showMessage(`✓ Hazırlandı: ${items[itemIndex].productName}`, 'success')
-      playSuccessSound()
-      
-      // Check if all items are prepared
-      if (updatedItems.every(item => item.isPrepared)) {
-        setTimeout(() => {
-          showMessage('🎉 Sipariş tamamlandı!', 'success')
-        }, 500)
-      }
+      return
+    }
+    
+    const item = items[itemIndex]
+    
+    // Update okutulan count
+    const updatedItems = [...items]
+    updatedItems[itemIndex].okutulan = (updatedItems[itemIndex].okutulan || 0) + 1
+    updatedItems[itemIndex].isPrepared = updatedItems[itemIndex].okutulan >= updatedItems[itemIndex].quantity
+    setItems(updatedItems)
+    updateStats(updatedItems)
+    
+    showMessage(`✅ ${item.productName} (${updatedItems[itemIndex].okutulan}/${item.quantity})`, 'success')
+    playSuccessSound()
+    
+    // Check if all items are prepared
+    if (updatedItems.every(item => item.okutulan >= item.quantity)) {
+      setTimeout(() => {
+        showMessage('🎉 Tüm ürünler tamamlandı!', 'success')
+        playSuccessSound()
+      }, 1000)
     }
   }
 
   // ITS Karekod İşlemi
   const handleITSBarcode = async (itsBarcode) => {
     try {
-      showMessage('📱 ITS Karekod işleniyor...', 'info')
+      console.log('🔍 ITS Karekod okutuldu:', itsBarcode.substring(0, 50) + '...')
+      showMessage('📱 İşleniyor...', 'info')
       
       // ITS karekoddan barkodu parse et (basit parse - ilk 01'den sonraki 14 karakter)
       const barkodPart = itsBarcode.substring(3, 16) // 13 digit barkod
+      console.log('📦 Barkod parse edildi:', barkodPart)
       
       // Ürünü bul
       const itemIndex = items.findIndex(item => item.barcode === barkodPart || item.stokKodu === barkodPart)
       
       if (itemIndex === -1) {
-        showMessage(`ITS Karekodda barkod bulunamadı: ${barkodPart}`, 'error')
+        showMessage(`❌ Ürün bulunamadı: ${barkodPart}`, 'error')
         playErrorSound()
         return
       }
@@ -376,7 +450,7 @@ const DocumentDetailPage = () => {
       
       // Sadece ITS ürünleri için karekod okutulabilir
       if (item.turu !== 'ITS') {
-        showMessage(`Bu ürün ITS değil! Sadece ITS ürünleri için karekod okutabilirsiniz.`, 'error')
+        showMessage(`❌ ${item.productName} - ITS ürünü değil!`, 'error')
         playErrorSound()
         return
       }
@@ -411,33 +485,52 @@ const DocumentDetailPage = () => {
       })
       
       if (result.success) {
+        console.log('✅ ITS Karekod başarıyla kaydedildi!')
+        console.log('Ürün:', item.productName)
+        console.log('Seri No:', result.data.seriNo)
+        console.log('Miad:', result.data.miad)
+        console.log('Lot:', result.data.lot)
+        
         // Ürünü hazırlandı olarak işaretle
         const updatedItems = [...items]
-        updatedItems[itemIndex].isPrepared = true
         updatedItems[itemIndex].okutulan = (updatedItems[itemIndex].okutulan || 0) + 1
+        updatedItems[itemIndex].isPrepared = updatedItems[itemIndex].okutulan >= updatedItems[itemIndex].quantity
         setItems(updatedItems)
         updateStats(updatedItems)
         
         showMessage(
-          `✓ ITS Karekod Kaydedildi!\nÜrün: ${item.productName}\nSeri: ${result.data.seriNo}\nMiad: ${result.data.miad}`, 
+          `✅ ${item.productName} - Seri: ${result.data.seriNo} (${updatedItems[itemIndex].okutulan}/${item.quantity})`, 
           'success'
         )
         playSuccessSound()
         
         // Check if all items are prepared
-        if (updatedItems.every(item => item.isPrepared)) {
+        if (updatedItems.every(item => item.okutulan >= item.quantity)) {
           setTimeout(() => {
-            showMessage('🎉 Sipariş tamamlandı!', 'success')
-          }, 500)
+            showMessage('🎉 Tüm ürünler tamamlandı!', 'success')
+            playSuccessSound()
+          }, 1000)
         }
+      } else if (result.error === 'DUPLICATE') {
+        // Duplicate karekod uyarısı - HATA!
+        console.error('⚠️⚠️⚠️ DUPLICATE KAREKOD! Bu seri numarası daha önce okutulmuş!')
+        console.error('Ürün:', item.productName)
+        console.error('Stok Kodu:', item.stokKodu)
+        
+        // Seri numarasını karekoddan çıkar (21 ile başlayan kısım)
+        const seriMatch = itsBarcode.match(/21([^\x1D]+)/)
+        const seriKisa = seriMatch ? seriMatch[1].substring(0, 12) : 'N/A'
+        
+        showMessage(`❌ DUPLICATE! ${item.productName} - Seri: ${seriKisa}... - Bu karekod zaten okutulmuş!`, 'error')
+        playErrorSound() // Warning yerine error sesi çal
       } else {
-        showMessage(`❌ ITS Karekod Hatası: ${result.message}`, 'error')
+        showMessage(`❌ ${item.productName} - ${result.message}`, 'error')
         playErrorSound()
       }
       
     } catch (error) {
       console.error('ITS Karekod Hatası:', error)
-      showMessage(`❌ ITS Karekod işlenemedi: ${error.message}`, 'error')
+      showMessage(`❌ Hata: ${error.message}`, 'error')
       playErrorSound()
     }
   }
@@ -448,18 +541,143 @@ const DocumentDetailPage = () => {
     setTimeout(() => setMessage(null), 3000)
   }
 
-  // Sound effects (simple beep simulation)
+  // ITS Modal Aç
+  const handleOpenITSModal = async (item) => {
+    try {
+      setSelectedItem(item)
+      setShowITSModal(true)
+      setItsLoading(true)
+      
+      // ITS kayıtlarını getir
+      const response = await apiService.getITSBarcodeRecords(order.id, item.itemId)
+      
+      if (response.success) {
+        setItsRecords(response.data || [])
+      } else {
+        showMessage('ITS kayıtları yüklenemedi', 'error')
+      }
+    } catch (error) {
+      console.error('ITS kayıtları yükleme hatası:', error)
+      showMessage('ITS kayıtları yüklenemedi', 'error')
+    } finally {
+      setItsLoading(false)
+    }
+  }
+
+  // ITS Modal Kapat
+  const handleCloseITSModal = () => {
+    setShowITSModal(false)
+    setSelectedItem(null)
+    setItsRecords([])
+    setSelectedRecords([])
+  }
+
+  // ITS Kayıtlarını Sil
+  const handleDeleteITSRecords = async () => {
+    if (selectedRecords.length === 0) {
+      showMessage('Lütfen silinecek kayıtları seçin', 'warning')
+      return
+    }
+
+    if (!confirm(`${selectedRecords.length} kayıt silinecek. Emin misiniz?`)) {
+      return
+    }
+
+    try {
+      const result = await apiService.deleteITSBarcodeRecords(
+        order.id,
+        selectedItem.itemId,
+        selectedRecords
+      )
+
+      if (result.success) {
+        showMessage(`${result.deletedCount} kayıt silindi`, 'success')
+        // Kayıtları yeniden yükle
+        const response = await apiService.getITSBarcodeRecords(order.id, selectedItem.itemId)
+        if (response.success) {
+          setItsRecords(response.data || [])
+          setSelectedRecords([])
+        }
+        
+        // Ana grid'i yenile
+        const docResponse = await apiService.getDocumentById(order.id)
+        if (docResponse.success && docResponse.data) {
+          setItems(docResponse.data.items || [])
+        }
+      } else {
+        showMessage('Kayıtlar silinemedi: ' + result.message, 'error')
+      }
+    } catch (error) {
+      console.error('ITS kayıt silme hatası:', error)
+      showMessage('Kayıtlar silinemedi', 'error')
+    }
+  }
+
+  // Sound effects - Web Audio API ile gerçek ses
   const playSuccessSound = () => {
-    // You can add actual sound here
-    console.log('Success beep!')
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.value = 800 // Başarı için yüksek ton
+      oscillator.type = 'sine'
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15)
+      
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.15)
+    } catch (error) {
+      console.log('Success beep!')
+    }
   }
 
   const playErrorSound = () => {
-    console.log('Error beep!')
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.value = 200 // Hata için düşük ton
+      oscillator.type = 'sawtooth'
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+      
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.3)
+    } catch (error) {
+      console.log('Error beep!')
+    }
   }
 
   const playWarningSound = () => {
-    console.log('Warning beep!')
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      
+      oscillator.frequency.value = 500 // Uyarı için orta ton
+      oscillator.type = 'square'
+      
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
+      
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.2)
+    } catch (error) {
+      console.log('Warning beep!')
+    }
   }
 
   // Tamamlanma yüzdesini miktar bazında hesapla (Hook'lar early return'den ÖNCE olmalı)
@@ -619,39 +837,48 @@ const DocumentDetailPage = () => {
       </div>
 
       {/* Barcode Scanner - Compact */}
-      <div className="px-6 py-2 bg-gradient-to-r from-primary-500 to-primary-600">
-        <form onSubmit={handleBarcodeScan}>
-          <div className="flex gap-3 items-center">
-            <div className="flex-1 relative">
-              <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/70" />
-              <input
-                ref={barcodeInputRef}
-                type="text"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Barkod okutun veya girin..."
-                className="w-full pl-11 pr-4 py-2.5 text-base bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-lg text-white placeholder-white/70 focus:bg-white/30 focus:border-white focus:outline-none transition-all"
-                autoComplete="off"
-              />
-            </div>
-            <button
-              type="submit"
-              className="px-6 py-2.5 bg-white text-primary-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
-            >
-              Onayla
-            </button>
-            {/* Message - Inline */}
-            {message && (
-              <div className={`px-4 py-2.5 rounded-lg font-medium ${
-                message.type === 'success' ? 'bg-green-500 text-white' :
-                message.type === 'error' ? 'bg-red-500 text-white' :
-                'bg-yellow-500 text-white'
-              }`}>
-                {message.text}
+      <div className="bg-gradient-to-r from-primary-500 to-primary-600">
+        <div className="px-6 py-2">
+          <form onSubmit={handleBarcodeScan}>
+            <div className="flex gap-3 items-center">
+              <div className="flex-1 relative">
+                <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/70" />
+                <input
+                  ref={barcodeInputRef}
+                  type="text"
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  placeholder="Barkod okutun veya girin..."
+                  className="w-full pl-11 pr-4 py-2.5 text-base bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-lg text-white placeholder-white/70 focus:bg-white/30 focus:border-white focus:outline-none transition-all"
+                  autoComplete="off"
+                />
               </div>
-            )}
-          </div>
-        </form>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-white text-primary-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
+              >
+                Onayla
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        {/* Message Strip - Fixed Below Barcode Scanner - Fixed Height */}
+        <div className={`px-6 py-2.5 transition-all ${
+          message 
+            ? message.type === 'success' 
+              ? 'bg-green-600' 
+              : message.type === 'error' 
+              ? 'bg-red-600' 
+              : message.type === 'info'
+              ? 'bg-blue-600'
+              : 'bg-yellow-600'
+            : 'bg-primary-700'
+        }`}>
+          <p className="text-white font-medium text-center text-sm h-5 leading-5 overflow-hidden text-ellipsis whitespace-nowrap">
+            {message ? message.text : 'Barkod okutmak için yukarıdaki alana okutun veya girin...'}
+          </p>
+        </div>
       </div>
 
       {/* AG Grid */}
@@ -676,6 +903,82 @@ const DocumentDetailPage = () => {
           />
         </div>
       </div>
+
+      {/* ITS Karekod Detay Modal */}
+      {showITSModal && selectedItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleCloseITSModal}>
+          <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-5xl max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">ITS Karekod Detayları</h2>
+                  <p className="text-sm text-primary-100">{selectedItem.productName}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-xs text-primary-100">Toplam Okutulan</p>
+                    <p className="text-2xl font-bold">{itsRecords.length}</p>
+                  </div>
+                  <button
+                    onClick={handleCloseITSModal}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    <XCircle className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              {/* Toolbar */}
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-sm text-gray-600">
+                  {selectedRecords.length > 0 && (
+                    <span className="font-semibold text-primary-600">
+                      {selectedRecords.length} kayıt seçildi
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={handleDeleteITSRecords}
+                  disabled={selectedRecords.length === 0}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                >
+                  Seçilenleri Sil
+                </button>
+              </div>
+
+              {/* ITS Records Grid */}
+              <div className="ag-theme-alpine" style={{ height: '400px' }}>
+                {itsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="animate-spin w-8 h-8 border-3 border-gray-200 border-t-primary-600 rounded-full mx-auto mb-2" />
+                      <p className="text-gray-600 text-sm">Yükleniyor...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <AgGridReact
+                    rowData={itsRecords}
+                    columnDefs={itsModalColumnDefs}
+                    defaultColDef={itsModalDefaultColDef}
+                    rowSelection="multiple"
+                    suppressRowClickSelection={true}
+                    onSelectionChanged={(event) => {
+                      const selected = event.api.getSelectedRows()
+                      setSelectedRecords(selected.map(r => r.seriNo))
+                    }}
+                    animateRows={true}
+                    enableCellTextSelection={true}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

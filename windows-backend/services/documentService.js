@@ -475,6 +475,95 @@ const documentService = {
     }
   },
 
+  // TBLSERITRA Kayıtlarını Getir (Belirli bir kalem için)
+  async getITSBarcodeRecords(subeKodu, belgeNo, straInc, kayitTipi) {
+    try {
+      const pool = await getConnection()
+      
+      const query = `
+        SELECT
+          SERI_NO,
+          STOK_KODU,
+          STRA_INC,
+          TARIH,
+          ACIK1 AS MIAD,
+          ACIK2 AS LOT,
+          GCKOD,
+          MIKTAR,
+          BELGENO,
+          BELGETIP,
+          SUBE_KODU,
+          ILC_GTIN AS BARKOD,
+          KAYIT_TIPI
+        FROM TBLSERITRA WITH (NOLOCK)
+        WHERE SUBE_KODU = @subeKodu
+          AND BELGENO = @belgeNo
+          AND STRA_INC = @straInc
+          AND KAYIT_TIPI = @kayitTipi
+        ORDER BY SERI_NO
+      `
+      
+      const request = pool.request()
+      request.input('subeKodu', subeKodu)
+      request.input('belgeNo', belgeNo)
+      request.input('straInc', straInc)
+      request.input('kayitTipi', kayitTipi)
+      
+      const result = await request.query(query)
+      
+      const records = result.recordset.map(row => ({
+        seriNo: row.SERI_NO,
+        stokKodu: row.STOK_KODU,
+        barkod: row.BARKOD,
+        miad: row.MIAD,
+        lot: row.LOT,
+        miktar: row.MIKTAR,
+        tarih: row.TARIH,
+        gckod: row.GCKOD,
+        belgeTip: row.BELGETIP
+      }))
+      
+      return records
+    } catch (error) {
+      console.error('❌ ITS Kayıtları Getirme Hatası:', error)
+      throw error
+    }
+  },
+
+  // TBLSERITRA Kayıtlarını Sil
+  async deleteITSBarcodeRecords(seriNos, subeKodu, belgeNo, straInc) {
+    try {
+      const pool = await getConnection()
+      
+      // Seri numaralarını tek tek sil
+      for (const seriNo of seriNos) {
+        const query = `
+          DELETE FROM TBLSERITRA
+          WHERE SUBE_KODU = @subeKodu
+            AND BELGENO = @belgeNo
+            AND STRA_INC = @straInc
+            AND SERI_NO = @seriNo
+        `
+        
+        const request = pool.request()
+        request.input('subeKodu', subeKodu)
+        request.input('belgeNo', belgeNo)
+        request.input('straInc', straInc)
+        request.input('seriNo', seriNo)
+        
+        await request.query(query)
+        console.log('🗑️ ITS Kayıt Silindi:', seriNo)
+      }
+      
+      console.log('✅ ITS Kayıtlar Başarıyla Silindi:', seriNos.length)
+      return { success: true, deletedCount: seriNos.length }
+      
+    } catch (error) {
+      console.error('❌ ITS Kayıt Silme Hatası:', error)
+      throw error
+    }
+  },
+
   // ITS Karekod Kaydet
   async saveITSBarcode(data) {
     try {
@@ -498,6 +587,37 @@ const documentService = {
       } = data
       
       console.log('💾 ITS Karekod Kaydediliyor:', data)
+      
+      // Aynı seri numarasının daha önce okutulup okutulmadığını kontrol et
+      const checkQuery = `
+        SELECT COUNT(*) AS KAYIT_SAYISI
+        FROM TBLSERITRA WITH (NOLOCK)
+        WHERE SERI_NO = @seriNo
+          AND SUBE_KODU = @subeKodu
+          AND BELGENO = @belgeNo
+      `
+      
+      const checkRequest = pool.request()
+      checkRequest.input('seriNo', seriNo)
+      checkRequest.input('subeKodu', subeKodu)
+      checkRequest.input('belgeNo', belgeNo)
+      
+      const checkResult = await checkRequest.query(checkQuery)
+      
+      if (checkResult.recordset[0].KAYIT_SAYISI > 0) {
+        console.log('⚠️⚠️⚠️ DUPLICATE KAREKOD TESPIT EDİLDİ! ⚠️⚠️⚠️')
+        console.log('Seri No:', seriNo)
+        console.log('Belge No:', belgeNo)
+        console.log('Şube Kodu:', subeKodu)
+        console.log('Bu karekod daha önce', checkResult.recordset[0].KAYIT_SAYISI, 'kere okutulmuş!')
+        return { 
+          success: false, 
+          error: 'DUPLICATE',
+          message: '⚠️ Bu karekod daha önce okutulmuş! Aynı seri numarası tekrar okutulamaz.'
+        }
+      }
+      
+      console.log('✓ Seri numarası kontrolü geçti, kayıt yapılacak:', seriNo)
       
       const query = `
         INSERT INTO TBLSERITRA (
@@ -558,8 +678,21 @@ const documentService = {
       
       await request.query(query)
       
-      console.log('✅ ITS Karekod Başarıyla Kaydedildi')
-      return { success: true }
+      console.log('✅✅✅ ITS KAREKOD BAŞARIYLA KAYDEDİLDİ! ✅✅✅')
+      console.log('Seri No:', seriNo)
+      console.log('Stok Kodu:', stokKodu)
+      console.log('Miad:', acik1)
+      console.log('Lot:', acik2)
+      console.log('Belge No:', belgeNo)
+      
+      return { 
+        success: true,
+        data: {
+          seriNo,
+          miad: acik1,
+          lot: acik2
+        }
+      }
       
     } catch (error) {
       console.error('❌ ITS Karekod Kaydetme Hatası:', error)

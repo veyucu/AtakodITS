@@ -168,6 +168,37 @@ const apiService = {
         message: error.response?.data?.message || error.message || 'ITS karekod kaydedilemedi'
       }
     }
+  },
+
+  // ITS Kayıtlarını Getir
+  getITSBarcodeRecords: async (documentId, itemId) => {
+    try {
+      const response = await apiClient.get(`/documents/${documentId}/item/${itemId}/its-records`)
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Kayıtları hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'ITS kayıtları alınamadı',
+        data: []
+      }
+    }
+  },
+
+  // ITS Kayıtlarını Sil
+  deleteITSBarcodeRecords: async (documentId, itemId, seriNos) => {
+    try {
+      const response = await apiClient.delete(`/documents/${documentId}/item/${itemId}/its-records`, {
+        data: { seriNos }
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Kayıt Silme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'ITS kayıtları silinemedi'
+      }
+    }
   }
 }
 
