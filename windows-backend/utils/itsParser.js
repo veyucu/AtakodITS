@@ -112,7 +112,7 @@ function formatMiad(miad) {
   }
 }
 
-module.exports = {
+export {
   parseITSBarcode,
   formatMiad
 }
