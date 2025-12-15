@@ -1072,14 +1072,23 @@ const DocumentDetailPage = () => {
       // Boş satırları filtrele
       const validRows = allRows.filter(row => row.seriNo || row.lot)
 
-      if (validRows.length === 0) {
+      // Eğer grid boşsa ama originalRecords varsa, silme işlemi yapılacak
+      if (validRows.length === 0 && originalUtsRecords.length === 0) {
         showUTSMessage('❌ Kaydedilecek satır yok!', 'error')
         playErrorSound()
         return
       }
 
-      // Validasyonlar
-      for (let i = 0; i < validRows.length; i++) {
+      // Eğer sadece silme işlemi yapılacaksa (grid boş, orijinalde kayıt var)
+      if (validRows.length === 0 && originalUtsRecords.length > 0) {
+        if (!confirm(`Tüm kayıtlar silinecek (${originalUtsRecords.length} kayıt). Emin misiniz?`)) {
+          return
+        }
+      }
+
+      // Validasyonlar (sadece kayıt varsa)
+      if (validRows.length > 0) {
+        for (let i = 0; i < validRows.length; i++) {
         const row = validRows[i]
         const rowNum = i + 1
 
@@ -1126,39 +1135,40 @@ const DocumentDetailPage = () => {
         }
       }
 
-      // Seri No teklik kontrolü
-      const serialNumbers = validRows.filter(r => r.seriNo).map(r => r.seriNo.trim().toLowerCase())
-      const serialCounts = {}
-      serialNumbers.forEach(sn => {
-        serialCounts[sn] = (serialCounts[sn] || 0) + 1
-      })
-      const duplicateSerials = Object.keys(serialCounts).filter(sn => serialCounts[sn] > 1)
-      if (duplicateSerials.length > 0) {
-        showUTSMessage(`❌ Aynı Seri No birden fazla satırda kullanılamaz: ${duplicateSerials.join(', ')}`, 'error')
-        playErrorSound()
-        return
-      }
+        // Seri No teklik kontrolü
+        const serialNumbers = validRows.filter(r => r.seriNo).map(r => r.seriNo.trim().toLowerCase())
+        const serialCounts = {}
+        serialNumbers.forEach(sn => {
+          serialCounts[sn] = (serialCounts[sn] || 0) + 1
+        })
+        const duplicateSerials = Object.keys(serialCounts).filter(sn => serialCounts[sn] > 1)
+        if (duplicateSerials.length > 0) {
+          showUTSMessage(`❌ Aynı Seri No birden fazla satırda kullanılamaz: ${duplicateSerials.join(', ')}`, 'error')
+          playErrorSound()
+          return
+        }
 
-      // Lot No teklik kontrolü
-      const lotNumbers = validRows.filter(r => r.lot).map(r => r.lot.trim().toLowerCase())
-      const lotCounts = {}
-      lotNumbers.forEach(lot => {
-        lotCounts[lot] = (lotCounts[lot] || 0) + 1
-      })
-      const duplicateLots = Object.keys(lotCounts).filter(lot => lotCounts[lot] > 1)
-      if (duplicateLots.length > 0) {
-        showUTSMessage(`❌ Aynı Lot numarası birden fazla satırda kullanılamaz: ${duplicateLots.join(', ')}`, 'error')
-        playErrorSound()
-        return
-      }
+        // Lot No teklik kontrolü
+        const lotNumbers = validRows.filter(r => r.lot).map(r => r.lot.trim().toLowerCase())
+        const lotCounts = {}
+        lotNumbers.forEach(lot => {
+          lotCounts[lot] = (lotCounts[lot] || 0) + 1
+        })
+        const duplicateLots = Object.keys(lotCounts).filter(lot => lotCounts[lot] > 1)
+        if (duplicateLots.length > 0) {
+          showUTSMessage(`❌ Aynı Lot numarası birden fazla satırda kullanılamaz: ${duplicateLots.join(', ')}`, 'error')
+          playErrorSound()
+          return
+        }
 
-      // Toplam miktar kontrolü
-      const totalMiktar = validRows.reduce((sum, row) => sum + (row.miktar || 0), 0)
-      if (totalMiktar > selectedUTSItem.quantity) {
-        showUTSMessage(`❌ Toplam miktar (${totalMiktar}) belge kalemindeki miktarı (${selectedUTSItem.quantity}) geçemez!`, 'error')
-        playErrorSound()
-        return
-      }
+        // Toplam miktar kontrolü
+        const totalMiktar = validRows.reduce((sum, row) => sum + (row.miktar || 0), 0)
+        if (totalMiktar > selectedUTSItem.quantity) {
+          showUTSMessage(`❌ Toplam miktar (${totalMiktar}) belge kalemindeki miktarı (${selectedUTSItem.quantity}) geçemez!`, 'error')
+          playErrorSound()
+          return
+        }
+      } // Validasyonlar sonu
 
       // Belge tarihini formatla
       let belgeTarihiFormatted
@@ -1176,58 +1186,30 @@ const DocumentDetailPage = () => {
         belgeTarihiFormatted = `${year}-${month}-${day}`
       }
 
-      // Her satırı backend'e kaydet
-      let savedCount = 0
-      for (const row of validRows) {
-        // Üretim tarihini backend'e YYYY-MM-DD formatında gönder
-        let uretimTarihiForBackend = row.uretimTarihiDisplay || ''
-        
-        // Eğer YYMMDD formatındaysa (eski kayıtlar için), YYYY-MM-DD'ye çevir
-        if (row.uretimTarihi && row.uretimTarihi.length === 6 && !row.uretimTarihiDisplay) {
-          const yy = row.uretimTarihi.substring(0, 2)
-          const mm = row.uretimTarihi.substring(2, 4)
-          const dd = row.uretimTarihi.substring(4, 6)
-          const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
-          uretimTarihiForBackend = `${yyyy}-${mm}-${dd}`
-        }
+      // Bulk save API'yi çağır (toplu kaydet/güncelle/sil)
+      const result = await apiService.saveUTSRecords({
+        records: validRows,
+        originalRecords: originalUtsRecords,
+        documentId: order.id,
+        itemId: selectedUTSItem.itemId,
+        stokKodu: selectedUTSItem.stokKodu,
+        belgeTip: selectedUTSItem.stharHtur,
+        gckod: selectedUTSItem.stharGckod || '',
+        belgeNo: order.orderNo,
+        belgeTarihi: belgeTarihiFormatted,
+        docType: order.docType,
+        expectedQuantity: selectedUTSItem.quantity,
+        barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu
+      })
 
-        const result = await apiService.saveUTSBarcode({
-          barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
-          documentId: order.id,
-          itemId: selectedUTSItem.itemId,
-          stokKodu: selectedUTSItem.stokKodu,
-          belgeTip: selectedUTSItem.stharHtur,
-          gckod: selectedUTSItem.stharGckod || '',
-          belgeNo: order.orderNo,
-          belgeTarihi: belgeTarihiFormatted,
-          docType: order.docType,
-          expectedQuantity: selectedUTSItem.quantity,
-          seriNo: row.seriNo || '',
-          lotNo: row.lot || '',
-          uretimTarihi: uretimTarihiForBackend, // YYYY-MM-DD formatında
-          miktar: row.miktar
-        })
-
-        if (result.success) {
-          savedCount++
-        } else if (result.error === 'QUANTITY_EXCEEDED') {
-          showUTSMessage(`❌ MİKTAR AŞIMI! ${result.message}`, 'error')
-          playErrorSound()
-          return
-        } else if (result.error === 'DUPLICATE') {
-          showUTSMessage(`❌ DUPLICATE! ${result.message}`, 'error')
-          playErrorSound()
-          return
-        } else {
-          showUTSMessage(`❌ Kayıt hatası: ${result.message}`, 'error')
-          playErrorSound()
-          return
-        }
+      if (result.success) {
+        showUTSMessage(`✅ ${result.message}`, 'success')
+        playSuccessSound()
+      } else {
+        showUTSMessage(`❌ ${result.message}`, 'error')
+        playErrorSound()
+        return
       }
-
-      // Başarılı
-      showUTSMessage(`✅ ${savedCount} kayıt başarıyla kaydedildi!`, 'success')
-      playSuccessSound()
 
       // Grid'i yenile
       const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
@@ -1248,6 +1230,7 @@ const DocumentDetailPage = () => {
           }
         })
         setUtsRecords(enrichedRecords)
+        setOriginalUtsRecords(JSON.parse(JSON.stringify(enrichedRecords))) // Yeni orijinal
       }
 
       // Ana grid'i güncelle
