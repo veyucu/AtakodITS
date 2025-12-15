@@ -375,7 +375,19 @@ const DocumentDetailPage = () => {
       flex: 1,
       minWidth: 150,
       cellClass: 'font-mono font-bold text-red-600',
-      editable: true
+      editable: true,
+      valueSetter: (params) => {
+        const newValue = params.newValue ? params.newValue.trim() : ''
+        params.data.seriNo = newValue
+        
+        // Seri No girildiğinde miktar otomatik 1 olmalı
+        if (newValue) {
+          params.data.miktar = 1
+        }
+        
+        // Grid'i güncelle
+        return true
+      }
     },
     {
       headerName: 'Lot No',
@@ -445,17 +457,40 @@ const DocumentDetailPage = () => {
       headerName: 'Miktar',
       field: 'miktar',
       width: 120,
-      cellClass: 'text-center font-bold',
-      editable: true,
+      cellClass: (params) => {
+        // Seri No varsa disabled görünümü
+        if (params.data && params.data.seriNo) {
+          return 'text-center font-bold bg-gray-100 text-gray-500'
+        }
+        return 'text-center font-bold'
+      },
+      editable: (params) => {
+        // Sadece Seri No yoksa miktar düzenlenebilir
+        return !params.data.seriNo
+      },
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
         min: 1,
         max: 9999,
         precision: 0
       },
-      valueParser: (params) => {
-        const val = Number(params.newValue)
-        return val > 0 ? val : 1
+      valueGetter: (params) => {
+        // Seri No varsa miktar her zaman 1
+        if (params.data && params.data.seriNo) {
+          return 1
+        }
+        return params.data ? params.data.miktar : 1
+      },
+      valueSetter: (params) => {
+        // Seri No yoksa miktarı güncelle
+        if (!params.data.seriNo) {
+          const val = Number(params.newValue)
+          params.data.miktar = val > 0 ? val : 1
+        } else {
+          // Seri No varsa her zaman 1
+          params.data.miktar = 1
+        }
+        return true
       }
     }
   ], [])
