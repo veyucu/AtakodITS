@@ -582,11 +582,13 @@ const documentService = {
       const result = await request.query(query)
       
       const records = result.recordset.map(row => ({
-        seriNo: row.SERI_NO,
+        // Eğer hem SERI_NO hem LOT doluysa: seriNo = SERI_NO, lot = LOT
+        // Eğer sadece SERI_NO dolu, LOT boş ise: seriNo = '', lot = SERI_NO
+        seriNo: row.LOT ? row.SERI_NO : '', // LOT varsa SERI_NO göster, yoksa boş
+        lot: row.LOT || row.SERI_NO, // LOT varsa LOT, yoksa SERI_NO
         stokKodu: row.STOK_KODU,
         barkod: row.BARKOD,
         uretimTarihi: row.URETIM_TARIHI, // YYMMDD formatında
-        lot: row.LOT || row.SERI_NO, // Lot no yoksa seri no
         miktar: row.MIKTAR,
         tarih: row.TARIH,
         gckod: row.GCKOD,
@@ -1061,14 +1063,24 @@ const documentService = {
       
       console.log('💾 UTS Barkod Kaydediliyor:', data)
       
-      // Üretim tarihini YYAAYY formatına çevir (YYMMDD)
+      // Üretim tarihini YYMMDD formatına çevir (YYAAGG - Yıl Ay Gün)
       let formattedUretimTarihi = ''
       if (uretimTarihi) {
-        const date = new Date(uretimTarihi)
-        const yy = String(date.getFullYear()).slice(-2)
-        const mm = String(date.getMonth() + 1).padStart(2, '0')
-        const dd = String(date.getDate()).padStart(2, '0')
-        formattedUretimTarihi = `${yy}${mm}${dd}` // YYMMDD
+        // YYYY-MM-DD string'inden direkt parse et (timezone problemi olmasın)
+        if (uretimTarihi.includes('-')) {
+          const [yyyy, mm, dd] = uretimTarihi.split('-')
+          const yy = yyyy.substring(2, 4) // Son 2 hane
+          formattedUretimTarihi = `${yy}${mm}${dd}` // YYMMDD (YYAAGG)
+          console.log(`📅 Tarih dönüşümü: ${uretimTarihi} -> ${formattedUretimTarihi}`)
+        } else {
+          // Fallback: Date parse et
+          const date = new Date(uretimTarihi)
+          const yy = String(date.getFullYear()).slice(-2)
+          const mm = String(date.getMonth() + 1).padStart(2, '0')
+          const dd = String(date.getDate()).padStart(2, '0')
+          formattedUretimTarihi = `${yy}${mm}${dd}` // YYMMDD
+          console.log(`📅 Tarih dönüşümü (fallback): ${uretimTarihi} -> ${formattedUretimTarihi}`)
+        }
       }
       
       // Belge Tarih formatı - saat bilgisi olmadan (YYYY-MM-DD)

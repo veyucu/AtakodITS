@@ -1204,11 +1204,16 @@ const DocumentDetailPage = () => {
       // Her satırı backend'e kaydet
       let savedCount = 0
       for (const row of validRows) {
-        // Tarih formatı dönüşümü
-        let uretimTarihiYYMMDD = row.uretimTarihi
-        if (row.uretimTarihiDisplay && row.uretimTarihiDisplay.includes('-')) {
-          const [yyyy, mm, dd] = row.uretimTarihiDisplay.split('-')
-          uretimTarihiYYMMDD = `${yyyy.substring(2, 4)}${mm}${dd}`
+        // Üretim tarihini backend'e YYYY-MM-DD formatında gönder
+        let uretimTarihiForBackend = row.uretimTarihiDisplay || ''
+        
+        // Eğer YYMMDD formatındaysa (eski kayıtlar için), YYYY-MM-DD'ye çevir
+        if (row.uretimTarihi && row.uretimTarihi.length === 6 && !row.uretimTarihiDisplay) {
+          const yy = row.uretimTarihi.substring(0, 2)
+          const mm = row.uretimTarihi.substring(2, 4)
+          const dd = row.uretimTarihi.substring(4, 6)
+          const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+          uretimTarihiForBackend = `${yyyy}-${mm}-${dd}`
         }
 
         const result = await apiService.saveUTSBarcode({
@@ -1224,7 +1229,7 @@ const DocumentDetailPage = () => {
           expectedQuantity: selectedUTSItem.quantity,
           seriNo: row.seriNo || '',
           lotNo: row.lot || '',
-          uretimTarihi: uretimTarihiYYMMDD,
+          uretimTarihi: uretimTarihiForBackend, // YYYY-MM-DD formatında
           miktar: row.miktar
         })
 
