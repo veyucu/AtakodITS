@@ -231,6 +231,37 @@ const apiService = {
         message: error.response?.data?.message || error.message || 'UTS barkod kaydedilemedi'
       }
     }
+  },
+
+  // UTS Kayıtlarını Getir
+  getUTSBarcodeRecords: async (documentId, itemId) => {
+    try {
+      const response = await apiClient.get(`/documents/${documentId}/item/${itemId}/uts-records`)
+      return response.data
+    } catch (error) {
+      console.error('❌ UTS Kayıtları hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'UTS kayıtları alınamadı',
+        data: []
+      }
+    }
+  },
+
+  // UTS Kayıtlarını Sil
+  deleteUTSBarcodeRecords: async (documentId, itemId, seriNos) => {
+    try {
+      const response = await apiClient.delete(`/documents/${documentId}/item/${itemId}/uts-records`, {
+        data: { seriNos }
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ UTS Kayıt Silme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'UTS kayıtları silinemedi'
+      }
+    }
   }
 }
 

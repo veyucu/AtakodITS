@@ -109,6 +109,40 @@ router.get('/:documentId/item/:itemId/its-records', async (req, res) => {
   }
 })
 
+// GET /api/documents/:documentId/item/:itemId/uts-records - UTS Kayıtlarını Getir
+router.get('/:documentId/item/:itemId/uts-records', async (req, res) => {
+  try {
+    const { documentId, itemId } = req.params
+    
+    // Document ID parse et
+    const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
+    
+    // Kayıt tipi belirle
+    const kayitTipi = ftirsip === '6' ? 'M' : 'A'
+    
+    const records = await documentService.getUTSBarcodeRecords(
+      subeKodu,
+      fatirs_no,
+      itemId,
+      kayitTipi
+    )
+    
+    res.json({
+      success: true,
+      data: records,
+      count: records.length
+    })
+    
+  } catch (error) {
+    console.error('❌ UTS Kayıtları Getirme Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'UTS kayıtları alınamadı',
+      error: error.message
+    })
+  }
+})
+
 // DELETE /api/documents/:documentId/item/:itemId/its-records - ITS Kayıtlarını Sil
 router.delete('/:documentId/item/:itemId/its-records', async (req, res) => {
   try {
@@ -143,6 +177,45 @@ router.delete('/:documentId/item/:itemId/its-records', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'ITS kayıtları silinemedi',
+      error: error.message
+    })
+  }
+})
+
+// DELETE /api/documents/:documentId/item/:itemId/uts-records - UTS Kayıtlarını Sil
+router.delete('/:documentId/item/:itemId/uts-records', async (req, res) => {
+  try {
+    const { documentId, itemId } = req.params
+    const { seriNos } = req.body // Array of seri numbers to delete
+    
+    if (!seriNos || !Array.isArray(seriNos) || seriNos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Silinecek seri numaraları belirtilmeli'
+      })
+    }
+    
+    // Document ID parse et
+    const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
+    
+    const result = await documentService.deleteUTSBarcodeRecords(
+      seriNos,
+      subeKodu,
+      fatirs_no,
+      itemId
+    )
+    
+    res.json({
+      success: true,
+      message: `${result.deletedCount} kayıt silindi`,
+      deletedCount: result.deletedCount
+    })
+    
+  } catch (error) {
+    console.error('❌ UTS Kayıt Silme Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'UTS kayıtları silinemedi',
       error: error.message
     })
   }

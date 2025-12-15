@@ -490,7 +490,7 @@ const documentService = {
     }
   },
 
-  // TBLSERITRA Kayıtlarını Getir (Belirli bir kalem için)
+  // TBLSERITRA Kayıtlarını Getir (Belirli bir kalem için) - ITS
   async getITSBarcodeRecords(subeKodu, belgeNo, straInc, kayitTipi) {
     try {
       const pool = await getConnection()
@@ -545,7 +545,62 @@ const documentService = {
     }
   },
 
-  // TBLSERITRA Kayıtlarını Sil
+  // TBLSERITRA Kayıtlarını Getir (Belirli bir kalem için) - UTS
+  async getUTSBarcodeRecords(subeKodu, belgeNo, straInc, kayitTipi) {
+    try {
+      const pool = await getConnection()
+      
+      const query = `
+        SELECT
+          SERI_NO,
+          STOK_KODU,
+          STRA_INC,
+          TARIH,
+          ACIK1 AS URETIM_TARIHI,
+          ACIK2 AS LOT,
+          GCKOD,
+          MIKTAR,
+          BELGENO,
+          BELGETIP,
+          SUBE_KODU,
+          ILC_GTIN AS BARKOD,
+          KAYIT_TIPI
+        FROM TBLSERITRA WITH (NOLOCK)
+        WHERE SUBE_KODU = @subeKodu
+          AND BELGENO = @belgeNo
+          AND STRA_INC = @straInc
+          AND KAYIT_TIPI = @kayitTipi
+        ORDER BY SERI_NO
+      `
+      
+      const request = pool.request()
+      request.input('subeKodu', subeKodu)
+      request.input('belgeNo', belgeNo)
+      request.input('straInc', straInc)
+      request.input('kayitTipi', kayitTipi)
+      
+      const result = await request.query(query)
+      
+      const records = result.recordset.map(row => ({
+        seriNo: row.SERI_NO,
+        stokKodu: row.STOK_KODU,
+        barkod: row.BARKOD,
+        uretimTarihi: row.URETIM_TARIHI, // YYMMDD formatında
+        lot: row.LOT || row.SERI_NO, // Lot no yoksa seri no
+        miktar: row.MIKTAR,
+        tarih: row.TARIH,
+        gckod: row.GCKOD,
+        belgeTip: row.BELGETIP
+      }))
+      
+      return records
+    } catch (error) {
+      console.error('❌ UTS Kayıtları Getirme Hatası:', error)
+      throw error
+    }
+  },
+
+  // TBLSERITRA Kayıtlarını Sil - ITS
   async deleteITSBarcodeRecords(seriNos, subeKodu, belgeNo, straInc) {
     try {
       const pool = await getConnection()
@@ -575,6 +630,40 @@ const documentService = {
       
     } catch (error) {
       console.error('❌ ITS Kayıt Silme Hatası:', error)
+      throw error
+    }
+  },
+
+  // TBLSERITRA Kayıtlarını Sil - UTS
+  async deleteUTSBarcodeRecords(seriNos, subeKodu, belgeNo, straInc) {
+    try {
+      const pool = await getConnection()
+      
+      // Seri numaralarını tek tek sil
+      for (const seriNo of seriNos) {
+        const query = `
+          DELETE FROM TBLSERITRA
+          WHERE SUBE_KODU = @subeKodu
+            AND BELGENO = @belgeNo
+            AND STRA_INC = @straInc
+            AND SERI_NO = @seriNo
+        `
+        
+        const request = pool.request()
+        request.input('subeKodu', subeKodu)
+        request.input('belgeNo', belgeNo)
+        request.input('straInc', straInc)
+        request.input('seriNo', seriNo)
+        
+        await request.query(query)
+        console.log('🗑️ UTS Kayıt Silindi:', seriNo)
+      }
+      
+      console.log('✅ UTS Kayıtlar Başarıyla Silindi:', seriNos.length)
+      return { success: true, deletedCount: seriNos.length }
+      
+    } catch (error) {
+      console.error('❌ UTS Kayıt Silme Hatası:', error)
       throw error
     }
   },

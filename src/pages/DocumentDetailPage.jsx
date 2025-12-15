@@ -38,6 +38,13 @@ const DocumentDetailPage = () => {
     uretimTarihi: '',
     miktar: 1
   })
+  
+  // UTS Modal State'leri (Grid görünümü için)
+  const [showUTSModal, setShowUTSModal] = useState(false)
+  const [selectedUTSItem, setSelectedUTSItem] = useState(null)
+  const [utsRecords, setUtsRecords] = useState([])
+  const [selectedUTSRecords, setSelectedUTSRecords] = useState([])
+  const [utsLoading, setUtsLoading] = useState(false)
 
   // Belge tipini belirle
   const getDocumentTypeName = (docType, tipi) => {
@@ -252,7 +259,7 @@ const DocumentDetailPage = () => {
         const okutulan = params.value || 0
         const item = params.data
         
-        // ITS ürünleri için tıklanabilir badge
+        // ITS ürünleri için tıklanabilir badge (0'dan büyükse)
         if (item.turu === 'ITS' && okutulan > 0) {
           return (
             <button
@@ -265,6 +272,24 @@ const DocumentDetailPage = () => {
           )
         }
         
+        // UTS ürünleri için tıklanabilir badge (0 da olsa tıklanabilir!)
+        if (item.turu === 'UTS') {
+          return (
+            <button
+              onClick={() => handleOpenUTSModal(item)}
+              className={`px-3 py-1 rounded text-sm font-bold transition-colors cursor-pointer ${
+                okutulan > 0 
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+              title="UTS kayıtlarını görüntüle / Manuel kayıt ekle"
+            >
+              {okutulan} {okutulan > 0 ? '🔍' : '➕'}
+            </button>
+          )
+        }
+        
+        // Diğer ürünler için normal badge
         if (okutulan > 0) {
           return (
             <span className="px-3 py-1 rounded text-sm font-bold bg-green-100 text-green-700">
@@ -331,6 +356,55 @@ const DocumentDetailPage = () => {
     sortable: true,
     resizable: true,
     filter: false
+  }), [])
+
+  // UTS Modal Grid Column Definitions
+  const utsModalColumnDefs = useMemo(() => [
+    {
+      headerName: '',
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      width: 50,
+      pinned: 'left',
+      suppressMenu: true
+    },
+    {
+      headerName: '#',
+      valueGetter: 'node.rowIndex + 1',
+      width: 60,
+      cellClass: 'text-center font-semibold text-gray-600'
+    },
+    {
+      headerName: 'Seri No',
+      field: 'seriNo',
+      flex: 1,
+      minWidth: 150,
+      cellClass: 'font-mono font-bold text-red-600'
+    },
+    {
+      headerName: 'Lot No',
+      field: 'lot',
+      width: 150,
+      cellClass: 'font-mono'
+    },
+    {
+      headerName: 'Üretim Tarihi',
+      field: 'uretimTarihi',
+      width: 130,
+      cellClass: 'text-center font-semibold'
+    },
+    {
+      headerName: 'Miktar',
+      field: 'miktar',
+      width: 100,
+      cellClass: 'text-center font-bold'
+    }
+  ], [])
+
+  const utsModalDefaultColDef = useMemo(() => ({
+    sortable: true,
+    resizable: true,
+    filter: true
   }), [])
 
   // ITS Modal Grid Column Definitions
@@ -793,6 +867,92 @@ const DocumentDetailPage = () => {
     setTimeout(() => setMessage(null), 3000)
   }
 
+  // UTS Modal Aç
+  const handleOpenUTSModal = async (item) => {
+    try {
+      setSelectedUTSItem(item)
+      setShowUTSModal(true)
+      setUtsLoading(true)
+      
+      // UTS kayıtlarını getir
+      const response = await apiService.getUTSBarcodeRecords(order.id, item.itemId)
+      
+      if (response.success) {
+        setUtsRecords(response.data || [])
+      } else {
+        showMessage('UTS kayıtları yüklenemedi', 'error')
+      }
+    } catch (error) {
+      console.error('UTS kayıtları yükleme hatası:', error)
+      showMessage('UTS kayıtları yüklenemedi', 'error')
+    } finally {
+      setUtsLoading(false)
+    }
+  }
+
+  // UTS Modal Kapat
+  const handleCloseUTSModal = () => {
+    setShowUTSModal(false)
+    setSelectedUTSItem(null)
+    setUtsRecords([])
+    setSelectedUTSRecords([])
+  }
+
+  // UTS Kayıtlarını Sil
+  const handleDeleteUTSRecords = async () => {
+    if (selectedUTSRecords.length === 0) {
+      showMessage('Lütfen silinecek kayıtları seçin', 'warning')
+      return
+    }
+
+    if (!confirm(`${selectedUTSRecords.length} kayıt silinecek. Emin misiniz?`)) {
+      return
+    }
+
+    try {
+      const result = await apiService.deleteUTSBarcodeRecords(
+        order.id,
+        selectedUTSItem.itemId,
+        selectedUTSRecords
+      )
+
+      if (result.success) {
+        showMessage(`${result.deletedCount} kayıt silindi`, 'success')
+        // Kayıtları yeniden yükle
+        const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
+        if (response.success) {
+          setUtsRecords(response.data || [])
+          setSelectedUTSRecords([])
+        }
+        
+        // Ana grid'i yenile
+        const docResponse = await apiService.getDocumentById(order.id)
+        if (docResponse.success && docResponse.data) {
+          setItems(docResponse.data.items || [])
+        }
+      } else {
+        showMessage('Kayıtlar silinemedi: ' + result.message, 'error')
+      }
+    } catch (error) {
+      console.error('UTS kayıt silme hatası:', error)
+      showMessage('Kayıtlar silinemedi', 'error')
+    }
+  }
+
+  // UTS Modal'dan Manuel Kayıt Ekle
+  const handleAddUTSManualRecord = () => {
+    // UTS popup formunu aç (modal içinde)
+    setUtsFormData({
+      barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
+      item: selectedUTSItem,
+      seriNo: '',
+      lotNo: '',
+      uretimTarihi: '',
+      miktar: 1
+    })
+    setShowUTSPopup(true)
+  }
+
   // ITS Modal Aç
   const handleOpenITSModal = async (item) => {
     try {
@@ -924,6 +1084,14 @@ const DocumentDetailPage = () => {
       
       // Popup'ı kapat
       setShowUTSPopup(false)
+      
+      // Eğer UTS Modal açıksa kayıtları yenile
+      if (showUTSModal && selectedUTSItem) {
+        const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
+        if (response.success) {
+          setUtsRecords(response.data || [])
+        }
+      }
       
       // Grid'i yenile
       const docResponse = await apiService.getDocumentById(order.id)
@@ -1435,6 +1603,86 @@ const DocumentDetailPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* UTS Kayıtları Modal */}
+      {showUTSModal && selectedUTSItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleCloseUTSModal}>
+          <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-5xl max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">UTS Kayıtları</h2>
+                  <p className="text-sm text-red-100">{selectedUTSItem.productName}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-xs text-red-100">Toplam Okutulan</p>
+                    <p className="text-2xl font-bold">{utsRecords.reduce((sum, r) => sum + (r.miktar || 0), 0)}</p>
+                  </div>
+                  <button
+                    onClick={handleCloseUTSModal}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    <XCircle className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col" style={{ height: 'calc(80vh - 100px)' }}>
+              {/* UTS Records Grid */}
+              <div className="ag-theme-alpine flex-1 mb-4">
+                {utsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="animate-spin w-8 h-8 border-3 border-gray-200 border-t-red-600 rounded-full mx-auto mb-2" />
+                      <p className="text-gray-600 text-sm">Yükleniyor...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <AgGridReact
+                    rowData={utsRecords}
+                    columnDefs={utsModalColumnDefs}
+                    defaultColDef={utsModalDefaultColDef}
+                    rowSelection="multiple"
+                    suppressRowClickSelection={true}
+                    onSelectionChanged={(event) => {
+                      const selected = event.api.getSelectedRows()
+                      setSelectedUTSRecords(selected.map(r => r.seriNo))
+                    }}
+                    animateRows={true}
+                    enableCellTextSelection={true}
+                  />
+                )}
+              </div>
+
+              {/* Action Bar - Fixed at Bottom */}
+              <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
+                <button
+                  onClick={handleDeleteUTSRecords}
+                  disabled={selectedUTSRecords.length === 0}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                >
+                  Seçilenleri Sil
+                </button>
+                <button
+                  onClick={handleAddUTSManualRecord}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg"
+                >
+                  ➕ Manuel Kayıt Ekle
+                </button>
+                {selectedUTSRecords.length > 0 && (
+                  <span className="text-sm text-gray-600 font-semibold">
+                    {selectedUTSRecords.length} kayıt seçildi
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
