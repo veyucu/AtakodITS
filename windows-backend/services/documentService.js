@@ -944,6 +944,246 @@ const documentService = {
       console.error('❌ DGR Barkod Kaydetme Hatası:', error)
       throw error
     }
+  },
+
+  // UTS Barkod Kaydet
+  async saveUTSBarcode(data) {
+    try {
+      const pool = await getConnection()
+      
+      const {
+        kayitTipi,    // 'M' veya 'A' (Sipariş = M, Fatura = A)
+        seriNo,       // Seri No (opsiyonel)
+        lotNo,        // Lot No (opsiyonel ama en az biri olmalı)
+        stokKodu,     // Stok Kodu
+        straInc,      // INCKEYNO
+        tarih,        // Belge Tarihi
+        uretimTarihi, // Üretim Tarihi (YYYY-MM-DD)
+        gckod,        // STHAR_GCKOD
+        miktar,       // Miktar (seri no varsa 1, yoksa kullanıcı girer)
+        belgeNo,      // Belge No
+        belgeTip,     // STHAR_HTUR
+        subeKodu,     // Şube Kodu
+        ilcGtin,      // Okutulan Barkod
+        expectedQuantity  // Beklenen miktar (kalem miktarı)
+      } = data
+      
+      console.log('💾 UTS Barkod Kaydediliyor:', data)
+      
+      // Üretim tarihini YYAAYY formatına çevir (YYMMDD)
+      let formattedUretimTarihi = ''
+      if (uretimTarihi) {
+        const date = new Date(uretimTarihi)
+        const yy = String(date.getFullYear()).slice(-2)
+        const mm = String(date.getMonth() + 1).padStart(2, '0')
+        const dd = String(date.getDate()).padStart(2, '0')
+        formattedUretimTarihi = `${yy}${mm}${dd}` // YYMMDD
+      }
+      
+      // Belge Tarih formatı - saat bilgisi olmadan (YYYY-MM-DD)
+      const tarihDate = new Date(tarih)
+      const year = tarihDate.getFullYear()
+      const month = String(tarihDate.getMonth() + 1).padStart(2, '0')
+      const day = String(tarihDate.getDate()).padStart(2, '0')
+      const formattedTarih = `${year}-${month}-${day}`
+      
+      // SERI_NO: Seri no varsa seri, yoksa lot numarası
+      const finalSeriNo = seriNo || lotNo
+      
+      // Miktar kontrolü - beklenen miktarı aşmamalı
+      if (expectedQuantity) {
+        const quantityCheckQuery = `
+          SELECT ISNULL(SUM(MIKTAR), 0) AS TOTAL_OKUTULAN
+          FROM TBLSERITRA WITH (NOLOCK)
+          WHERE BELGENO = @belgeNo
+            AND STRA_INC = @straInc
+            AND STOK_KODU = @stokKodu
+            AND BELGETIP = @belgeTip
+            AND SUBE_KODU = @subeKodu
+            AND KAYIT_TIPI = @kayitTipi
+            AND GCKOD = @gckod
+        `
+        
+        const quantityCheckRequest = pool.request()
+        quantityCheckRequest.input('belgeNo', belgeNo)
+        quantityCheckRequest.input('straInc', straInc)
+        quantityCheckRequest.input('stokKodu', stokKodu)
+        quantityCheckRequest.input('belgeTip', belgeTip)
+        quantityCheckRequest.input('subeKodu', subeKodu)
+        quantityCheckRequest.input('kayitTipi', kayitTipi)
+        quantityCheckRequest.input('gckod', gckod)
+        
+        const quantityCheckResult = await quantityCheckRequest.query(quantityCheckQuery)
+        const currentOkutulan = quantityCheckResult.recordset[0].TOTAL_OKUTULAN
+        
+        if (currentOkutulan + miktar > expectedQuantity) {
+          console.log('⚠️⚠️⚠️ MİKTAR AŞIMI! (UTS) ⚠️⚠️⚠️')
+          console.log('Stok Kodu:', stokKodu)
+          console.log('Beklenen Miktar:', expectedQuantity)
+          console.log('Mevcut Okutulan:', currentOkutulan)
+          console.log('Eklenecek Miktar:', miktar)
+          return {
+            success: false,
+            error: 'QUANTITY_EXCEEDED',
+            message: `⚠️ Miktar aşımı! Bu üründen ${expectedQuantity} adet okutulması gerekiyor, ${currentOkutulan} adet zaten okutulmuş.`
+          }
+        }
+        console.log('✓ Miktar kontrolü geçti:', currentOkutulan + miktar, '/', expectedQuantity)
+      }
+      
+      // Eğer sadece lot numarası girilmişse, aynı lot var mı kontrol et (miktar artacak)
+      if (!seriNo && lotNo) {
+        const checkQuery = `
+          SELECT MIKTAR
+          FROM TBLSERITRA WITH (NOLOCK)
+          WHERE KAYIT_TIPI = @kayitTipi
+            AND SERI_NO = @finalSeriNo
+            AND STOK_KODU = @stokKodu
+            AND STRA_INC = @straInc
+            AND BELGENO = @belgeNo
+            AND BELGETIP = @belgeTip
+            AND SUBE_KODU = @subeKodu
+            AND GCKOD = @gckod
+        `
+        
+        const checkRequest = pool.request()
+        checkRequest.input('kayitTipi', kayitTipi)
+        checkRequest.input('finalSeriNo', finalSeriNo)
+        checkRequest.input('stokKodu', stokKodu)
+        checkRequest.input('straInc', straInc)
+        checkRequest.input('belgeNo', belgeNo)
+        checkRequest.input('belgeTip', belgeTip)
+        checkRequest.input('subeKodu', subeKodu)
+        checkRequest.input('gckod', gckod)
+        
+        const checkResult = await checkRequest.query(checkQuery)
+        
+        if (checkResult.recordset.length > 0) {
+          // Lot var, MIKTAR'ı güncelle
+          const currentMiktar = checkResult.recordset[0].MIKTAR || 0
+          const newMiktar = currentMiktar + miktar
+          
+          console.log(`✓ Lot bulundu, MIKTAR güncelleniyor: ${currentMiktar} -> ${newMiktar}`)
+          
+          const updateQuery = `
+            UPDATE TBLSERITRA
+            SET MIKTAR = @newMiktar
+            WHERE KAYIT_TIPI = @kayitTipi
+              AND SERI_NO = @finalSeriNo
+              AND STOK_KODU = @stokKodu
+              AND STRA_INC = @straInc
+              AND BELGENO = @belgeNo
+              AND BELGETIP = @belgeTip
+              AND SUBE_KODU = @subeKodu
+              AND GCKOD = @gckod
+          `
+          
+          const updateRequest = pool.request()
+          updateRequest.input('kayitTipi', kayitTipi)
+          updateRequest.input('finalSeriNo', finalSeriNo)
+          updateRequest.input('stokKodu', stokKodu)
+          updateRequest.input('straInc', straInc)
+          updateRequest.input('belgeNo', belgeNo)
+          updateRequest.input('belgeTip', belgeTip)
+          updateRequest.input('subeKodu', subeKodu)
+          updateRequest.input('gckod', gckod)
+          updateRequest.input('newMiktar', newMiktar)
+          
+          await updateRequest.query(updateQuery)
+          
+          console.log('✅✅✅ UTS BARKOD BAŞARIYLA GÜNCELLENDİ! ✅✅✅')
+          console.log('Stok Kodu:', stokKodu)
+          console.log('Lot No:', lotNo)
+          console.log('Yeni Miktar:', newMiktar)
+          
+          return {
+            success: true,
+            data: {
+              stokKodu,
+              lotNo,
+              miktar: newMiktar,
+              isUpdate: true
+            }
+          }
+        }
+      }
+      
+      // Yeni kayıt oluştur (INSERT)
+      console.log('✓ Yeni kayıt oluşturuluyor...')
+      
+      const insertQuery = `
+        INSERT INTO TBLSERITRA (
+          KAYIT_TIPI,
+          SERI_NO,
+          STOK_KODU,
+          STRA_INC,
+          TARIH,
+          ACIK1,
+          ACIK2,
+          GCKOD,
+          MIKTAR,
+          BELGENO,
+          BELGETIP,
+          SUBE_KODU,
+          DEPOKOD,
+          ILC_GTIN
+        ) VALUES (
+          @kayitTipi,
+          @finalSeriNo,
+          @stokKodu,
+          @straInc,
+          @tarih,
+          @formattedUretimTarihi,
+          @acik2,
+          @gckod,
+          @miktar,
+          @belgeNo,
+          @belgeTip,
+          @subeKodu,
+          '0',
+          @ilcGtin
+        )
+      `
+      
+      const insertRequest = pool.request()
+      insertRequest.input('kayitTipi', kayitTipi)
+      insertRequest.input('finalSeriNo', finalSeriNo)
+      insertRequest.input('stokKodu', stokKodu)
+      insertRequest.input('straInc', straInc)
+      insertRequest.input('tarih', formattedTarih)
+      insertRequest.input('formattedUretimTarihi', formattedUretimTarihi)
+      insertRequest.input('acik2', seriNo ? (lotNo || '') : '') // Seri no varsa ACIK2'ye lot numarası
+      insertRequest.input('gckod', gckod)
+      insertRequest.input('miktar', miktar)
+      insertRequest.input('belgeNo', belgeNo)
+      insertRequest.input('belgeTip', belgeTip)
+      insertRequest.input('subeKodu', subeKodu)
+      insertRequest.input('ilcGtin', ilcGtin)
+      
+      await insertRequest.query(insertQuery)
+      
+      console.log('✅✅✅ UTS BARKOD BAŞARIYLA KAYDEDİLDİ! ✅✅✅')
+      console.log('Stok Kodu:', stokKodu)
+      console.log('Seri No:', seriNo || 'YOK')
+      console.log('Lot No:', lotNo || 'YOK')
+      console.log('Üretim Tarihi:', formattedUretimTarihi)
+      console.log('Miktar:', miktar)
+      
+      return {
+        success: true,
+        data: {
+          stokKodu,
+          seriNo,
+          lotNo,
+          miktar,
+          isUpdate: false
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ UTS Barkod Kaydetme Hatası:', error)
+      throw error
+    }
   }
 }
 

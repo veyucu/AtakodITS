@@ -231,6 +231,76 @@ router.post('/its-barcode', async (req, res) => {
   }
 })
 
+// POST /api/documents/uts-barcode - UTS Barkod Okut ve Kaydet
+router.post('/uts-barcode', async (req, res) => {
+  try {
+    const {
+      barcode,          // Normal Barkod
+      documentId,       // Belge ID (SUBE_KODU-FTIRSIP-FATIRS_NO)
+      itemId,           // INCKEYNO
+      stokKodu,         // Stok Kodu
+      belgeTip,         // STHAR_HTUR
+      gckod,            // STHAR_GCKOD
+      belgeNo,          // Belge No
+      belgeTarihi,      // Belge Tarihi
+      docType,          // '6' = Sipariş, '1'/'2' = Fatura
+      expectedQuantity, // Beklenen miktar (kalem miktarı)
+      seriNo,           // Seri No (opsiyonel)
+      lotNo,            // Lot No (opsiyonel)
+      uretimTarihi,     // Üretim Tarihi
+      miktar            // Miktar
+    } = req.body
+    
+    console.log('🔴 UTS Barkod İsteği:', { barcode, documentId, itemId, stokKodu, seriNo, lotNo, miktar })
+    
+    // Belge ID'sini parse et
+    const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
+    
+    // KAYIT_TIPI belirle (Sipariş = M, Fatura = A)
+    const kayitTipi = docType === '6' ? 'M' : 'A'
+    
+    // TBLSERITRA'ya kaydet veya güncelle
+    const saveResult = await documentService.saveUTSBarcode({
+      kayitTipi,
+      seriNo,
+      lotNo,
+      stokKodu,
+      straInc: itemId,
+      tarih: belgeTarihi,
+      uretimTarihi,
+      gckod,
+      miktar,
+      belgeNo,
+      belgeTip,
+      subeKodu,
+      ilcGtin: barcode,
+      expectedQuantity
+    })
+    
+    if (!saveResult.success) {
+      console.log('⚠️ UTS Barkod kaydedilemedi:', saveResult.message)
+      return res.status(400).json(saveResult)
+    }
+    
+    console.log('✅ UTS Barkod başarıyla kaydedildi!')
+    res.json({
+      success: true,
+      message: saveResult.data.isUpdate 
+        ? `UTS barkod güncellendi (${saveResult.data.miktar} adet)` 
+        : 'UTS barkod başarıyla kaydedildi',
+      data: saveResult.data
+    })
+    
+  } catch (error) {
+    console.error('❌ UTS Barkod Kaydetme Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'UTS barkod kaydedilemedi',
+      error: error.message
+    })
+  }
+})
+
 // POST /api/documents/dgr-barcode - DGR Barkod Okut ve Kaydet (ITS olmayan normal ürünler)
 router.post('/dgr-barcode', async (req, res) => {
   try {

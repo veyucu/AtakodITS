@@ -215,6 +215,22 @@ const apiService = {
         message: error.response?.data?.message || error.message || 'DGR barkod kaydedilemedi'
       }
     }
+  },
+
+  // UTS Barkod Okut ve Kaydet
+  saveUTSBarcode: async (data) => {
+    try {
+      console.log('🔴 UTS Barkod gönderiliyor:', data)
+      const response = await apiClient.post('/documents/uts-barcode', data)
+      console.log('✅ UTS Barkod yanıtı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ UTS Barkod hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'UTS barkod kaydedilemedi'
+      }
+    }
   }
 }
 
