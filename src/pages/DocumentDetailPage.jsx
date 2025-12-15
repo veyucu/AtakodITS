@@ -13,6 +13,7 @@ const DocumentDetailPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const barcodeInputRef = useRef(null)
+  const utsGridRef = useRef(null)
   
   const [order, setOrder] = useState(null)
   const [items, setItems] = useState([])
@@ -29,15 +30,6 @@ const DocumentDetailPage = () => {
   const [itsModalView, setItsModalView] = useState('grid') // 'grid' veya 'text'
   
   // UTS Popup State'leri
-  const [showUTSPopup, setShowUTSPopup] = useState(false)
-  const [utsFormData, setUtsFormData] = useState({
-    barcode: '',
-    item: null,
-    seriNo: '',
-    lotNo: '',
-    uretimTarihi: '',
-    miktar: 1
-  })
   
   // UTS Modal State'leri (Grid görünümü için)
   const [showUTSModal, setShowUTSModal] = useState(false)
@@ -358,7 +350,7 @@ const DocumentDetailPage = () => {
     filter: false
   }), [])
 
-  // UTS Modal Grid Column Definitions
+  // UTS Modal Grid Column Definitions - EDITABLE
   const utsModalColumnDefs = useMemo(() => [
     {
       headerName: '',
@@ -366,38 +358,55 @@ const DocumentDetailPage = () => {
       headerCheckboxSelection: true,
       width: 50,
       pinned: 'left',
-      suppressMenu: true
+      suppressMenu: true,
+      editable: false
     },
     {
       headerName: '#',
       valueGetter: 'node.rowIndex + 1',
       width: 60,
-      cellClass: 'text-center font-semibold text-gray-600'
+      cellClass: 'text-center font-semibold text-gray-600',
+      editable: false
     },
     {
       headerName: 'Seri No',
       field: 'seriNo',
       flex: 1,
       minWidth: 150,
-      cellClass: 'font-mono font-bold text-red-600'
+      cellClass: 'font-mono font-bold text-red-600',
+      editable: true
     },
     {
       headerName: 'Lot No',
       field: 'lot',
       width: 150,
-      cellClass: 'font-mono'
+      cellClass: 'font-mono',
+      editable: true
     },
     {
       headerName: 'Üretim Tarihi',
       field: 'uretimTarihi',
       width: 130,
-      cellClass: 'text-center font-semibold'
+      cellClass: 'text-center font-semibold',
+      editable: true,
+      cellEditor: 'agTextCellEditor',
+      valueParser: (params) => {
+        // YYMMDD formatında gir (6 karakter)
+        const value = params.newValue
+        if (value && value.length === 6) {
+          return value
+        }
+        return params.oldValue
+      }
     },
     {
       headerName: 'Miktar',
       field: 'miktar',
       width: 100,
-      cellClass: 'text-center font-bold'
+      cellClass: 'text-center font-bold',
+      editable: true,
+      cellEditor: 'agNumberCellEditor',
+      valueParser: (params) => Number(params.newValue)
     }
   ], [])
 
@@ -524,17 +533,9 @@ const DocumentDetailPage = () => {
       return
     }
     
-    // UTS ürünü kontrolü - UTS ürünlerinde popup form açılır!
+    // UTS ürünü kontrolü - UTS ürünlerinde direkt modal aç!
     if (item.turu === 'UTS') {
-      setUtsFormData({
-        barcode: actualBarcode,
-        item: item,
-        seriNo: '',
-        lotNo: '',
-        uretimTarihi: '',
-        miktar: 1
-      })
-      setShowUTSPopup(true)
+      handleOpenUTSModal(item)
       return
     }
     
@@ -939,19 +940,139 @@ const DocumentDetailPage = () => {
     }
   }
 
-  // UTS Modal'dan Manuel Kayıt Ekle
-  const handleAddUTSManualRecord = () => {
-    // UTS popup formunu aç (modal içinde)
-    setUtsFormData({
-      barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
-      item: selectedUTSItem,
+  // UTS Grid'e Yeni Boş Satır Ekle
+  const handleAddNewUTSRow = () => {
+    const newRow = {
+      id: `new-${Date.now()}`,
       seriNo: '',
-      lotNo: '',
+      lot: '',
       uretimTarihi: '',
-      miktar: 1
-    })
-    setShowUTSPopup(true)
+      miktar: 1,
+      isNew: true
+    }
+    setUtsRecords([...utsRecords, newRow])
+    
+    // Grid'i scroll et yeni satıra
+    setTimeout(() => {
+      if (utsGridRef.current) {
+        utsGridRef.current.api.ensureIndexVisible(utsRecords.length, 'bottom')
+      }
+    }, 100)
   }
+
+  // UTS Grid'de Hücre Değiştiğinde Kaydet
+  const handleUTSCellValueChanged = async (params) => {
+    const updatedRow = params.data
+
+    // Boş satırı kaydetme
+    if (!updatedRow.seriNo && !updatedRow.lot) {
+      // Eğer kullanıcı herhangi bir veri girmemişse, sessizce devam et
+      return
+    }
+
+    // Validasyon
+    if (!updatedRow.uretimTarihi) {
+      showMessage('❌ Üretim Tarihi girilmeli (YYMMDD)', 'error')
+      playErrorSound()
+      // Eski değere geri dön
+      params.node.setData(params.oldValue)
+      return
+    }
+
+    if (updatedRow.uretimTarihi.length !== 6) {
+      showMessage('❌ Üretim Tarihi 6 karakter olmalı (YYMMDD)', 'error')
+      playErrorSound()
+      // Eski değere geri dön
+      params.node.setData(params.oldValue)
+      return
+    }
+
+    if (!updatedRow.miktar || updatedRow.miktar <= 0) {
+      showMessage('❌ Miktar 0\'dan büyük olmalı', 'error')
+      playErrorSound()
+      // Eski değere geri dön
+      params.node.setData(params.oldValue)
+      return
+    }
+
+    // Seri no varsa miktar 1 olmalı
+    if (updatedRow.seriNo && updatedRow.miktar !== 1) {
+      updatedRow.miktar = 1
+      params.node.setData(updatedRow)
+      showMessage('⚠️ Seri No girildiğinde miktar 1 olarak ayarlandı', 'warning')
+    }
+
+    // Belge tarihini formatla
+    let belgeTarihiFormatted
+    if (order.orderDate) {
+      const date = new Date(order.orderDate)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    } else {
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    }
+
+    try {
+      // Backend'e kaydet
+      const result = await apiService.saveUTSBarcode({
+        barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
+        documentId: order.id,
+        itemId: selectedUTSItem.itemId,
+        stokKodu: selectedUTSItem.stokKodu,
+        belgeTip: selectedUTSItem.stharHtur,
+        gckod: selectedUTSItem.stharGckod || '',
+        belgeNo: order.orderNo,
+        belgeTarihi: belgeTarihiFormatted,
+        docType: order.docType,
+        expectedQuantity: selectedUTSItem.quantity,
+        seriNo: updatedRow.seriNo || '',
+        lotNo: updatedRow.lot || '',
+        uretimTarihi: updatedRow.uretimTarihi,
+        miktar: updatedRow.miktar
+      })
+
+      if (result.success) {
+        showMessage('✅ Kayıt kaydedildi', 'success')
+        playSuccessSound()
+
+        // Grid'i yenile
+        const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
+        if (response.success) {
+          setUtsRecords(response.data || [])
+        }
+
+        // Ana grid'i güncelle
+        const docResponse = await apiService.getDocumentById(order.id)
+        if (docResponse.success && docResponse.data) {
+          setItems(docResponse.data.items || [])
+          updateStats(docResponse.data.items || [])
+        }
+      } else if (result.error === 'QUANTITY_EXCEEDED') {
+        showMessage(`❌ MİKTAR AŞIMI! ${result.message}`, 'error')
+        playErrorSound()
+        // Eski değere geri dön
+        params.node.setData(params.oldValue)
+      } else {
+        showMessage(`❌ ${result.message}`, 'error')
+        playErrorSound()
+        // Eski değere geri dön
+        params.node.setData(params.oldValue)
+      }
+    } catch (error) {
+      console.error('UTS kayıt güncelleme hatası:', error)
+      showMessage('❌ Kayıt güncellenirken hata oluştu', 'error')
+      playErrorSound()
+      // Eski değere geri dön
+      params.node.setData(params.oldValue)
+    }
+  }
+
 
   // ITS Modal Aç
   const handleOpenITSModal = async (item) => {
@@ -1017,110 +1138,6 @@ const DocumentDetailPage = () => {
     })
   }
 
-  // UTS Form Submit
-  const handleUTSFormSubmit = async (e) => {
-    e.preventDefault()
-    
-    const { barcode, item, seriNo, lotNo, uretimTarihi, miktar } = utsFormData
-    
-    // Validasyonlar
-    if (!seriNo && !lotNo) {
-      showMessage('❌ Seri No veya Lot No giriniz!', 'error')
-      playErrorSound()
-      return
-    }
-    
-    if (!uretimTarihi) {
-      showMessage('❌ Üretim Tarihi giriniz!', 'error')
-      playErrorSound()
-      return
-    }
-    
-    // Seri no varsa miktar 1 olmalı
-    const finalMiktar = seriNo ? 1 : miktar
-    
-    if (!seriNo && finalMiktar < 1) {
-      showMessage('❌ Miktar en az 1 olmalı!', 'error')
-      playErrorSound()
-      return
-    }
-    
-    // Belge tarihini formatla
-    let belgeTarihiFormatted
-    if (order.orderDate) {
-      const date = new Date(order.orderDate)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      belgeTarihiFormatted = `${year}-${month}-${day}`
-    } else {
-      const today = new Date()
-      const year = today.getFullYear()
-      const month = String(today.getMonth() + 1).padStart(2, '0')
-      const day = String(today.getDate()).padStart(2, '0')
-      belgeTarihiFormatted = `${year}-${month}-${day}`
-    }
-    
-    // Backend'e UTS kaydı gönder
-    const result = await apiService.saveUTSBarcode({
-      barcode: barcode,
-      documentId: order.id,
-      itemId: item.itemId,
-      stokKodu: item.stokKodu,
-      belgeTip: item.stharHtur,
-      gckod: item.stharGckod || '',
-      belgeNo: order.orderNo,
-      belgeTarihi: belgeTarihiFormatted,
-      docType: order.docType,
-      expectedQuantity: item.quantity,
-      seriNo: seriNo || '',
-      lotNo: lotNo || '',
-      uretimTarihi: uretimTarihi,
-      miktar: finalMiktar
-    })
-    
-    if (result.success) {
-      console.log('✅ UTS Barkod başarıyla kaydedildi!')
-      
-      // Popup'ı kapat
-      setShowUTSPopup(false)
-      
-      // Eğer UTS Modal açıksa kayıtları yenile
-      if (showUTSModal && selectedUTSItem) {
-        const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
-        if (response.success) {
-          setUtsRecords(response.data || [])
-        }
-      }
-      
-      // Grid'i yenile
-      const docResponse = await apiService.getDocumentById(order.id)
-      if (docResponse.success && docResponse.data) {
-        setItems(docResponse.data.items || [])
-        updateStats(docResponse.data.items || [])
-        
-        const updatedItem = docResponse.data.items.find(i => i.itemId === item.itemId)
-        if (updatedItem) {
-          showMessage(`✅ ${item.productName} (${updatedItem.okutulan}/${item.quantity})`, 'success')
-          playSuccessSound()
-          
-          // Tüm ürünler tamamlandı mı?
-          if (docResponse.data.items.every(item => item.okutulan >= item.quantity)) {
-            setTimeout(() => {
-              showMessage('🎉 Tüm ürünler tamamlandı!', 'success')
-              playSuccessSound()
-            }, 1000)
-          }
-        }
-      }
-    } else if (result.error === 'QUANTITY_EXCEEDED') {
-      showMessage(`❌ MİKTAR AŞIMI! ${item.productName} - ${result.message}`, 'error')
-      playErrorSound()
-    } else {
-      showMessage(`❌ ${item.productName} - ${result.message}`, 'error')
-      playErrorSound()
-    }
-  }
 
   // ITS Kayıtlarını Sil
   const handleDeleteITSRecords = async () => {
@@ -1499,114 +1516,6 @@ const DocumentDetailPage = () => {
         </div>
       </div>
 
-      {/* UTS Barkod Form Popup */}
-      {showUTSPopup && utsFormData.item && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-[500px] max-h-[80vh] overflow-hidden">
-            {/* Popup Header */}
-            <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 text-white">
-              <h2 className="text-xl font-bold">UTS Ürün Bilgileri</h2>
-              <p className="text-sm text-red-100">{utsFormData.item.productName}</p>
-            </div>
-
-            {/* Popup Body */}
-            <form onSubmit={handleUTSFormSubmit} className="p-6">
-              <div className="space-y-4">
-                {/* Seri No */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Seri No <span className="text-gray-400">(opsiyonel)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={utsFormData.seriNo}
-                    onChange={(e) => {
-                      const seriNo = e.target.value
-                      setUtsFormData({
-                        ...utsFormData,
-                        seriNo,
-                        miktar: seriNo ? 1 : utsFormData.miktar
-                      })
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="Seri numarası giriniz"
-                  />
-                  {utsFormData.seriNo && (
-                    <p className="text-xs text-gray-500 mt-1">✓ Seri no girildi, miktar otomatik 1 olacak</p>
-                  )}
-                </div>
-
-                {/* Lot No */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Lot No {!utsFormData.seriNo && <span className="text-red-600">*</span>}
-                  </label>
-                  <input
-                    type="text"
-                    value={utsFormData.lotNo}
-                    onChange={(e) => setUtsFormData({ ...utsFormData, lotNo: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="Lot numarası giriniz"
-                    required={!utsFormData.seriNo}
-                  />
-                </div>
-
-                {/* Üretim Tarihi */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Üretim Tarihi <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={utsFormData.uretimTarihi}
-                    onChange={(e) => setUtsFormData({ ...utsFormData, uretimTarihi: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">TBLSERITRA'ya YYAAYY formatında kaydedilecek</p>
-                </div>
-
-                {/* Miktar */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Miktar {!utsFormData.seriNo && <span className="text-red-600">*</span>}
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={utsFormData.miktar}
-                    onChange={(e) => setUtsFormData({ ...utsFormData, miktar: parseInt(e.target.value) || 1 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    disabled={!!utsFormData.seriNo}
-                    required
-                  />
-                  {utsFormData.seriNo && (
-                    <p className="text-xs text-orange-600 mt-1">⚠️ Seri no girildiğinde miktar her zaman 1'dir</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 mt-6 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowUTSPopup(false)}
-                  className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors"
-                >
-                  İptal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
-                >
-                  Kaydet
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* UTS Kayıtları Modal */}
       {showUTSModal && selectedUTSItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleCloseUTSModal}>
@@ -1646,6 +1555,7 @@ const DocumentDetailPage = () => {
                   </div>
                 ) : (
                   <AgGridReact
+                    ref={utsGridRef}
                     rowData={utsRecords}
                     columnDefs={utsModalColumnDefs}
                     defaultColDef={utsModalDefaultColDef}
@@ -1655,8 +1565,10 @@ const DocumentDetailPage = () => {
                       const selected = event.api.getSelectedRows()
                       setSelectedUTSRecords(selected.map(r => r.seriNo))
                     }}
+                    onCellValueChanged={handleUTSCellValueChanged}
                     animateRows={true}
                     enableCellTextSelection={true}
+                    singleClickEdit={true}
                   />
                 )}
               </div>
@@ -1664,17 +1576,17 @@ const DocumentDetailPage = () => {
               {/* Action Bar - Fixed at Bottom */}
               <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                 <button
+                  onClick={handleAddNewUTSRow}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg"
+                >
+                  ➕ Yeni Satır Ekle
+                </button>
+                <button
                   onClick={handleDeleteUTSRecords}
                   disabled={selectedUTSRecords.length === 0}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
                 >
                   Seçilenleri Sil
-                </button>
-                <button
-                  onClick={handleAddUTSManualRecord}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg"
-                >
-                  ➕ Manuel Kayıt Ekle
                 </button>
                 {selectedUTSRecords.length > 0 && (
                   <span className="text-sm text-gray-600 font-semibold">
