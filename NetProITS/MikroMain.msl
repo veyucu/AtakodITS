@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2008/09/mapping/cs">
+  <EntityContainerMapping StorageEntityContainer="MikroDB_V14ModelStoreContainer" CdmEntityContainer="MikroDB_V14Entities">
+    <EntitySetMapping Name="TBL_AYARLAR">
+      <EntityTypeMapping TypeName="MikroDB_V14Model.TBL_AYARLAR">
+        <MappingFragment StoreEntitySet="TBL_AYARLAR">
+          <ScalarProperty Name="PARAM_VALUE" ColumnName="PARAM_VALUE" />
+          <ScalarProperty Name="PARAM_NAME" ColumnName="PARAM_NAME" />
+          <ScalarProperty Name="ID" ColumnName="ID" />
+        </MappingFragment>
+      </EntityTypeMapping>
+    </EntitySetMapping>
+  </EntityContainerMapping>
+</Mapping>

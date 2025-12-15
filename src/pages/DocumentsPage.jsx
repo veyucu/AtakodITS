@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AgGridReact } from 'ag-grid-react'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
-import { Package, Search, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { Package, Search, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle, AlertCircle, Home } from 'lucide-react'
 import apiService from '../services/apiService'
 
 const DocumentsPage = () => {
@@ -19,7 +19,8 @@ const DocumentsPage = () => {
         return {
           searchText: filters.searchText || '',
           docTypeFilter: filters.docTypeFilter || 'all',
-          dateFilter: filters.dateFilter || new Date().toISOString().split('T')[0] // Varsayılan bugün
+          dateFilter: filters.dateFilter || new Date().toISOString().split('T')[0], // Varsayılan bugün
+          hideCompleted: filters.hideCompleted || false
         }
       }
     } catch (error) {
@@ -28,7 +29,8 @@ const DocumentsPage = () => {
     return {
       searchText: '',
       docTypeFilter: 'all',
-      dateFilter: new Date().toISOString().split('T')[0] // Varsayılan bugün
+      dateFilter: new Date().toISOString().split('T')[0], // Varsayılan bugün
+      hideCompleted: false
     }
   }
 
@@ -38,6 +40,7 @@ const DocumentsPage = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [docTypeFilter, setDocTypeFilter] = useState(savedFilters.docTypeFilter)
   const [dateFilter, setDateFilter] = useState(savedFilters.dateFilter)
+  const [hideCompleted, setHideCompleted] = useState(savedFilters.hideCompleted) // Okutulanları gizle
   const [rowData, setRowData] = useState([])
   const [allOrders, setAllOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -68,6 +71,15 @@ const DocumentsPage = () => {
       okutulan: 'bg-green-100 text-green-700 border border-green-300',
       kalan: 'bg-orange-100 text-orange-700 border border-orange-300',
       default: 'bg-gray-100 text-gray-700 border border-gray-300'
+    }
+    
+    // Kalan sütunu için özel gösterim
+    if (type === 'kalan' && (value === 0 || value === '0')) {
+      return (
+        <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-green-100 text-green-700">
+          ✓
+        </span>
+      )
     }
     
     return (
@@ -252,6 +264,10 @@ const DocumentsPage = () => {
           if (dgrCount > 0) parts.push(`DGR:${dgrCount}`)
           return parts.length > 0 ? parts.join(' | ') : params.value
         }
+        // Kalan sütunu için - 0 ise ✓
+        if (params.column.colId === 'kalan') {
+          return params.value === 0 || params.value === '0' ? '✓' : params.value
+        }
         return params.value
       }
     }
@@ -318,10 +334,11 @@ const DocumentsPage = () => {
     const filters = {
       searchText,
       docTypeFilter,
-      dateFilter
+      dateFilter,
+      hideCompleted
     }
     localStorage.setItem('documentsPageFilters', JSON.stringify(filters))
-  }, [searchText, docTypeFilter, dateFilter])
+  }, [searchText, docTypeFilter, dateFilter, hideCompleted])
 
   // Tarih değiştiğinde backend'den yeni veri çek
   useEffect(() => {
@@ -337,7 +354,7 @@ const DocumentsPage = () => {
       handleFilter()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docTypeFilter, statusFilter, searchText, allOrders, isInitialLoad])
+  }, [docTypeFilter, statusFilter, searchText, hideCompleted, allOrders, isInitialLoad])
 
   // Filter Handler - Client-side filtreleme
   const handleFilter = () => {
@@ -351,6 +368,11 @@ const DocumentsPage = () => {
     // Durum filtresi
     if (statusFilter !== 'all') {
       filtered = filtered.filter(order => order.status === statusFilter)
+    }
+
+    // Tamamlananları gizle (kalan = 0 olanları filtrele)
+    if (hideCompleted) {
+      filtered = filtered.filter(order => order.kalan > 0)
     }
 
     // Arama filtresi
@@ -400,6 +422,7 @@ const DocumentsPage = () => {
     setSearchText('')
     setStatusFilter('all')
     setDocTypeFilter('all')
+    setHideCompleted(false)
     const today = new Date().toISOString().split('T')[0]
     setDateFilter(today) // Bugüne sıfırla
     setRowData(allOrders)
@@ -422,15 +445,15 @@ const DocumentsPage = () => {
     fetchDocuments()
   }
 
-  // Statistics
+  // Statistics - Filtrelenmiş veriye göre hesapla
   const stats = useMemo(() => {
-    const total = allOrders.length
-    const pending = allOrders.filter(o => o.status === 'pending').length
-    const preparing = allOrders.filter(o => o.status === 'preparing').length
-    const completed = allOrders.filter(o => o.status === 'completed').length
+    const total = rowData.length
+    const completed = rowData.filter(o => o.kalan === 0).length // Tamamlanan (kalan = 0)
+    const partial = rowData.filter(o => o.okutulan > 0 && o.kalan > 0).length // Yarım (okutulan > 0 ve kalan > 0)
+    const pending = rowData.filter(o => o.okutulan === 0).length // Bekleyen (okutulan = 0)
     
-    return { total, pending, preparing, completed }
-  }, [allOrders])
+    return { total, completed, partial, pending }
+  }, [rowData])
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -440,6 +463,13 @@ const DocumentsPage = () => {
           <div className="flex items-center justify-between gap-4">
             {/* Sol - Başlık */}
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/')}
+                className="w-8 h-8 bg-gray-600 rounded flex items-center justify-center hover:bg-gray-700 transition-colors shadow-lg hover:shadow-xl"
+                title="Ana Menü"
+              >
+                <Home className="w-5 h-5 text-white" />
+              </button>
               <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
                 <Package className="w-5 h-5 text-white" />
               </div>
@@ -458,12 +488,12 @@ const DocumentsPage = () => {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-yellow-500 to-orange-500 rounded px-3 py-1.5 text-white shadow-sm">
+              <div className="bg-gradient-to-br from-green-500 to-green-600 rounded px-3 py-1.5 text-white shadow-sm">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5" />
+                  <CheckCircle className="w-3.5 h-3.5" />
                   <div className="flex items-baseline gap-1">
-                    <span className="text-xs font-medium opacity-90">Bekleyen:</span>
-                    <span className="text-base font-bold">{stats.pending}</span>
+                    <span className="text-xs font-medium opacity-90">Okutulan:</span>
+                    <span className="text-base font-bold">{stats.completed}</span>
                   </div>
                 </div>
               </div>
@@ -472,18 +502,18 @@ const DocumentsPage = () => {
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-3.5 h-3.5" />
                   <div className="flex items-baseline gap-1">
-                    <span className="text-xs font-medium opacity-90">Hazırlanıyor:</span>
-                    <span className="text-base font-bold">{stats.preparing}</span>
+                    <span className="text-xs font-medium opacity-90">Yarım:</span>
+                    <span className="text-base font-bold">{stats.partial}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-green-500 to-green-600 rounded px-3 py-1.5 text-white shadow-sm">
+              <div className="bg-gradient-to-br from-yellow-500 to-orange-500 rounded px-3 py-1.5 text-white shadow-sm">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="w-3.5 h-3.5" />
+                  <Clock className="w-3.5 h-3.5" />
                   <div className="flex items-baseline gap-1">
-                    <span className="text-xs font-medium opacity-90">Tamamlanan:</span>
-                    <span className="text-base font-bold">{stats.completed}</span>
+                    <span className="text-xs font-medium opacity-90">Bekleyen:</span>
+                    <span className="text-base font-bold">{stats.pending}</span>
                   </div>
                 </div>
               </div>
@@ -554,6 +584,19 @@ const DocumentsPage = () => {
               Alış
             </button>
           </div>
+
+          <div className="h-6 w-px bg-gray-300"></div>
+
+          {/* Okutulanları Gizle */}
+          <label className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={hideCompleted}
+              onChange={(e) => setHideCompleted(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-gray-700">Okutulanları Gizle</span>
+          </label>
 
           <div className="h-6 w-px bg-gray-300"></div>
 
@@ -721,8 +764,6 @@ const DocumentsPage = () => {
             rowData={rowData}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            pagination={true}
-            paginationPageSize={20}
             onRowClicked={onRowClicked}
             rowClass="cursor-pointer hover:bg-gray-50"
             animateRows={true}

@@ -480,13 +480,14 @@ const DocumentDetailPage = () => {
         if (params.data && params.data.seriNo) {
           return 1
         }
-        return params.data ? params.data.miktar : 1
+        // Seri No yoksa miktar değerini döndür (boş olabilir)
+        return params.data ? params.data.miktar : ''
       },
       valueSetter: (params) => {
         // Seri No yoksa miktarı güncelle
         if (!params.data.seriNo) {
           const val = Number(params.newValue)
-          params.data.miktar = val > 0 ? val : 1
+          params.data.miktar = val > 0 ? val : ''
         } else {
           // Seri No varsa her zaman 1
           params.data.miktar = 1
@@ -535,7 +536,19 @@ const DocumentDetailPage = () => {
       headerName: 'Miad',
       field: 'miad',
       width: 120,
-      cellClass: 'text-center font-semibold'
+      cellClass: 'text-center font-semibold',
+      valueFormatter: (params) => {
+        // YYMMDD -> DD.MM.YYYY
+        if (!params.value) return ''
+        if (params.value.length === 6) {
+          const yy = params.value.substring(0, 2)
+          const mm = params.value.substring(2, 4)
+          const dd = params.value.substring(4, 6)
+          const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+          return `${dd}.${mm}.${yyyy}`
+        }
+        return params.value
+      }
     },
     {
       headerName: 'Lot',
@@ -971,8 +984,8 @@ const DocumentDetailPage = () => {
       const response = await apiService.getUTSBarcodeRecords(order.id, item.itemId)
       
       if (response.success) {
-        // Kayıtlara uretimTarihiDisplay ekle (YYMMDD -> YYYY-MM-DD)
-        const enrichedRecords = (response.data || []).map(record => {
+        // Kayıtlara uretimTarihiDisplay ve benzersiz id ekle (YYMMDD -> YYYY-MM-DD)
+        const enrichedRecords = (response.data || []).map((record, index) => {
           let uretimTarihiDisplay = ''
           if (record.uretimTarihi && record.uretimTarihi.length === 6) {
             const yy = record.uretimTarihi.substring(0, 2)
@@ -983,6 +996,7 @@ const DocumentDetailPage = () => {
           }
           return {
             ...record,
+            id: record.siraNo || `existing-${Date.now()}-${index}`, // Benzersiz ID ekle
             uretimTarihiDisplay
           }
         })
@@ -1020,20 +1034,11 @@ const DocumentDetailPage = () => {
       return
     }
 
-    // Sadece grid'den kaldır (veri tabanına dokunma)
-    const selectedSiraNumbers = selectedUTSRecords.map(r => r.siraNo).filter(Boolean)
-    const filteredRecords = utsRecords.filter(record => {
-      // SiraNo varsa ona göre, yoksa unique olarak seriNo+lot kombinasyonuna göre
-      if (record.siraNo) {
-        return !selectedSiraNumbers.includes(record.siraNo)
-      } else {
-        // Yeni eklenmiş kayıtlar için (siraNo yok)
-        const selected = selectedUTSRecords.find(s => 
-          s.seriNo === record.seriNo && s.lot === record.lot
-        )
-        return !selected
-      }
-    })
+    // Seçili kayıtların ID'lerini al
+    const selectedIds = selectedUTSRecords.map(r => r.id)
+    
+    // Sadece grid'den kaldır - ID'ye göre filtrele
+    const filteredRecords = utsRecords.filter(record => !selectedIds.includes(record.id))
     
     setUtsRecords(filteredRecords)
     setSelectedUTSRecords([])
@@ -1049,7 +1054,7 @@ const DocumentDetailPage = () => {
       lot: '',
       uretimTarihi: '',
       uretimTarihiDisplay: '',
-      miktar: 1,
+      miktar: '', // Boş başlasın, kullanıcı girecek (seri no girilirse otomatik 1 olur)
       isNew: true
     }
     setUtsRecords([...utsRecords, newRow])
@@ -1099,9 +1104,16 @@ const DocumentDetailPage = () => {
           return
         }
 
-        // Üretim Tarihi zorunlu ve 6 karakter
+        // Seri No varsa Lot No da zorunlu
+        if (row.seriNo && !row.lot) {
+          showUTSMessage(`❌ Satır ${rowNum}: Seri No girildiğinde Lot No da girilmelidir!`, 'error')
+          playErrorSound()
+          return
+        }
+
+        // Üretim Tarihi her zaman zorunlu
         if (!row.uretimTarihi && !row.uretimTarihiDisplay) {
-          showUTSMessage(`❌ Satır ${rowNum}: Üretim Tarihi girilmeli!`, 'error')
+          showUTSMessage(`❌ Satır ${rowNum}: Üretim Tarihi zorunludur!`, 'error')
           playErrorSound()
           return
         }
@@ -1122,7 +1134,7 @@ const DocumentDetailPage = () => {
 
         // Miktar kontrolü
         if (!row.miktar || row.miktar <= 0) {
-          showUTSMessage(`❌ Satır ${rowNum}: Miktar 0'dan büyük olmalı!`, 'error')
+          showUTSMessage(`❌ Satır ${rowNum}: Miktar boş olamaz ve 0'dan büyük olmalı!`, 'error')
           playErrorSound()
           return
         }
@@ -1239,6 +1251,12 @@ const DocumentDetailPage = () => {
         setItems(docResponse.data.items || [])
         updateStats(docResponse.data.items || [])
       }
+
+      // Başarılı kayıt sonrası modal'ı kapat
+      setTimeout(() => {
+        handleCloseUTSModal()
+      }, 1000) // 1 saniye sonra kapat (başarı mesajını göster)
+      
     } catch (error) {
       console.error('UTS toplu kayıt hatası:', error)
       showUTSMessage('❌ Kayıt sırasında hata oluştu', 'error')
@@ -1753,12 +1771,14 @@ const DocumentDetailPage = () => {
                     rowData={utsRecords}
                     columnDefs={utsModalColumnDefs}
                     defaultColDef={utsModalDefaultColDef}
+                    getRowId={(params) => params.data.id}
                     rowSelection="multiple"
                     suppressRowClickSelection={true}
                     onSelectionChanged={(event) => {
                       const selected = event.api.getSelectedRows()
-                      // Seri No, Lot No ve Sira No kombinasyonunu sakla
+                      // Benzersiz ID, Seri No, Lot No ve Sira No kombinasyonunu sakla
                       setSelectedUTSRecords(selected.map(r => ({
+                        id: r.id,
                         siraNo: r.siraNo,
                         seriNo: r.seriNo,
                         lot: r.lot

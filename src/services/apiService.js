@@ -278,6 +278,68 @@ const apiService = {
         message: error.response?.data?.message || error.message || 'UTS kayıtları kaydedilemedi'
       }
     }
+  },
+
+  // ==================== PTS İşlemleri ====================
+
+  // Tarih aralığında paket listesi sorgula
+  searchPackages: async (startDate, endDate) => {
+    try {
+      console.log('🔍 PTS\'den paket listesi sorgulanıyor:', startDate, endDate)
+      const response = await apiClient.post('/pts/search', { startDate, endDate })
+      console.log('✅ PTS yanıtı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS arama hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Paket listesi alınamadı'
+      }
+    }
+  },
+
+  // Transfer ID ile paket sorgula
+  queryPackage: async (transferId) => {
+    try {
+      const response = await apiClient.get(`/pts/query/${transferId}`)
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS sorgulama hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Paket sorgulanamadı'
+      }
+    }
+  },
+
+  // Transfer ID ile paket indir
+  downloadPackage: async (transferId) => {
+    try {
+      console.log('📥 Paket indiriliyor:', transferId)
+      const response = await apiClient.post('/pts/download', { transferId })
+      console.log('✅ Paket indirildi:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ Paket indirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Paket indirilemedi'
+      }
+    }
+  },
+
+  // PTS Konfigürasyon
+  getPTSConfig: async () => {
+    try {
+      const response = await apiClient.get('/pts/config')
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS config hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'PTS konfigürasyonu alınamadı'
+      }
+    }
   }
 }
 

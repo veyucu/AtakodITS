@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import DocumentsPage from './pages/DocumentsPage'
 import DocumentDetailPage from './pages/DocumentDetailPage'
+import PTSPage from './pages/PTSPage'
 
 function App() {
   return (
@@ -38,6 +39,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <DocumentDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/pts" 
+            element={
+              <ProtectedRoute>
+                <PTSPage />
               </ProtectedRoute>
             } 
           />

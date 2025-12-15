@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import documentsRouter from './routes/documents.js';
+import ptsRouter from './routes/pts.js';
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.get('/api/test', (req, res) => {
 
 // Routes
 app.use('/api/documents', documentsRouter);
+app.use('/api/pts', ptsRouter);
 
 // 404 handler
 app.use((req, res) => {

@@ -1,0 +1,505 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Schema Namespace="FirmaModel" Alias="Self" xmlns="http://schemas.microsoft.com/ado/2008/09/edm">
+  <EntityContainer Name="FIRMAEntities">
+    <EntitySet Name="TBLFATUIRS" EntityType="FirmaModel.TBLFATUIRS" />
+    <EntitySet Name="TBLSTSABIT" EntityType="FirmaModel.TBLSTSABIT" />
+    <EntitySet Name="TBLSIPAMAS" EntityType="FirmaModel.TBLSIPAMAS" />
+    <EntitySet Name="ITSHAR" EntityType="FirmaModel.ITSHAR" />
+    <EntitySet Name="HATA_KODLARI" EntityType="FirmaModel.HATA_KODLARI" />
+    <EntitySet Name="TBLTRANSFER" EntityType="FirmaModel.TBLTRANSFER" />
+    <EntitySet Name="TBLTRANSFER_DETAY" EntityType="FirmaModel.TBLTRANSFER_DETAY" />
+    <EntitySet Name="TRANSFER_CARI" EntityType="FirmaModel.TRANSFER_CARI" />
+    <EntitySet Name="VIEWTRANSFER_DETAY" EntityType="FirmaModel.VIEWTRANSFER_DETAY" />
+    <EntitySet Name="ITSHAR_VIEW" EntityType="FirmaModel.ITSHAR_VIEW" />
+    <EntitySet Name="PTSHAR_VIEW" EntityType="FirmaModel.PTSHAR_VIEW" />
+    <EntitySet Name="BILDIRIM_STOK" EntityType="FirmaModel.BILDIRIM_STOK" />
+    <EntitySet Name="BILDIRIM" EntityType="FirmaModel.BILDIRIM" />
+  </EntityContainer>
+  <EntityType Name="TBLFATUIRS">
+    <Key>
+      <PropertyRef Name="FTIRSIP" />
+      <PropertyRef Name="FATIRS_NO" />
+      <PropertyRef Name="CARI_KODU" />
+    </Key>
+    <Property Name="SUBE_KODU" Type="Int16" Nullable="false" />
+    <Property Name="FTIRSIP" Type="String" Nullable="false" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="FATIRS_NO" Type="String" Nullable="false" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KODU" Type="String" Nullable="false" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="TARIH" Type="DateTime" Nullable="false" Precision="3" />
+    <Property Name="TIPI" Type="Byte" />
+    <Property Name="BRUTTUTAR" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SAT_ISKT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MFAZ_ISKT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK1T" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK2T" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK3T" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK1O" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK2O" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK3O" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KDV" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="FAT_ALTM1" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="FAT_ALTM2" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ACIKLAMA" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="KOD1" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="KOD2" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="ODEMEGUNU" Type="Int16" />
+    <Property Name="ODEMETARIHI" Type="DateTime" Precision="3" />
+    <Property Name="KDV_DAHILMI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="FATKALEM_ADEDI" Type="Int16" />
+    <Property Name="SIPARIS_TEST" Type="DateTime" Precision="3" />
+    <Property Name="TOPLAM_MIK" Type="Decimal" Precision="15" Scale="5" />
+    <Property Name="TOPDEPO" Type="Int16" />
+    <Property Name="YEDEK22" Type="String" MaxLength="2" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KOD2" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="YEDEK" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="UPDATE_KODU" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SIRANO" Type="Int32" Nullable="false" />
+    <Property Name="KDV_DAHIL_BRUT_TOP" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KDV_TENZIL" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MALFAZLASIKDVSI" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GENELTOPLAM" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="YUVARLAMA" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SATIS_KOND" Type="String" MaxLength="4" FixedLength="false" Unicode="false" />
+    <Property Name="PLA_KODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="DOVIZTIP" Type="Byte" />
+    <Property Name="DOVIZTUT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KS_KODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="BAG_TUTAR" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="YEDEK2" Type="String" MaxLength="7" FixedLength="false" Unicode="false" />
+    <Property Name="HIZMET_FAT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="VADEBAZT" Type="DateTime" Precision="3" />
+    <Property Name="KAPATILMIS" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="S_YEDEK1" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="S_YEDEK2" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="F_YEDEK3" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="F_YEDEK4" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="F_YEDEK5" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="C_YEDEK6" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="B_YEDEK7" Type="Byte" />
+    <Property Name="I_YEDEK8" Type="Int16" />
+    <Property Name="L_YEDEK9" Type="Int32" />
+    <Property Name="AMBAR_KBLNO" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="D_YEDEK10" Type="DateTime" Precision="3" />
+    <Property Name="PROJE_KODU" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="KOSULKODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="FIYATTARIHI" Type="DateTime" Precision="3" />
+    <Property Name="KOSULTARIHI" Type="DateTime" Precision="3" />
+    <Property Name="GENISK1TIP" Type="Int16" />
+    <Property Name="GENISK2TIP" Type="Int16" />
+    <Property Name="GENISK3TIP" Type="Int16" />
+    <Property Name="EXPORTTYPE" Type="Byte" />
+    <Property Name="EXGUMRUKNO" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="EXGUMTARIH" Type="DateTime" Precision="3" />
+    <Property Name="EXFIILITARIH" Type="DateTime" Precision="3" />
+    <Property Name="EXPORTREFNO" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="KAYITYAPANKUL" Type="String" MaxLength="12" FixedLength="false" Unicode="false" />
+    <Property Name="KAYITTARIHI" Type="DateTime" Precision="3" />
+    <Property Name="DUZELTMEYAPANKUL" Type="String" MaxLength="12" FixedLength="false" Unicode="false" />
+    <Property Name="DUZELTMETARIHI" Type="DateTime" Precision="3" />
+    <Property Name="GELSUBE_KODU" Type="Int16" />
+    <Property Name="GITSUBE_KODU" Type="Int16" />
+    <Property Name="ONAYTIPI" Type="String" Nullable="false" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="ONAYNUM" Type="Int32" Nullable="false" />
+    <Property Name="ISLETME_KODU" Type="Int16" Nullable="false" />
+    <Property Name="ODEKOD" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="BRMALIYET" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KOSVADEGUNU" Type="Int16" />
+    <Property Name="YAPKOD" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="HAZIRLAYAN" Type="String" MaxLength="50" FixedLength="false" Unicode="false" />
+    <Property Name="TRANSFER_NO" Type="String" MaxLength="50" FixedLength="false" Unicode="false" />
+    <Property Name="GIB_FATIRS_NO" Type="String" MaxLength="16" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="TBLSTSABIT">
+    <Key>
+      <PropertyRef Name="STOK_KODU" />
+    </Key>
+    <Property Name="SUBE_KODU" Type="Int16" Nullable="false" />
+    <Property Name="ISLETME_KODU" Type="Int16" Nullable="false" />
+    <Property Name="STOK_KODU" Type="String" Nullable="false" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="URETICI_KODU" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_ADI" Type="String" MaxLength="100" FixedLength="false" Unicode="false" />
+    <Property Name="GRUP_KODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="KOD_1" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="KOD_2" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="KOD_3" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="KOD_4" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="KOD_5" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="SATICI_KODU" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="OLCU_BR1" Type="String" MaxLength="2" FixedLength="false" Unicode="false" />
+    <Property Name="OLCU_BR2" Type="String" MaxLength="2" FixedLength="false" Unicode="false" />
+    <Property Name="PAY_1" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="PAYDA_1" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="OLCU_BR3" Type="String" MaxLength="2" FixedLength="false" Unicode="false" />
+    <Property Name="PAY2" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="PAYDA2" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="FIAT_BIRIMI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="AZAMI_STOK" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ASGARI_STOK" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="TEMIN_SURESI" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KUL_MIK" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="RISK_SURESI" Type="Int16" />
+    <Property Name="ZAMAN_BIRIMI" Type="String" MaxLength="3" FixedLength="false" Unicode="false" />
+    <Property Name="SATIS_FIAT1" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SATIS_FIAT2" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SATIS_FIAT3" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SATIS_FIAT4" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SAT_DOV_TIP" Type="Byte" />
+    <Property Name="DOV_ALIS_FIAT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="DOV_MAL_FIAT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="DOV_SATIS_FIAT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MUH_DETAYKODU" Type="Int32" />
+    <Property Name="BIRIM_AGIRLIK" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="NAKLIYET_TUT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KDV_ORANI" Type="Decimal" Precision="5" Scale="2" />
+    <Property Name="ALIS_DOV_TIP" Type="Byte" />
+    <Property Name="DEPO_KODU" Type="Int16" />
+    <Property Name="DOV_TUR" Type="Byte" />
+    <Property Name="URET_OLCU_BR" Type="Byte" />
+    <Property Name="BILESENMI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="MAMULMU" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="FORMUL_TOPLAMI" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="UPDATE_KODU" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="MAX_ISKONTO" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ECZACI_KARI" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MIKTAR" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MAL_FAZLASI" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KDV_TENZIL_ORAN" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KILIT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="ONCEKI_KOD" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="SONRAKI_KOD" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="BARKOD1" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="BARKOD2" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="BARKOD3" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="ALIS_KDV_KODU" Type="Decimal" Precision="5" Scale="2" />
+    <Property Name="ALIS_FIAT1" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ALIS_FIAT2" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ALIS_FIAT3" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ALIS_FIAT4" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="LOT_SIZE" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MIN_SIP_MIKTAR" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SABIT_SIP_ARALIK" Type="Int16" />
+    <Property Name="SIP_POLITIKASI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="OZELLIK_KODU1" Type="Byte" />
+    <Property Name="OZELLIK_KODU2" Type="Byte" />
+    <Property Name="OZELLIK_KODU3" Type="Byte" />
+    <Property Name="OZELLIK_KODU4" Type="Byte" />
+    <Property Name="OZELLIK_KODU5" Type="Byte" />
+    <Property Name="OPSIYON_KODU1" Type="Byte" />
+    <Property Name="OPSIYON_KODU2" Type="Byte" />
+    <Property Name="OPSIYON_KODU3" Type="Byte" />
+    <Property Name="OPSIYON_KODU4" Type="Byte" />
+    <Property Name="OPSIYON_KODU5" Type="Byte" />
+    <Property Name="BILESEN_OP_KODU" Type="Byte" />
+    <Property Name="SIP_VER_MAL" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ELDE_BUL_MAL" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="YIL_TAH_KUL_MIK" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="EKON_SIP_MIKTAR" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ESKI_RECETE" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="OTOMATIK_URETIM" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="ALFKOD" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SAFKOD" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="KODTURU" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="S_YEDEK1" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="S_YEDEK2" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="F_YEDEK3" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="F_YEDEK4" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="C_YEDEK5" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="C_YEDEK6" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="B_YEDEK7" Type="Byte" />
+    <Property Name="I_YEDEK8" Type="Int16" />
+    <Property Name="L_YEDEK9" Type="Int32" />
+    <Property Name="D_YEDEK10" Type="DateTime" Precision="3" />
+    <Property Name="GIRIS_SERI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="CIKIS_SERI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SERI_BAK" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SERI_MIK" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SERI_GIR_OT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SERI_CIK_OT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SERI_BASLANGIC" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="FIYATKODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="FIYATSIRASI" Type="Int32" />
+    <Property Name="PLANLANACAK" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="LOT_SIZECUSTOMER" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MIN_SIP_MIKTARCUSTOMER" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GUMRUKTARIFEKODU" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="ABCKODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="PERFORMANSKODU" Type="String" MaxLength="4" FixedLength="false" Unicode="false" />
+    <Property Name="SATICISIPKILIT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="MUSTERISIPKILIT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SATINALMAKILIT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SATISKILIT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="EN" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="BOY" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GENISLIK" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SIPLIMITVAR" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SONSTOKKODU" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="ONAYTIPI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="ONAYNUM" Type="Int32" />
+    <Property Name="FIKTIF_MAM" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="YAPILANDIR" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SBOMVARMI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="BAGLISTOKKOD" Type="String" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="YAPKOD" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="TBLSIPAMAS">
+    <Key>
+      <PropertyRef Name="SUBE_KODU" />
+      <PropertyRef Name="FTIRSIP" />
+      <PropertyRef Name="FATIRS_NO" />
+      <PropertyRef Name="CARI_KODU" />
+    </Key>
+    <Property Name="SUBE_KODU" Type="Int16" Nullable="false" />
+    <Property Name="FTIRSIP" Type="String" Nullable="false" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="FATIRS_NO" Type="String" Nullable="false" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KODU" Type="String" Nullable="false" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="TARIH" Type="DateTime" Nullable="false" Precision="3" />
+    <Property Name="TIPI" Type="Byte" />
+    <Property Name="BRUTTUTAR" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SAT_ISKT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MFAZ_ISKT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK1T" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK2T" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK3T" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK1O" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK2O" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GEN_ISK3O" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KDV" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="FAT_ALTM1" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="FAT_ALTM2" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="ACIKLAMA" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="KOD1" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="KOD2" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="ODEMEGUNU" Type="Int16" />
+    <Property Name="ODEMETARIHI" Type="DateTime" Precision="3" />
+    <Property Name="KDV_DAHILMI" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="FATKALEM_ADEDI" Type="Int16" />
+    <Property Name="SIPARIS_TEST" Type="DateTime" Precision="3" />
+    <Property Name="TOPLAM_MIK" Type="Decimal" Precision="15" Scale="5" />
+    <Property Name="TOPDEPO" Type="Int16" />
+    <Property Name="YEDEK22" Type="String" MaxLength="2" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KOD2" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="YEDEK" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="UPDATE_KODU" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="SIRANO" Type="Int32" Nullable="false" />
+    <Property Name="KDV_DAHIL_BRUT_TOP" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KDV_TENZIL" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="MALFAZLASIKDVSI" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="GENELTOPLAM" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="YUVARLAMA" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="SATIS_KOND" Type="String" MaxLength="4" FixedLength="false" Unicode="false" />
+    <Property Name="PLA_KODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="DOVIZTIP" Type="Byte" />
+    <Property Name="DOVIZTUT" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KS_KODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="BAG_TUTAR" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="YEDEK2" Type="String" MaxLength="7" FixedLength="false" Unicode="false" />
+    <Property Name="HIZMET_FAT" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="VADEBAZT" Type="DateTime" Precision="3" />
+    <Property Name="KAPATILMIS" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="S_YEDEK1" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="S_YEDEK2" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="F_YEDEK3" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="F_YEDEK4" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="F_YEDEK5" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="C_YEDEK6" Type="String" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="B_YEDEK7" Type="Byte" />
+    <Property Name="I_YEDEK8" Type="Int16" />
+    <Property Name="L_YEDEK9" Type="Int32" />
+    <Property Name="AMBAR_KBLNO" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="D_YEDEK10" Type="DateTime" Precision="3" />
+    <Property Name="PROJE_KODU" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="KOSULKODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="FIYATTARIHI" Type="DateTime" Precision="3" />
+    <Property Name="KOSULTARIHI" Type="DateTime" Precision="3" />
+    <Property Name="GENISK1TIP" Type="Int16" />
+    <Property Name="GENISK2TIP" Type="Int16" />
+    <Property Name="GENISK3TIP" Type="Int16" />
+    <Property Name="EXPORTTYPE" Type="Byte" />
+    <Property Name="EXGUMRUKNO" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="EXGUMTARIH" Type="DateTime" Precision="3" />
+    <Property Name="EXFIILITARIH" Type="DateTime" Precision="3" />
+    <Property Name="EXPORTREFNO" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="KAYITYAPANKUL" Type="String" MaxLength="12" FixedLength="false" Unicode="false" />
+    <Property Name="KAYITTARIHI" Type="DateTime" Precision="3" />
+    <Property Name="DUZELTMEYAPANKUL" Type="String" MaxLength="12" FixedLength="false" Unicode="false" />
+    <Property Name="DUZELTMETARIHI" Type="DateTime" Precision="3" />
+    <Property Name="GELSUBE_KODU" Type="Int16" />
+    <Property Name="GITSUBE_KODU" Type="Int16" />
+    <Property Name="ONAYTIPI" Type="String" Nullable="false" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="ONAYNUM" Type="Int32" Nullable="false" />
+    <Property Name="ISLETME_KODU" Type="Int16" Nullable="false" />
+    <Property Name="ODEKOD" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="BRMALIYET" Type="Decimal" Precision="28" Scale="8" />
+    <Property Name="KOSVADEGUNU" Type="Int16" />
+    <Property Name="YAPKOD" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="SIRA_NO" Type="Int32" />
+    <Property Name="HAZIRLAYAN" Type="String" MaxLength="50" FixedLength="false" Unicode="false" />
+    <Property Name="TRANSFER_NO" Type="String" MaxLength="50" FixedLength="false" Unicode="false" />
+    <Property Name="GIB_FATIRS_NO" Type="String" MaxLength="16" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="ITSHAR">
+    <Key>
+      <PropertyRef Name="ID" />
+    </Key>
+    <Property Name="ID" Type="Int32" Nullable="false" a:StoreGeneratedPattern="Identity" xmlns:a="http://schemas.microsoft.com/ado/2009/02/edm/annotation" />
+    <Property Name="TIP" Type="Int32" />
+    <Property Name="EVRAK_SERI" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_KOD" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="BARKOD" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="SERI_NO" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="MIAD" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="PARTINO" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="DURUM" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KOD" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="HATA_KODLARI">
+    <Key>
+      <PropertyRef Name="HATAID" />
+    </Key>
+    <Property Name="HATAID" Type="Int32" Nullable="false" />
+    <Property Name="MESAJ" Type="String" MaxLength="Max" FixedLength="false" Unicode="false" />
+    <Property Name="AD" Type="Int32" />
+    <Property Name="ID" Type="Int32" Nullable="false" a:StoreGeneratedPattern="Identity" xmlns:a="http://schemas.microsoft.com/ado/2009/02/edm/annotation" />
+  </EntityType>
+  <EntityType Name="TBLTRANSFER">
+    <Key>
+      <PropertyRef Name="ID" />
+    </Key>
+    <Property Name="ID" Type="Int32" Nullable="false" a:StoreGeneratedPattern="Identity" xmlns:a="http://schemas.microsoft.com/ado/2009/02/edm/annotation" />
+    <Property Name="KAYNAK_GLNNO" Type="String" Nullable="false" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="TRANSFER_ID" Type="Int64" Nullable="false" />
+    <Property Name="TARIH" Type="String" Nullable="false" MaxLength="12" FixedLength="false" Unicode="false" />
+    <Property Name="DURUM" Type="String" MaxLength="5" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="TBLTRANSFER_DETAY">
+    <Key>
+      <PropertyRef Name="ID" />
+    </Key>
+    <Property Name="ID" Type="Int32" Nullable="false" a:StoreGeneratedPattern="Identity" xmlns:a="http://schemas.microsoft.com/ado/2009/02/edm/annotation" />
+    <Property Name="KAYNAK_GLNNO" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="DOCUMENT_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="DOCUMENT_DATE" Type="DateTime" Precision="3" />
+    <Property Name="CARRIER_LABEL" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="GTIN" Type="String" MaxLength="14" FixedLength="false" Unicode="false" />
+    <Property Name="SERIAL_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="LOT_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="DATE" Type="String" MaxLength="10" FixedLength="false" Unicode="false" />
+    <Property Name="KOLI_BARKOD" Type="String" MaxLength="50" FixedLength="false" Unicode="false" />
+    <Property Name="TRANSFER_ID" Type="Int64" />
+    <Property Name="DURUM" Type="String" MaxLength="10" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="TRANSFER_CARI">
+    <Key>
+      <PropertyRef Name="ID" />
+      <PropertyRef Name="TARIH" />
+      <PropertyRef Name="TRANSFER_ID" />
+      <PropertyRef Name="KAYNAK_GLNNO" />
+    </Key>
+    <Property Name="ID" Type="Int32" Nullable="false" a:StoreGeneratedPattern="Identity" xmlns:a="http://schemas.microsoft.com/ado/2009/02/edm/annotation" />
+    <Property Name="TARIH" Type="String" Nullable="false" MaxLength="12" FixedLength="false" Unicode="false" />
+    <Property Name="TRANSFER_ID" Type="Int64" Nullable="false" />
+    <Property Name="KAYNAK_GLNNO" Type="String" Nullable="false" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_UNVAN" Type="String" MaxLength="4000" FixedLength="false" Unicode="true" />
+    <Property Name="DURUM" Type="String" MaxLength="5" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="VIEWTRANSFER_DETAY">
+    <Key>
+      <PropertyRef Name="ID" />
+    </Key>
+    <Property Name="ID" Type="Int32" Nullable="false" />
+    <Property Name="KAYNAK_GLNNO" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="DOCUMENT_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="DOCUMENT_DATE" Type="DateTime" Precision="3" />
+    <Property Name="CARRIER_LABEL" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="GTIN" Type="String" MaxLength="14" FixedLength="false" Unicode="false" />
+    <Property Name="SERIAL_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="LOT_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="DATE" Type="String" MaxLength="10" FixedLength="false" Unicode="false" />
+    <Property Name="KOLI_BARKOD" Type="String" MaxLength="50" FixedLength="false" Unicode="false" />
+    <Property Name="TRANSFER_ID" Type="Int64" />
+    <Property Name="DURUM" Type="String" MaxLength="10" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_ISIM" Type="String" MaxLength="100" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="ITSHAR_VIEW">
+    <Key>
+      <PropertyRef Name="ID" />
+    </Key>
+    <Property Name="ID" Type="Int32" Nullable="false" />
+    <Property Name="TIP" Type="Int32" />
+    <Property Name="EVRAK_SERI" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_KOD" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="BARKOD" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="SERI_NO" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="MIAD" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="PARTINO" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="DURUM" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KOD" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_ISIM" Type="String" MaxLength="4000" FixedLength="false" Unicode="true" />
+    <Property Name="MESAJ" Type="String" MaxLength="Max" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="PTSHAR_VIEW">
+    <Key>
+      <PropertyRef Name="ID" />
+      <PropertyRef Name="MESAJ" />
+    </Key>
+    <Property Name="ID" Type="Int32" Nullable="false" />
+    <Property Name="KAYNAK_GLNNO" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="DOCUMENT_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="DOCUMENT_DATE" Type="DateTime" Precision="3" />
+    <Property Name="CARRIER_LABEL" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="GTIN" Type="String" MaxLength="14" FixedLength="false" Unicode="false" />
+    <Property Name="SERIAL_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="LOT_NUMBER" Type="String" MaxLength="20" FixedLength="false" Unicode="false" />
+    <Property Name="DATE" Type="String" MaxLength="10" FixedLength="false" Unicode="false" />
+    <Property Name="KOLI_BARKOD" Type="String" MaxLength="50" FixedLength="false" Unicode="false" />
+    <Property Name="TRANSFER_ID" Type="Int64" />
+    <Property Name="DURUM" Type="String" MaxLength="10" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_ISIM" Type="String" MaxLength="4000" FixedLength="false" Unicode="true" />
+    <Property Name="MESAJ" Type="String" Nullable="false" MaxLength="Max" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="BILDIRIM_STOK">
+    <Key>
+      <PropertyRef Name="BARKOD" />
+      <PropertyRef Name="STOK_KODU" />
+    </Key>
+    <Property Name="TIP" Type="Int32" />
+    <Property Name="RECNO" Type="Int64" />
+    <Property Name="EVRAK_SERI" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KOD" Type="String" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="REYON_KODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+    <Property Name="BARKOD" Type="String" Nullable="false" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_KODU" Type="String" Nullable="false" MaxLength="35" FixedLength="false" Unicode="false" />
+    <Property Name="STOK_ISIM" Type="String" MaxLength="100" FixedLength="false" Unicode="false" />
+    <Property Name="MIKTAR" Type="Double" />
+    <Property Name="KARSILANAN" Type="Int32" />
+    <Property Name="BAKIYE" Type="Double" />
+    <Property Name="KALAN" Type="Double" />
+    <Property Name="BOLUM_KODU" Type="String" MaxLength="25" FixedLength="false" Unicode="false" />
+    <Property Name="KOSULKODU" Type="String" MaxLength="8" FixedLength="false" Unicode="false" />
+  </EntityType>
+  <EntityType Name="BILDIRIM">
+    <Key>
+      <PropertyRef Name="FTIRSIP" />
+      <PropertyRef Name="DURUM" />
+      <PropertyRef Name="TARIH" />
+      <PropertyRef Name="EVRAK_NO" />
+      <PropertyRef Name="CARI_KOD" />
+      <PropertyRef Name="ACIKLAMA" />
+    </Key>
+    <Property Name="TIP" Type="Int32" />
+    <Property Name="FTIRSIP" Type="String" Nullable="false" MaxLength="1" FixedLength="true" Unicode="false" />
+    <Property Name="DURUM" Type="String" Nullable="false" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="TARIH" Type="DateTime" Nullable="false" Precision="3" />
+    <Property Name="EVRAK_NO" Type="String" Nullable="false" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_KOD" Type="String" Nullable="false" MaxLength="15" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_UNVAN" Type="String" MaxLength="4000" FixedLength="false" Unicode="true" />
+    <Property Name="GLNNO" Type="String" MaxLength="60" FixedLength="false" Unicode="false" />
+    <Property Name="CARI_IL" Type="String" MaxLength="4000" FixedLength="false" Unicode="true" />
+    <Property Name="CARI_ILCE" Type="String" MaxLength="4000" FixedLength="false" Unicode="true" />
+    <Property Name="SIRANO" Type="Int32" />
+    <Property Name="SIPDURUM" Type="String" MaxLength="30" FixedLength="false" Unicode="false" />
+    <Property Name="ACIKLAMA" Type="String" Nullable="false" MaxLength="4000" FixedLength="false" Unicode="true" />
+    <Property Name="TUTAR" Type="Double" />
+    <Property Name="SAAT" Type="String" MaxLength="5" FixedLength="false" Unicode="false" />
+  </EntityType>
+</Schema>

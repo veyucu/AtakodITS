@@ -1,0 +1,180 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--Project was exported from assembly: C:\Dosyalar\Müşteriler\Afyon Şifa\NetProITS\NetProITS\NetProITS.exe-->
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{8BF77C53-E689-4058-BC25-3F7BD67AAA75}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>atakodb2b</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <ApplicationVersion>1.0.0.0</ApplicationVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="DevExpress.Data.v17.1">
+      <HintPath>lib\DevExpress.Data.v17.1.dll</HintPath>
+    </Reference>
+    <Reference Include="DevExpress.Utils.v17.1">
+      <HintPath>lib\DevExpress.Utils.v17.1.dll</HintPath>
+    </Reference>
+    <Reference Include="DevExpress.XtraBars.v17.1">
+      <HintPath>lib\DevExpress.XtraBars.v17.1.dll</HintPath>
+    </Reference>
+    <Reference Include="DevExpress.XtraEditors.v17.1">
+      <HintPath>lib\DevExpress.XtraEditors.v17.1.dll</HintPath>
+    </Reference>
+    <Reference Include="DevExpress.XtraGrid.v17.1">
+      <HintPath>lib\DevExpress.XtraGrid.v17.1.dll</HintPath>
+    </Reference>
+    <Reference Include="EntityFramework">
+      <HintPath>lib\EntityFramework.dll</HintPath>
+    </Reference>
+    <Reference Include="FastReport">
+      <HintPath>lib\FastReport.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>lib\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>lib\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="RestSharp">
+      <HintPath>lib\RestSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.Entity" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="NetProITS\BILDIRIM.cs" />
+    <Compile Include="NetProITS\BildirimHelper.cs" />
+    <Compile Include="NetProITS\BILDIRIM_STOK.cs" />
+    <Compile Include="NetProITS\FIRMAEntities.cs" />
+    <Compile Include="NetProITS\FrmAdet.cs" />
+    <Compile Include="NetProITS\FrmAyarlar.cs" />
+    <Compile Include="NetProITS\FrmEvrakNo.cs" />
+    <Compile Include="NetProITS\FrmEvrakTip.cs" />
+    <Compile Include="NetProITS\FrmExportSettings.cs" />
+    <Compile Include="NetProITS\FrmFoy.cs" />
+    <Compile Include="NetProITS\FrmCariSecim.cs" />
+    <Compile Include="NetProITS\FrmMesaj.cs" />
+    <Compile Include="NetProITS\FrmSerbestBildirim.cs" />
+    <Compile Include="NetProITS\FrmDeaktivasyon.cs" />
+    <Compile Include="NetProITS\FrmBildirimSonuc.cs" />
+    <Compile Include="NetProITS\FrmKalemDetay.cs" />
+    <Compile Include="NetProITS\FrmKoliSonuc.cs" />
+    <Compile Include="NetProITS\FrmPaketTransfer.cs" />
+    <Compile Include="NetProITS\FrmPaketYonetim.cs" />
+    <Compile Include="NetProITS\FrmBildirim.cs" />
+    <Compile Include="NetProITS\FrmGiris.cs" />
+    <Compile Include="NetProITS\FrmKareKod.cs" />
+    <Compile Include="NetProITS\FrmSatisBildirimi.cs" />
+    <Compile Include="NetProITS\FrmYaziciSec.cs" />
+    <Compile Include="NetProITS\HATA_KODLARI.cs" />
+    <Compile Include="NetProITS\ITSHAR.cs" />
+    <Compile Include="NetProITS\ITSHAR_VIEW.cs" />
+    <Compile Include="NetProITS\MikroDB_V14Entities.cs" />
+    <Compile Include="NetProITS\KalemTipi.cs" />
+    <Compile Include="NetProITS\EvrakTipi.cs" />
+    <Compile Include="NetProITS\Sirketler.cs" />
+    <Compile Include="NetProITS\BildirimClass.cs" />
+    <Compile Include="NetProITS\BildirimStokClass.cs" />
+    <Compile Include="NetProITS\ItsHarClass.cs" />
+    <Compile Include="NetProITS\MEVCUT_STOK.cs" />
+    <Compile Include="NetProITS\DurumClass.cs" />
+    <Compile Include="NetProITS\CariKart.cs" />
+    <Compile Include="NetProITS\KarekodBilgi.cs" />
+    <Compile Include="NetProITS\MyUtils.cs" />
+    <Compile Include="NetProITS\Program.cs" />
+    <Compile Include="NetProITS\PTSHAR_VIEW.cs" />
+    <Compile Include="NetProITS\TBLFATUIRS.cs" />
+    <Compile Include="NetProITS\TBLSIPAMAS.cs" />
+    <Compile Include="NetProITS\TBLSTSABIT.cs" />
+    <Compile Include="NetProITS\TBLTRANSFER.cs" />
+    <Compile Include="NetProITS\TBLTRANSFER_DETAY.cs" />
+    <Compile Include="NetProITS\TBL_AYARLAR.cs" />
+    <Compile Include="NetProITS\TRANSFER_CARI.cs" />
+    <Compile Include="NetProITS\VIEWTRANSFER_DETAY.cs" />
+    <Compile Include="NetProITS\Properties\Resources.cs" />
+    <Compile Include="NetProITS\Properties\Settings.cs" />
+    <Compile Include="NetOpenX50\Basim.cs" />
+    <Compile Include="NetOpenX50\FatKalem.cs" />
+    <Compile Include="NetOpenX50\FatUst.cs" />
+    <Compile Include="NetOpenX50\Fatura.cs" />
+    <Compile Include="NetOpenX50\IBasim.cs" />
+    <Compile Include="NetOpenX50\IData.cs" />
+    <Compile Include="NetOpenX50\IFatKalem.cs" />
+    <Compile Include="NetOpenX50\IFatUst.cs" />
+    <Compile Include="NetOpenX50\IFatura.cs" />
+    <Compile Include="NetOpenX50\IKernel.cs" />
+    <Compile Include="NetOpenX50\IMerkez.cs" />
+    <Compile Include="NetOpenX50\INetRS.cs" />
+    <Compile Include="NetOpenX50\ISirket.cs" />
+    <Compile Include="NetOpenX50\Kernel.cs" />
+    <Compile Include="NetOpenX50\NetRS.cs" />
+    <Compile Include="NetOpenX50\Sirket.cs" />
+    <Compile Include="NetOpenX50\TFaturaTip.cs" />
+    <Compile Include="NetOpenX50\TFaturaTipi.cs" />
+    <Compile Include="NetOpenX50\TVTTipi.cs" />
+    <Compile Include="AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Firma.csdl" />
+    <EmbeddedResource Include="Firma.msl" />
+    <EmbeddedResource Include="Firma.ssdl" />
+    <EmbeddedResource Include="MikroMain.csdl" />
+    <EmbeddedResource Include="MikroMain.msl" />
+    <EmbeddedResource Include="MikroMain.ssdl" />
+    <EmbeddedResource Include="NetProITS\exe.licenses" />
+    <EmbeddedResource Include="NetProITS\FrmAdet.resx" />
+    <EmbeddedResource Include="NetProITS\FrmAyarlar.resx" />
+    <EmbeddedResource Include="NetProITS\FrmBildirim.resx" />
+    <EmbeddedResource Include="NetProITS\FrmBildirimSonuc.resx" />
+    <EmbeddedResource Include="NetProITS\FrmCariSecim.resx" />
+    <EmbeddedResource Include="NetProITS\FrmDeaktivasyon.resx" />
+    <EmbeddedResource Include="NetProITS\FrmEvrakNo.resx" />
+    <EmbeddedResource Include="NetProITS\FrmEvrakTip.resx" />
+    <EmbeddedResource Include="NetProITS\FrmExportSettings.resx" />
+    <EmbeddedResource Include="NetProITS\FrmFoy.resx" />
+    <EmbeddedResource Include="NetProITS\FrmGiris.resx" />
+    <EmbeddedResource Include="NetProITS\FrmKalemDetay.resx" />
+    <EmbeddedResource Include="NetProITS\FrmKareKod.resx" />
+    <EmbeddedResource Include="NetProITS\FrmKoliSonuc.resx" />
+    <EmbeddedResource Include="NetProITS\FrmMesaj.resx" />
+    <EmbeddedResource Include="NetProITS\FrmPaketTransfer.resx" />
+    <EmbeddedResource Include="NetProITS\FrmPaketYonetim.resx" />
+    <EmbeddedResource Include="NetProITS\FrmSatisBildirimi.resx" />
+    <EmbeddedResource Include="NetProITS\FrmSerbestBildirim.resx" />
+    <EmbeddedResource Include="NetProITS\FrmYaziciSec.resx" />
+    <EmbeddedResource Include="NetProITS\Properties\Resources.resx" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
