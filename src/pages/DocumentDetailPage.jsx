@@ -385,28 +385,65 @@ const DocumentDetailPage = () => {
     },
     {
       headerName: 'Üretim Tarihi',
-      field: 'uretimTarihi',
-      width: 130,
+      field: 'uretimTarihiDisplay',
+      width: 150,
       cellClass: 'text-center font-semibold',
       editable: true,
-      cellEditor: 'agTextCellEditor',
-      valueParser: (params) => {
-        // YYMMDD formatında gir (6 karakter)
-        const value = params.newValue
-        if (value && value.length === 6) {
-          return value
+      cellEditor: 'agDateStringCellEditor',
+      cellEditorParams: {
+        min: '2000-01-01',
+        max: '2099-12-31'
+      },
+      valueFormatter: (params) => {
+        // YYMMDD -> DD.MM.YYYY formatına çevir (gösterim için)
+        if (!params.value) return ''
+        
+        // Eğer zaten YYYY-MM-DD formatındaysa
+        if (params.value.includes('-')) {
+          const [yyyy, mm, dd] = params.value.split('-')
+          return `${dd}.${mm}.${yyyy}`
         }
-        return params.oldValue
+        
+        // YYMMDD formatından DD.MM.YYYY'ye
+        if (params.value.length === 6) {
+          const yy = params.value.substring(0, 2)
+          const mm = params.value.substring(2, 4)
+          const dd = params.value.substring(4, 6)
+          const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+          return `${dd}.${mm}.${yyyy}`
+        }
+        return params.value
+      },
+      valueParser: (params) => {
+        // YYYY-MM-DD -> YYMMDD formatına çevir (internal storage için)
+        const value = params.newValue
+        if (!value) return ''
+        
+        if (value.includes('-')) {
+          // YYYY-MM-DD formatından parse et
+          const [yyyy, mm, dd] = value.split('-')
+          const yy = yyyy.substring(2, 4)
+          return `${yy}${mm}${dd}`
+        }
+        return value
       }
     },
     {
       headerName: 'Miktar',
       field: 'miktar',
-      width: 100,
+      width: 120,
       cellClass: 'text-center font-bold',
       editable: true,
       cellEditor: 'agNumberCellEditor',
-      valueParser: (params) => Number(params.newValue)
+      cellEditorParams: {
+        min: 1,
+        max: 9999,
+        precision: 0
+      },
+      valueParser: (params) => {
+        const val = Number(params.newValue)
+        return val > 0 ? val : 1
+      }
     }
   ], [])
 
@@ -879,7 +916,22 @@ const DocumentDetailPage = () => {
       const response = await apiService.getUTSBarcodeRecords(order.id, item.itemId)
       
       if (response.success) {
-        setUtsRecords(response.data || [])
+        // Kayıtlara uretimTarihiDisplay ekle (YYMMDD -> YYYY-MM-DD)
+        const enrichedRecords = (response.data || []).map(record => {
+          let uretimTarihiDisplay = ''
+          if (record.uretimTarihi && record.uretimTarihi.length === 6) {
+            const yy = record.uretimTarihi.substring(0, 2)
+            const mm = record.uretimTarihi.substring(2, 4)
+            const dd = record.uretimTarihi.substring(4, 6)
+            const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+            uretimTarihiDisplay = `${yyyy}-${mm}-${dd}`
+          }
+          return {
+            ...record,
+            uretimTarihiDisplay
+          }
+        })
+        setUtsRecords(enrichedRecords)
       } else {
         showMessage('UTS kayıtları yüklenemedi', 'error')
       }
@@ -922,7 +974,22 @@ const DocumentDetailPage = () => {
         // Kayıtları yeniden yükle
         const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
         if (response.success) {
-          setUtsRecords(response.data || [])
+          // Kayıtlara uretimTarihiDisplay ekle (YYMMDD -> YYYY-MM-DD)
+          const enrichedRecords = (response.data || []).map(record => {
+            let uretimTarihiDisplay = ''
+            if (record.uretimTarihi && record.uretimTarihi.length === 6) {
+              const yy = record.uretimTarihi.substring(0, 2)
+              const mm = record.uretimTarihi.substring(2, 4)
+              const dd = record.uretimTarihi.substring(4, 6)
+              const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+              uretimTarihiDisplay = `${yyyy}-${mm}-${dd}`
+            }
+            return {
+              ...record,
+              uretimTarihiDisplay
+            }
+          })
+          setUtsRecords(enrichedRecords)
           setSelectedUTSRecords([])
         }
         
@@ -947,6 +1014,7 @@ const DocumentDetailPage = () => {
       seriNo: '',
       lot: '',
       uretimTarihi: '',
+      uretimTarihiDisplay: '',
       miktar: 1,
       isNew: true
     }
@@ -960,116 +1028,183 @@ const DocumentDetailPage = () => {
     }, 100)
   }
 
-  // UTS Grid'de Hücre Değiştiğinde Kaydet
-  const handleUTSCellValueChanged = async (params) => {
-    const updatedRow = params.data
-
-    // Boş satırı kaydetme
-    if (!updatedRow.seriNo && !updatedRow.lot) {
-      // Eğer kullanıcı herhangi bir veri girmemişse, sessizce devam et
-      return
-    }
-
-    // Validasyon
-    if (!updatedRow.uretimTarihi) {
-      showMessage('❌ Üretim Tarihi girilmeli (YYMMDD)', 'error')
-      playErrorSound()
-      // Eski değere geri dön
-      params.node.setData(params.oldValue)
-      return
-    }
-
-    if (updatedRow.uretimTarihi.length !== 6) {
-      showMessage('❌ Üretim Tarihi 6 karakter olmalı (YYMMDD)', 'error')
-      playErrorSound()
-      // Eski değere geri dön
-      params.node.setData(params.oldValue)
-      return
-    }
-
-    if (!updatedRow.miktar || updatedRow.miktar <= 0) {
-      showMessage('❌ Miktar 0\'dan büyük olmalı', 'error')
-      playErrorSound()
-      // Eski değere geri dön
-      params.node.setData(params.oldValue)
-      return
-    }
-
-    // Seri no varsa miktar 1 olmalı
-    if (updatedRow.seriNo && updatedRow.miktar !== 1) {
-      updatedRow.miktar = 1
-      params.node.setData(updatedRow)
-      showMessage('⚠️ Seri No girildiğinde miktar 1 olarak ayarlandı', 'warning')
-    }
-
-    // Belge tarihini formatla
-    let belgeTarihiFormatted
-    if (order.orderDate) {
-      const date = new Date(order.orderDate)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      belgeTarihiFormatted = `${year}-${month}-${day}`
-    } else {
-      const today = new Date()
-      const year = today.getFullYear()
-      const month = String(today.getMonth() + 1).padStart(2, '0')
-      const day = String(today.getDate()).padStart(2, '0')
-      belgeTarihiFormatted = `${year}-${month}-${day}`
-    }
-
+  // Tüm UTS Kayıtlarını Kaydet
+  const handleSaveAllUTSRecords = async () => {
     try {
-      // Backend'e kaydet
-      const result = await apiService.saveUTSBarcode({
-        barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
-        documentId: order.id,
-        itemId: selectedUTSItem.itemId,
-        stokKodu: selectedUTSItem.stokKodu,
-        belgeTip: selectedUTSItem.stharHtur,
-        gckod: selectedUTSItem.stharGckod || '',
-        belgeNo: order.orderNo,
-        belgeTarihi: belgeTarihiFormatted,
-        docType: order.docType,
-        expectedQuantity: selectedUTSItem.quantity,
-        seriNo: updatedRow.seriNo || '',
-        lotNo: updatedRow.lot || '',
-        uretimTarihi: updatedRow.uretimTarihi,
-        miktar: updatedRow.miktar
+      // Grid'den tüm satırları al
+      const allRows = []
+      utsGridRef.current.api.forEachNode(node => allRows.push(node.data))
+
+      // Boş satırları filtrele
+      const validRows = allRows.filter(row => row.seriNo || row.lot)
+
+      if (validRows.length === 0) {
+        showMessage('❌ Kaydedilecek satır yok!', 'error')
+        playErrorSound()
+        return
+      }
+
+      // Validasyonlar
+      for (let i = 0; i < validRows.length; i++) {
+        const row = validRows[i]
+        const rowNum = i + 1
+
+        // Seri No veya Lot No zorunlu
+        if (!row.seriNo && !row.lot) {
+          showMessage(`❌ Satır ${rowNum}: Seri No veya Lot No girilmeli!`, 'error')
+          playErrorSound()
+          return
+        }
+
+        // Üretim Tarihi zorunlu ve 6 karakter
+        if (!row.uretimTarihi && !row.uretimTarihiDisplay) {
+          showMessage(`❌ Satır ${rowNum}: Üretim Tarihi girilmeli!`, 'error')
+          playErrorSound()
+          return
+        }
+
+        // Tarih formatı kontrolü (YYMMDD veya YYYY-MM-DD)
+        let uretimTarihiYYMMDD = row.uretimTarihi
+        if (row.uretimTarihiDisplay && row.uretimTarihiDisplay.includes('-')) {
+          // YYYY-MM-DD -> YYMMDD
+          const [yyyy, mm, dd] = row.uretimTarihiDisplay.split('-')
+          uretimTarihiYYMMDD = `${yyyy.substring(2, 4)}${mm}${dd}`
+        }
+
+        if (uretimTarihiYYMMDD.length !== 6) {
+          showMessage(`❌ Satır ${rowNum}: Üretim Tarihi geçersiz format!`, 'error')
+          playErrorSound()
+          return
+        }
+
+        // Miktar kontrolü
+        if (!row.miktar || row.miktar <= 0) {
+          showMessage(`❌ Satır ${rowNum}: Miktar 0'dan büyük olmalı!`, 'error')
+          playErrorSound()
+          return
+        }
+
+        // Seri no varsa miktar 1 olmalı
+        if (row.seriNo && row.miktar !== 1) {
+          showMessage(`❌ Satır ${rowNum}: Seri No girildiğinde miktar 1 olmalı!`, 'error')
+          playErrorSound()
+          return
+        }
+      }
+
+      // Aynı Lot No kontrolü (Seri No yoksa lot tekil olmalı)
+      const lotsWithoutSerial = validRows.filter(r => !r.seriNo && r.lot)
+      const lotCounts = {}
+      lotsWithoutSerial.forEach(row => {
+        lotCounts[row.lot] = (lotCounts[row.lot] || 0) + 1
       })
-
-      if (result.success) {
-        showMessage('✅ Kayıt kaydedildi', 'success')
-        playSuccessSound()
-
-        // Grid'i yenile
-        const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
-        if (response.success) {
-          setUtsRecords(response.data || [])
-        }
-
-        // Ana grid'i güncelle
-        const docResponse = await apiService.getDocumentById(order.id)
-        if (docResponse.success && docResponse.data) {
-          setItems(docResponse.data.items || [])
-          updateStats(docResponse.data.items || [])
-        }
-      } else if (result.error === 'QUANTITY_EXCEEDED') {
-        showMessage(`❌ MİKTAR AŞIMI! ${result.message}`, 'error')
+      
+      const duplicateLots = Object.keys(lotCounts).filter(lot => lotCounts[lot] > 1)
+      if (duplicateLots.length > 0) {
+        showMessage(`❌ Aynı Lot numarası birden fazla satırda kullanılamaz: ${duplicateLots.join(', ')}`, 'error')
         playErrorSound()
-        // Eski değere geri dön
-        params.node.setData(params.oldValue)
+        return
+      }
+
+      // Toplam miktar kontrolü
+      const totalMiktar = validRows.reduce((sum, row) => sum + (row.miktar || 0), 0)
+      if (totalMiktar > selectedUTSItem.quantity) {
+        showMessage(`❌ Toplam miktar (${totalMiktar}) belge kalemindeki miktarı (${selectedUTSItem.quantity}) geçemez!`, 'error')
+        playErrorSound()
+        return
+      }
+
+      // Belge tarihini formatla
+      let belgeTarihiFormatted
+      if (order.orderDate) {
+        const date = new Date(order.orderDate)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        belgeTarihiFormatted = `${year}-${month}-${day}`
       } else {
-        showMessage(`❌ ${result.message}`, 'error')
-        playErrorSound()
-        // Eski değere geri dön
-        params.node.setData(params.oldValue)
+        const today = new Date()
+        const year = today.getFullYear()
+        const month = String(today.getMonth() + 1).padStart(2, '0')
+        const day = String(today.getDate()).padStart(2, '0')
+        belgeTarihiFormatted = `${year}-${month}-${day}`
+      }
+
+      // Her satırı backend'e kaydet
+      let savedCount = 0
+      for (const row of validRows) {
+        // Tarih formatı dönüşümü
+        let uretimTarihiYYMMDD = row.uretimTarihi
+        if (row.uretimTarihiDisplay && row.uretimTarihiDisplay.includes('-')) {
+          const [yyyy, mm, dd] = row.uretimTarihiDisplay.split('-')
+          uretimTarihiYYMMDD = `${yyyy.substring(2, 4)}${mm}${dd}`
+        }
+
+        const result = await apiService.saveUTSBarcode({
+          barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
+          documentId: order.id,
+          itemId: selectedUTSItem.itemId,
+          stokKodu: selectedUTSItem.stokKodu,
+          belgeTip: selectedUTSItem.stharHtur,
+          gckod: selectedUTSItem.stharGckod || '',
+          belgeNo: order.orderNo,
+          belgeTarihi: belgeTarihiFormatted,
+          docType: order.docType,
+          expectedQuantity: selectedUTSItem.quantity,
+          seriNo: row.seriNo || '',
+          lotNo: row.lot || '',
+          uretimTarihi: uretimTarihiYYMMDD,
+          miktar: row.miktar
+        })
+
+        if (result.success) {
+          savedCount++
+        } else if (result.error === 'QUANTITY_EXCEEDED') {
+          showMessage(`❌ MİKTAR AŞIMI! ${result.message}`, 'error')
+          playErrorSound()
+          return
+        } else {
+          showMessage(`❌ Kayıt hatası: ${result.message}`, 'error')
+          playErrorSound()
+          return
+        }
+      }
+
+      // Başarılı
+      showMessage(`✅ ${savedCount} kayıt başarıyla kaydedildi!`, 'success')
+      playSuccessSound()
+
+      // Grid'i yenile
+      const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
+      if (response.success) {
+        // Kayıtlara uretimTarihiDisplay ekle (YYMMDD -> YYYY-MM-DD)
+        const enrichedRecords = (response.data || []).map(record => {
+          let uretimTarihiDisplay = ''
+          if (record.uretimTarihi && record.uretimTarihi.length === 6) {
+            const yy = record.uretimTarihi.substring(0, 2)
+            const mm = record.uretimTarihi.substring(2, 4)
+            const dd = record.uretimTarihi.substring(4, 6)
+            const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+            uretimTarihiDisplay = `${yyyy}-${mm}-${dd}`
+          }
+          return {
+            ...record,
+            uretimTarihiDisplay
+          }
+        })
+        setUtsRecords(enrichedRecords)
+      }
+
+      // Ana grid'i güncelle
+      const docResponse = await apiService.getDocumentById(order.id)
+      if (docResponse.success && docResponse.data) {
+        setItems(docResponse.data.items || [])
+        updateStats(docResponse.data.items || [])
       }
     } catch (error) {
-      console.error('UTS kayıt güncelleme hatası:', error)
-      showMessage('❌ Kayıt güncellenirken hata oluştu', 'error')
+      console.error('UTS toplu kayıt hatası:', error)
+      showMessage('❌ Kayıt sırasında hata oluştu', 'error')
       playErrorSound()
-      // Eski değere geri dön
-      params.node.setData(params.oldValue)
     }
   }
 
@@ -1529,8 +1664,16 @@ const DocumentDetailPage = () => {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-xs text-red-100">Toplam Okutulan</p>
-                    <p className="text-2xl font-bold">{utsRecords.reduce((sum, r) => sum + (r.miktar || 0), 0)}</p>
+                    <p className="text-xs text-red-100">Beklenen / Okutulan / Kalan</p>
+                    <p className="text-2xl font-bold">
+                      <span className="text-red-100">{selectedUTSItem.quantity}</span>
+                      {' / '}
+                      <span>{utsRecords.reduce((sum, r) => sum + (r.miktar || 0), 0)}</span>
+                      {' / '}
+                      <span className={utsRecords.reduce((sum, r) => sum + (r.miktar || 0), 0) >= selectedUTSItem.quantity ? 'text-green-300' : 'text-yellow-300'}>
+                        {selectedUTSItem.quantity - utsRecords.reduce((sum, r) => sum + (r.miktar || 0), 0)}
+                      </span>
+                    </p>
                   </div>
                   <button
                     onClick={handleCloseUTSModal}
@@ -1565,10 +1708,10 @@ const DocumentDetailPage = () => {
                       const selected = event.api.getSelectedRows()
                       setSelectedUTSRecords(selected.map(r => r.seriNo))
                     }}
-                    onCellValueChanged={handleUTSCellValueChanged}
                     animateRows={true}
                     enableCellTextSelection={true}
                     singleClickEdit={true}
+                    stopEditingWhenCellsLoseFocus={true}
                   />
                 )}
               </div>
@@ -1577,22 +1720,35 @@ const DocumentDetailPage = () => {
               <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                 <button
                   onClick={handleAddNewUTSRow}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg flex items-center gap-2"
                 >
                   ➕ Yeni Satır Ekle
+                </button>
+                <button
+                  onClick={handleSaveAllUTSRecords}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2"
+                >
+                  💾 Kaydet
                 </button>
                 <button
                   onClick={handleDeleteUTSRecords}
                   disabled={selectedUTSRecords.length === 0}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
                 >
-                  Seçilenleri Sil
+                  🗑️ Seçilenleri Sil
                 </button>
+                <div className="flex-1" />
                 {selectedUTSRecords.length > 0 && (
                   <span className="text-sm text-gray-600 font-semibold">
                     {selectedUTSRecords.length} kayıt seçildi
                   </span>
                 )}
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Toplam Miktar</p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {utsRecords.reduce((sum, r) => sum + (r.miktar || 0), 0)} / {selectedUTSItem.quantity}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
