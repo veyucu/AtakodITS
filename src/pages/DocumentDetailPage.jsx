@@ -803,7 +803,8 @@ const DocumentDetailPage = () => {
   // ITS Karekodları Text Formatında Oluştur
   const generateITSBarcodeTexts = () => {
     return itsRecords.map(record => {
-      // Format: 010+ILC_GTIN+21+SERI_NO+17+ACIK1+10+ACIK2
+      // Format: 010 + ILC_GTIN + 21 + SERI_NO + 17 + ACIK1 + 10 + ACIK2
+      // + işaretleri olmadan, değerler direkt birleştirilir
       const parts = [
         '010',
         record.barkod || '',
@@ -814,7 +815,7 @@ const DocumentDetailPage = () => {
         '10',
         record.lot || ''
       ]
-      return parts.join('+')
+      return parts.join('')
     }).join('\n')
   }
   
@@ -1321,7 +1322,7 @@ const DocumentDetailPage = () => {
                       📋 Tümünü Kopyala
                     </button>
                     <span className="text-sm text-gray-600">
-                      Format: 010+BARKOD+21+SERİNO+17+MİAD+10+LOT
+                      Format: 010BARKOD21SERİNO17MİAD10LOT
                     </span>
                   </div>
                 </>
