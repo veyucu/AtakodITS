@@ -5,6 +5,24 @@ import * as ptsDbService from '../services/ptsDbService.js'
 const router = express.Router()
 
 /**
+ * GET /api/pts/transfers
+ * Tüm PTS transferlerini getir
+ */
+router.get('/transfers', async (req, res) => {
+  try {
+    const transfers = await ptsDbService.getAllTransfers()
+    res.json(transfers)
+  } catch (error) {
+    console.error('❌ PTS transfer listesi getirme hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Transfer listesi alınamadı',
+      error: error.message
+    })
+  }
+})
+
+/**
  * POST /api/pts/search
  * Tarih aralığında paket listesi sorgula
  */

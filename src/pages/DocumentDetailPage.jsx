@@ -2124,12 +2124,6 @@ const DocumentDetailPage = () => {
               {/* Action Bar - Fixed at Bottom */}
               <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                 <button
-                  onClick={() => alert(`State Kontrol:\n\nutsHasChanges = ${utsHasChanges}\n\nBu değer "true" olmalı!`)}
-                  className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors shadow-lg"
-                >
-                  🧪
-                </button>
-                <button
                   onClick={handleAddNewUTSRow}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg flex items-center gap-2"
                 >

@@ -446,6 +446,17 @@ const apiService = {
         message: error.response?.data?.message || error.message || 'Carrier detayları alınamadı'
       }
     }
+  },
+
+  // Tüm PTS transferlerini getir
+  getPTSTransfers: async () => {
+    try {
+      const response = await apiClient.get('/pts/transfers')
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS transfer listesi getirme hatası:', error)
+      throw error
+    }
   }
 }
 

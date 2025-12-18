@@ -878,6 +878,42 @@ async function getCarrierDetails(transferId, carrierLabel) {
   }
 }
 
+/**
+ * Tüm PTS transferlerini getir
+ */
+export async function getAllTransfers() {
+  try {
+    const pool = await getConnection()
+    
+    const query = `
+      SELECT 
+        TRANSFER_ID,
+        GONDERICI_GLN,
+        ALICI_GLN,
+        DURUM,
+        KAYIT_TARIHI,
+        GUNCELLEME_TARIHI
+      FROM AKTBLPTSMAS WITH (NOLOCK)
+      ORDER BY KAYIT_TARIHI DESC
+    `
+    
+    const result = await pool.request().query(query)
+    
+    return result.recordset.map(row => ({
+      TRANSFER_ID: row.TRANSFER_ID,
+      GONDERICI_GLN: row.GONDERICI_GLN,
+      ALICI_GLN: row.ALICI_GLN,
+      DURUM: row.DURUM,
+      KAYIT_TARIHI: row.KAYIT_TARIHI,
+      GUNCELLEME_TARIHI: row.GUNCELLEME_TARIHI
+    }))
+    
+  } catch (error) {
+    console.error('❌ Transfer listesi getirme hatası:', error)
+    throw error
+  }
+}
+
 export {
   createTablesIfNotExists,
   savePackageData,
