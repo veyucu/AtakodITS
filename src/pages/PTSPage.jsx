@@ -16,6 +16,17 @@ const PTSPage = () => {
   const [loading, setLoading] = useState(false)
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  
+  // İndirme modal state
+  const [showDownloadModal, setShowDownloadModal] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState({
+    total: 0,
+    current: 0,
+    downloaded: 0,
+    skipped: 0,
+    failed: 0,
+    status: 'idle' // idle, searching, downloading, completed, error
+  })
 
   // Mesaj göster
   const showMessage = (text, type = 'info') => {
@@ -94,31 +105,86 @@ const PTSPage = () => {
     }
 
     try {
-      setLoading(true)
-      showMessage('📥 Paketler indiriliyor ve veritabanına kaydediliyor...', 'info')
+      // Modal'ı aç ve ilk durumu ayarla
+      setShowDownloadModal(true)
+      setDownloadProgress({
+        total: 0,
+        current: 0,
+        downloaded: 0,
+        skipped: 0,
+        failed: 0,
+        status: 'searching'
+      })
       
+      // Önce kaç paket var öğren
+      const searchResponse = await apiService.searchPackages(startDate, endDate)
+      
+      if (!searchResponse.success) {
+        setDownloadProgress(prev => ({
+          ...prev,
+          status: 'error'
+        }))
+        showMessage(`❌ ${searchResponse.message || 'Paket listesi alınamadı'}`, 'error')
+        return
+      }
+
+      const transferIds = searchResponse.data || []
+      
+      if (transferIds.length === 0) {
+        setDownloadProgress(prev => ({
+          ...prev,
+          status: 'completed',
+          total: 0
+        }))
+        showMessage('ℹ️ Belirtilen tarih aralığında paket bulunamadı', 'warning')
+        return
+      }
+
+      // Progress'i güncelle
+      setDownloadProgress(prev => ({
+        ...prev,
+        total: transferIds.length,
+        status: 'downloading'
+      }))
+
       // Toplu paket indirme ve veritabanına kaydetme
       const response = await apiService.downloadBulkPackages(startDate, endDate)
       
       if (!response.success) {
+        setDownloadProgress(prev => ({
+          ...prev,
+          status: 'error'
+        }))
         showMessage(`❌ ${response.message || 'Paketler indirilemedi'}`, 'error')
         return
       }
 
-      const { downloadedCount, savedCount, failedCount } = response.data || {}
+      const { downloaded, skipped, failed } = response.data || {}
+      
+      // Son durumu güncelle
+      setDownloadProgress(prev => ({
+        ...prev,
+        current: prev.total,
+        downloaded: downloaded || 0,
+        skipped: skipped || 0,
+        failed: failed || 0,
+        status: 'completed'
+      }))
       
       showMessage(
-        `✅ ${downloadedCount || 0} paket indirildi, ${savedCount || 0} paket veritabanına kaydedildi${
-          failedCount > 0 ? `, ${failedCount} paket başarısız` : ''
+        `✅ ${downloaded || 0} paket indirildi, ${skipped || 0} paket zaten mevcut${
+          failed > 0 ? `, ${failed} paket başarısız` : ''
         }`, 
         'success'
       )
       
     } catch (error) {
       console.error('Toplu paket indirme hatası:', error)
+      setDownloadProgress(prev => ({
+        ...prev,
+        status: 'error'
+      }))
       showMessage('❌ Paketler indirilemedi', 'error')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -489,6 +555,101 @@ const PTSPage = () => {
           </>
         )}
       </div>
+
+      {/* İndirme Progress Modal */}
+      {showDownloadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              📥 Paket İndirme
+            </h3>
+
+            {/* Status mesajı */}
+            <div className="mb-4">
+              {downloadProgress.status === 'searching' && (
+                <p className="text-gray-600">🔍 Paketler aranıyor...</p>
+              )}
+              {downloadProgress.status === 'downloading' && (
+                <p className="text-gray-600">⬇️ Paketler indiriliyor...</p>
+              )}
+              {downloadProgress.status === 'completed' && (
+                <p className="text-green-600 font-semibold">✅ İndirme tamamlandı!</p>
+              )}
+              {downloadProgress.status === 'error' && (
+                <p className="text-red-600 font-semibold">❌ İndirme başarısız!</p>
+              )}
+            </div>
+
+            {/* İstatistikler */}
+            {downloadProgress.total > 0 && (
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Toplam Paket:</span>
+                  <span className="font-bold text-gray-900">{downloadProgress.total}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">İndirilen:</span>
+                  <span className="font-bold text-green-600">{downloadProgress.downloaded}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Zaten Mevcut:</span>
+                  <span className="font-bold text-blue-600">{downloadProgress.skipped}</span>
+                </div>
+                {downloadProgress.failed > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Başarısız:</span>
+                    <span className="font-bold text-red-600">{downloadProgress.failed}</span>
+                  </div>
+                )}
+
+                {/* Progress Bar */}
+                {downloadProgress.status === 'downloading' && (
+                  <div className="mt-4">
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 transition-all duration-500 rounded-full flex items-center justify-center"
+                        style={{
+                          width: `${((downloadProgress.downloaded + downloadProgress.skipped) / downloadProgress.total) * 100}%`
+                        }}
+                      >
+                        <span className="text-xs text-white font-bold">
+                          {Math.round(((downloadProgress.downloaded + downloadProgress.skipped) / downloadProgress.total) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      {downloadProgress.downloaded + downloadProgress.skipped} / {downloadProgress.total}
+                    </p>
+                  </div>
+                )}
+
+                {/* Tamamlama Progress */}
+                {downloadProgress.status === 'completed' && (
+                  <div className="mt-4">
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div className="bg-gradient-to-r from-green-500 to-green-600 h-4 w-full transition-all duration-500 rounded-full flex items-center justify-center">
+                        <span className="text-xs text-white font-bold">100%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Butonlar */}
+            <div className="flex gap-3 justify-end mt-6">
+              {(downloadProgress.status === 'completed' || downloadProgress.status === 'error') && (
+                <button
+                  onClick={() => setShowDownloadModal(false)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Kapat
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

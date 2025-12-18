@@ -11,6 +11,7 @@ BEGIN
         [FATIRS_NO] VARCHAR(15),
         [CARI_KODU] VARCHAR(35),
         [STOK_KODU] VARCHAR(35),
+        [MIKTAR] FLOAT,
         [GTIN] VARCHAR(15),
         [SERI_NO] VARCHAR(35),
         [MIAD] VARCHAR(25),
@@ -21,8 +22,7 @@ BEGIN
         [BILDIRIM_ID] NVARCHAR(50),
         [BILDIRIM_TARIHI] DATETIME,
         [KAYIT_TARIHI] DATETIME DEFAULT GETDATE(),
-        [KULLANICI] VARCHAR(35),
-        [MIKTAR] FLOAT
+        [KULLANICI] VARCHAR(35)
     );
 
     PRINT '✅ AKTBLITSUTS tablosu oluşturuldu';
@@ -30,38 +30,6 @@ END
 ELSE
 BEGIN
     PRINT '⚠️ AKTBLITSUTS tablosu zaten mevcut';
-    
-    -- Eğer ID kolonu varsa RECNO'ya dönüştür
-    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('AKTBLITSUTS') AND name = 'ID')
-    BEGIN
-        EXEC sp_rename 'AKTBLITSUTS.ID', 'RECNO', 'COLUMN';
-        PRINT '✅ ID kolonu RECNO olarak değiştirildi';
-    END
-    
-    -- HAR_RECNO kolonu yoksa ekle
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('AKTBLITSUTS') AND name = 'HAR_RECNO')
-    BEGIN
-        ALTER TABLE AKTBLITSUTS ADD HAR_RECNO INT;
-        PRINT '✅ HAR_RECNO kolonu eklendi';
-    END
-    
-    -- MIKTAR kolonu yoksa ekle
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('AKTBLITSUTS') AND name = 'MIKTAR')
-    BEGIN
-        ALTER TABLE AKTBLITSUTS ADD MIKTAR FLOAT;
-        PRINT '✅ MIKTAR kolonu eklendi';
-    END
-END
-GO
-
--- INDEX 1: BILDIRIM_ID için index (bildirime göre sorgulama)
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AKTBLITSUTS_BILDIRIM_ID' AND object_id = OBJECT_ID('AKTBLITSUTS'))
-BEGIN
-    CREATE NONCLUSTERED INDEX [IX_AKTBLITSUTS_BILDIRIM_ID] 
-    ON [dbo].[AKTBLITSUTS] ([BILDIRIM_ID])
-    INCLUDE ([DURUM], [BILDIRIM_TARIHI]);
-    
-    PRINT '✅ BILDIRIM_ID index oluşturuldu';
 END
 GO
 
@@ -92,7 +60,7 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AKTBLITSUTS_FATIRS_NO'
 BEGIN
     CREATE NONCLUSTERED INDEX [IX_AKTBLITSUTS_FATIRS_NO] 
     ON [dbo].[AKTBLITSUTS] ([FATIRS_NO], [FTIRSIP])
-    INCLUDE ([CARI_KODU], [KAYIT_TARIHI]);
+    INCLUDE ([CARI_KODU]);
     
     PRINT '✅ FATIRS_NO index oluşturuldu';
 END
@@ -106,39 +74,6 @@ BEGIN
     INCLUDE ([GTIN], [SERI_NO], [DURUM]);
     
     PRINT '✅ CARI_KODU + STOK_KODU index oluşturuldu';
-END
-GO
-
--- INDEX 6: KAYIT_TARIHI için index (tarih bazlı sorgulama)
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AKTBLITSUTS_KAYIT_TARIHI' AND object_id = OBJECT_ID('AKTBLITSUTS'))
-BEGIN
-    CREATE NONCLUSTERED INDEX [IX_AKTBLITSUTS_KAYIT_TARIHI] 
-    ON [dbo].[AKTBLITSUTS] ([KAYIT_TARIHI] DESC)
-    INCLUDE ([DURUM], [KULLANICI]);
-    
-    PRINT '✅ KAYIT_TARIHI index oluşturuldu';
-END
-GO
-
--- INDEX 7: DURUM için index (durum bazlı filtreleme)
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AKTBLITSUTS_DURUM' AND object_id = OBJECT_ID('AKTBLITSUTS'))
-BEGIN
-    CREATE NONCLUSTERED INDEX [IX_AKTBLITSUTS_DURUM] 
-    ON [dbo].[AKTBLITSUTS] ([DURUM])
-    INCLUDE ([BILDIRIM_ID], [BILDIRIM_TARIHI], [KAYIT_TARIHI]);
-    
-    PRINT '✅ DURUM index oluşturuldu';
-END
-GO
-
--- INDEX 8: KULLANICI için index (kullanıcı bazlı sorgulama)
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_AKTBLITSUTS_KULLANICI' AND object_id = OBJECT_ID('AKTBLITSUTS'))
-BEGIN
-    CREATE NONCLUSTERED INDEX [IX_AKTBLITSUTS_KULLANICI] 
-    ON [dbo].[AKTBLITSUTS] ([KULLANICI])
-    INCLUDE ([KAYIT_TARIHI], [DURUM]);
-    
-    PRINT '✅ KULLANICI index oluşturuldu';
 END
 GO
 
