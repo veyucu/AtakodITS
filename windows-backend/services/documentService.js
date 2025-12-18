@@ -1,5 +1,7 @@
 import { getConnection } from '../config/database.js'
+import { getCarrierProductsRecursive } from './ptsDbService.js'
 import iconv from 'iconv-lite'
+import sql from 'mssql'
 
 // Türkçe karakter düzeltme fonksiyonu - SQL Server CP1254 to UTF-8
 const fixTurkishChars = (str) => {
@@ -499,6 +501,7 @@ const documentService = {
           GTIN AS BARKOD,
           MIAD,
           LOT_NO AS LOT,
+          CARRIER_LABEL,
           HAR_RECNO,
           FATIRS_NO,
           FTIRSIP,
@@ -526,6 +529,7 @@ const documentService = {
         barkod: row.BARKOD,
         miad: row.MIAD,
         lot: row.LOT,
+        carrierLabel: row.CARRIER_LABEL,
         harRecno: row.HAR_RECNO,
         fatirs_no: row.FATIRS_NO,
         ftirsip: row.FTIRSIP,
@@ -1470,6 +1474,240 @@ const documentService = {
       
     } catch (error) {
       console.error('❌ UTS Toplu Kayıt Hatası:', error)
+      throw error
+    }
+  },
+
+  // Koli Barkodu Kaydet (ITS için)
+  async saveCarrierBarcode(data) {
+    try {
+      const pool = await getConnection()
+      
+      const { carrierLabel, docId, ftirsip, cariKodu, kullanici } = data
+      
+      if (!carrierLabel) {
+        throw new Error('Koli barkodu zorunludur')
+      }
+      
+      if (!docId) {
+        throw new Error('Belge ID zorunludur')
+      }
+      
+      if (!kullanici) {
+        throw new Error('Kullanıcı bilgisi zorunludur')
+      }
+      
+      console.log('📦 Koli barkodu işleniyor:', { carrierLabel, docId, ftirsip, cariKodu, kullanici })
+      
+      // docId'yi parse et (format: SUBE_KODU-FTIRSIP-FATIRS_NO)
+      const [subeKodu, parsedFtirsip, belgeNo] = docId.split('-')
+      
+      // ftirsip parametresi yoksa parse'dan al
+      const usedFtirsip = ftirsip || parsedFtirsip
+      
+      // Belge tipine göre kalem tablosunu seç
+      // Sipariş (6) = TBLSIPATRA, Fatura (1/2) = TBLSTHAR
+      const isSiparis = usedFtirsip === '6'
+      const itemTable = isSiparis ? 'TBLSIPATRA' : 'TBLSTHAR'
+      
+      console.log(`📋 Kalemler ${itemTable} tablosundan getiriliyor (belgeNo: ${belgeNo}, ftirsip: ${usedFtirsip})`)
+      
+      // Belgedeki ITS kalemlerini getir (sadece ITS olanlar)
+      const itemsRequest = pool.request()
+      itemsRequest.input('belgeNo', belgeNo)
+      itemsRequest.input('ftirsip', usedFtirsip)
+      itemsRequest.input('cariKodu', cariKodu)
+      itemsRequest.input('subeKodu', subeKodu)
+      const itemsResult = await itemsRequest.query(`
+        SELECT 
+          s.INCKEYNO,
+          s.STOK_KODU,
+          s.STHAR_GCMIK as MIKTAR,
+          st.STOK_KODU as GTIN,
+          ISNULL((
+            SELECT SUM(MIKTAR) 
+            FROM AKTBLITSUTS WITH (NOLOCK) 
+            WHERE FATIRS_NO = @belgeNo 
+            AND STOK_KODU = s.STOK_KODU 
+            AND TURU = 'ITS'
+          ), 0) as PREPARED_QTY
+        FROM ${itemTable} s WITH (NOLOCK)
+        INNER JOIN TBLSTSABIT st WITH (NOLOCK) ON s.STOK_KODU = st.STOK_KODU
+        WHERE s.FISNO = @belgeNo AND s.STHAR_FTIRSIP = @ftirsip 
+        AND s.STHAR_ACIKLAMA = @cariKodu
+        AND st.KOD_5 = 'BESERI'
+      `)
+      
+      if (itemsResult.recordset.length === 0) {
+        throw new Error('Belgede ITS ürünü bulunamadı')
+      }
+      
+      // Belgedeki stok kodlarını topla
+      const stockCodes = itemsResult.recordset.map(item => item.GTIN).filter(g => g)
+      
+      console.log('📋 Belgedeki ITS ürünleri:', itemsResult.recordset.length)
+      console.log('📋 Stok kodları (GTIN):', stockCodes)
+      
+      // Koliden ürünleri getir (hiyerarşik)
+      const carrierResult = await getCarrierProductsRecursive(carrierLabel, stockCodes)
+      
+      if (!carrierResult.success) {
+        throw new Error(carrierResult.error || 'Koli ürünleri getirilemedi')
+      }
+      
+      const { products, allRecords } = carrierResult.data
+      
+      if (products.length === 0) {
+        throw new Error('Kolide ürün bulunamadı veya belgede olmayan ürünler var')
+      }
+      
+      console.log('📦 Kolide bulunan ürün sayısı:', products.length)
+      console.log('📦 Kolide bulunan toplam kayıt:', allRecords.length)
+      
+      // Miktar kontrolü - GTIN bazında
+      const gtinCountMap = {}
+      products.forEach(p => {
+        gtinCountMap[p.GTIN] = (gtinCountMap[p.GTIN] || 0) + 1
+      })
+      
+      // Her GTIN için miktar kontrolü yap
+      for (const item of itemsResult.recordset) {
+        const expectedQty = item.MIKTAR
+        const preparedQty = item.PREPARED_QTY
+        const remainingQty = expectedQty - preparedQty
+        const carrierQty = gtinCountMap[item.GTIN] || 0
+        
+        console.log(`🔍 GTIN ${item.GTIN} kontrolü:`, {
+          expectedQty,
+          preparedQty,
+          remainingQty,
+          carrierQty
+        })
+        
+        if (carrierQty > remainingQty) {
+          throw new Error(
+            `❌ Koli içerisindeki ürün miktarı belgedeki miktarı aşıyor!\n` +
+            `Ürün: ${item.STOK_KODU} (GTIN: ${item.GTIN})\n` +
+            `Belgede kalan: ${remainingQty}, Kolide: ${carrierQty}`
+          )
+        }
+      }
+      
+      // Duplicate seri kontrolü - Kolide okutulan serilerden herhangi biri daha önce okutulmuş mu?
+      const serialNumbers = products.map(p => p.SERIAL_NUMBER).filter(s => s)
+      
+      if (serialNumbers.length > 0) {
+        const duplicateCheckRequest = pool.request()
+        
+        // Seri numaralarını parametre olarak ekle
+        serialNumbers.forEach((serial, index) => {
+          duplicateCheckRequest.input(`serial${index}`, serial)
+        })
+        
+        const serialParams = serialNumbers.map((_, i) => `@serial${i}`).join(',')
+        
+        const duplicateResult = await duplicateCheckRequest.query(`
+          SELECT SERI_NO 
+          FROM AKTBLITSUTS WITH (NOLOCK)
+          WHERE SERI_NO IN (${serialParams})
+          AND FATIRS_NO = '${belgeNo}'
+        `)
+        
+        if (duplicateResult.recordset.length > 0) {
+          const duplicateSerials = duplicateResult.recordset.map(r => r.SERI_NO).join(', ')
+          throw new Error(`Bu seriler daha önce okutulmuş: ${duplicateSerials}`)
+        }
+      }
+      
+      // Tüm kontroller geçti, ürünleri kaydet
+      const savedCount = 0
+      const transaction = new sql.Transaction(pool)
+      
+      try {
+        await transaction.begin()
+        
+        for (const product of products) {
+          const insertRequest = transaction.request()
+          
+          insertRequest.input('turu', 'ITS')
+          insertRequest.input('ftirsip', usedFtirsip)
+          insertRequest.input('fatirs_no', belgeNo)
+          insertRequest.input('cari_kodu', cariKodu)
+          
+          // GTIN'i temizle (leading zeros kaldır)
+          const cleanGtin = product.GTIN.replace(/^0+/, '')
+          
+          // GTIN'den STOK_KODU ve HAR_RECNO'yu bul (temizlenmiş GTIN ile)
+          const stockItem = itemsResult.recordset.find(i => i.GTIN === cleanGtin)
+          const stokKodu = stockItem ? stockItem.STOK_KODU : null
+          const harRecno = stockItem ? stockItem.INCKEYNO : null
+          
+          // MIAD formatını YYAAGG'ye çevir (YYMMDD)
+          let miadFormatted = null
+          if (product.EXPIRATION_DATE) {
+            const expDate = new Date(product.EXPIRATION_DATE)
+            const yy = String(expDate.getFullYear()).slice(-2)
+            const mm = String(expDate.getMonth() + 1).padStart(2, '0')
+            const dd = String(expDate.getDate()).padStart(2, '0')
+            miadFormatted = `${yy}${mm}${dd}`
+          }
+          
+          // URETIM_TARIHI formatını YYAAGG'ye çevir
+          let productionFormatted = null
+          if (product.PRODUCTION_DATE) {
+            const prodDate = new Date(product.PRODUCTION_DATE)
+            const yy = String(prodDate.getFullYear()).slice(-2)
+            const mm = String(prodDate.getMonth() + 1).padStart(2, '0')
+            const dd = String(prodDate.getDate()).padStart(2, '0')
+            productionFormatted = `${yy}${mm}${dd}`
+          }
+          
+          insertRequest.input('har_recno', harRecno)
+          insertRequest.input('stok_kodu', stokKodu)
+          insertRequest.input('miktar', 1) // ITS her zaman 1
+          insertRequest.input('gtin', cleanGtin) // Temizlenmiş GTIN
+          insertRequest.input('seri_no', product.SERIAL_NUMBER)
+          insertRequest.input('miad', miadFormatted)
+          insertRequest.input('lot_no', product.LOT_NUMBER)
+          insertRequest.input('uretim_tarihi', productionFormatted)
+          insertRequest.input('carrier_label', product.CARRIER_LABEL)
+          insertRequest.input('container_type', product.CONTAINER_TYPE)
+          insertRequest.input('kullanici', kullanici)
+          
+          await insertRequest.query(`
+            INSERT INTO AKTBLITSUTS (
+              HAR_RECNO, TURU, FTIRSIP, FATIRS_NO, CARI_KODU, STOK_KODU, MIKTAR,
+              GTIN, SERI_NO, MIAD, LOT_NO, URETIM_TARIHI,
+              CARRIER_LABEL, CONTAINER_TYPE, KULLANICI, KAYIT_TARIHI
+            ) VALUES (
+              @har_recno, @turu, @ftirsip, @fatirs_no, @cari_kodu, @stok_kodu, @miktar,
+              @gtin, @seri_no, @miad, @lot_no, @uretim_tarihi,
+              @carrier_label, @container_type, @kullanici, GETDATE()
+            )
+          `)
+        }
+        
+        await transaction.commit()
+        
+        console.log(`✅ Koliden ${products.length} ürün başarıyla kaydedildi`)
+        
+        // Etkilenen unique GTIN'leri topla (temizlenmiş haliyle)
+        const affectedGtins = [...new Set(products.map(p => p.GTIN.replace(/^0+/, '')))]
+        
+        return {
+          success: true,
+          message: `Koliden ${products.length} ürün başarıyla eklendi`,
+          savedCount: products.length,
+          affectedGtins: affectedGtins
+        }
+        
+      } catch (error) {
+        await transaction.rollback()
+        throw error
+      }
+      
+    } catch (error) {
+      console.error('❌ Koli Barkodu Kayıt Hatası:', error)
       throw error
     }
   }

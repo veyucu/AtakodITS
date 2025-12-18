@@ -90,6 +90,15 @@
   padding: 12px 8px;
 }
 
+/* Tüm sütun başlıklarını ortala */
+.ag-theme-alpine .ag-header-cell-label {
+  justify-content: center !important;
+}
+
+.ag-theme-alpine .ag-header-cell-text {
+  text-align: center !important;
+}
+
 .ag-theme-alpine .ag-row {
   border-bottom: 1px solid #e5e7eb;
   transition: all 0.2s ease;

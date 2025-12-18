@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import documentsRouter from './routes/documents.js';
@@ -94,4 +94,3 @@ app.listen(PORT, () => {
 }
 
 startServer();
-

@@ -357,6 +357,37 @@ router.post('/download-bulk-old', async (req, res) => {
 })
 
 /**
+ * POST /api/pts/list
+ * Veritabanındaki paketleri listele (tarih filtresi ile)
+ */
+router.post('/list', async (req, res) => {
+  try {
+    const { startDate, endDate, dateFilterType = 'created' } = req.body
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Başlangıç ve bitiş tarihi gerekli'
+      })
+    }
+
+    console.log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
+
+    const result = await ptsDbService.listPackages(startDate, endDate, dateFilterType)
+    
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ PTS liste hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası',
+      error: error.message
+    })
+  }
+})
+
+/**
  * POST /api/pts/query/:transferId
  * Transfer ID ile paket detayı sorgula
  */

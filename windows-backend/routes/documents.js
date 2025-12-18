@@ -441,6 +441,59 @@ router.post('/uts-records/bulk-save', async (req, res) => {
   }
 })
 
+// POST /api/documents/carrier-barcode - Koli Barkodu Okut ve Kaydet (ITS için)
+router.post('/carrier-barcode', async (req, res) => {
+  try {
+    const {
+      carrierLabel,  // Koli barkodu
+      docId,         // Belge ID (KAYITNO)
+      ftirsip,       // Belge tipi
+      cariKodu,      // Cari kodu
+      kullanici      // Kullanıcı adı
+    } = req.body
+    
+    console.log('📦 Koli Barkodu İsteği:', { carrierLabel, docId, ftirsip, cariKodu, kullanici })
+    
+    if (!carrierLabel) {
+      return res.status(400).json({
+        success: false,
+        message: 'Koli barkodu zorunludur'
+      })
+    }
+    
+    if (!docId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Belge ID zorunludur'
+      })
+    }
+    
+    if (!kullanici) {
+      return res.status(400).json({
+        success: false,
+        message: 'Kullanıcı bilgisi zorunludur'
+      })
+    }
+    
+    // Koli barkodundan ürünleri kaydet
+    const result = await documentService.saveCarrierBarcode({
+      carrierLabel,
+      docId,
+      ftirsip,
+      cariKodu,
+      kullanici
+    })
+    
+    res.json(result)
+  } catch (error) {
+    console.error('❌ Koli Barkodu Kayıt Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Koli barkodu işlenirken hata oluştu'
+    })
+  }
+})
+
 // POST /api/documents/dgr-barcode - DGR Barkod Okut ve Kaydet (ITS olmayan normal ürünler)
 router.post('/dgr-barcode', async (req, res) => {
   try {

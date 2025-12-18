@@ -18,6 +18,7 @@ BEGIN
         [LOT_NO] VARCHAR(35),
         [URETIM_TARIHI] VARCHAR(25),
         [CARRIER_LABEL] VARCHAR(100),
+        [CONTAINER_TYPE] VARCHAR(10),
         [DURUM] VARCHAR(20),
         [BILDIRIM_ID] NVARCHAR(50),
         [BILDIRIM_TARIHI] DATETIME,
@@ -74,6 +75,17 @@ BEGIN
     INCLUDE ([GTIN], [SERI_NO], [DURUM]);
     
     PRINT '✅ CARI_KODU + STOK_KODU index oluşturuldu';
+END
+GO
+
+-- Migration: CONTAINER_TYPE kolonu ekle
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'AKTBLITSUTS') AND type in (N'U'))
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'AKTBLITSUTS') AND name = 'CONTAINER_TYPE')
+    BEGIN
+        ALTER TABLE AKTBLITSUTS ADD CONTAINER_TYPE VARCHAR(10) NULL
+        PRINT '✅ AKTBLITSUTS tablosuna CONTAINER_TYPE kolonu eklendi'
+    END
 END
 GO
 

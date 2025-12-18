@@ -217,6 +217,19 @@ const apiService = {
     }
   },
 
+  // Koli Barkodu Kaydet (ITS için)
+  saveCarrierBarcode: async (data) => {
+    try {
+      console.log('📦 Koli Barkodu gönderiliyor:', data)
+      const response = await apiClient.post('/documents/carrier-barcode', data)
+      console.log('✅ Koli Barkodu yanıtı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ Koli Barkodu hatası:', error)
+      throw error
+    }
+  },
+
   // UTS Barkod Okut ve Kaydet
   saveUTSBarcode: async (data) => {
     try {
@@ -530,6 +543,26 @@ const apiService = {
     } catch (error) {
       console.error('❌ PTS transfer listesi getirme hatası:', error)
       throw error
+    }
+  },
+
+  // PTS paketlerini listele (tarih aralığı ve filtre tipi ile)
+  listPTSPackages: async (startDate, endDate, dateFilterType = 'created') => {
+    try {
+      console.log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
+      const response = await apiClient.post('/pts/list', { 
+        startDate, 
+        endDate, 
+        dateFilterType 
+      })
+      console.log('✅ PTS listesi alındı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS liste hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Liste alınamadı'
+      }
     }
   }
 }

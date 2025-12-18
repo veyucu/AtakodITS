@@ -27,6 +27,7 @@ const DocumentDetailPage = () => {
   const [selectedRecords, setSelectedRecords] = useState([])
   const [itsLoading, setItsLoading] = useState(false)
   const [deleteMode, setDeleteMode] = useState(false) // Silme modu
+  const [koliMode, setKoliMode] = useState(false) // Koli barkodu modu
   const [itsModalView, setItsModalView] = useState('grid') // 'grid' veya 'text'
   
   // UTS Popup State'leri
@@ -602,6 +603,12 @@ const DocumentDetailPage = () => {
       field: 'lot',
       width: 150,
       cellClass: 'font-mono'
+    },
+    {
+      headerName: 'Koli Barkodu',
+      field: 'carrierLabel',
+      width: 180,
+      cellClass: 'font-mono text-blue-600'
     }
   ], [])
 
@@ -622,6 +629,13 @@ const DocumentDetailPage = () => {
     }
 
     const scannedBarcode = barcodeInput.trim()
+    
+    // Koli modu kontrolü
+    if (koliMode) {
+      await handleCarrierBarcode(scannedBarcode)
+      setBarcodeInput('')
+      return
+    }
     
     // ITS Karekod kontrolü (01 ile başlıyorsa ITS karekodudur)
     const isITSBarcode = scannedBarcode.startsWith('01') && scannedBarcode.length > 30
@@ -886,6 +900,67 @@ const DocumentDetailPage = () => {
         const errorMessage = result.message || result.error || 'Kayıt başarısız!'
         throw new Error(errorMessage)
       }
+    }
+  }
+
+  // Koli Barkodu İşlemi (ITS için)
+  const handleCarrierBarcode = async (carrierLabel) => {
+    try {
+      console.log('📦 Koli barkodu okutuldu:', carrierLabel)
+      showMessage('📦 Koli işleniyor...', 'info')
+      
+      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      const username = user.username || 'USER'
+      
+      const result = await apiService.saveCarrierBarcode({
+        carrierLabel,
+        docId: id, // Belge KAYITNO
+        ftirsip: order.docType,
+        cariKodu: order.customerCode,
+        kullanici: username
+      })
+      
+      if (result.success) {
+        playSuccessSound()
+        showMessage(`✅ ${result.message}`, 'success')
+        
+        // Local state'i güncelle (ekranı yenileme)
+        const updatedItems = [...items]
+        let hasChanges = false
+        
+        // Backend'den dönen GTIN'lere göre okutulan miktarlarını artır
+        if (result.affectedGtins && result.affectedGtins.length > 0) {
+          result.affectedGtins.forEach(gtin => {
+            // Her GTIN için kaç adet ürün eklendi?
+            const addedCount = result.savedCount ? Math.floor(result.savedCount / result.affectedGtins.length) : 1
+            
+            // GTIN veya STOK_KODU ile eşleşen item'ı bul
+            const itemIndex = updatedItems.findIndex(item => 
+              item.gtin === gtin || 
+              item.stokKodu === gtin || 
+              item.barcode === gtin
+            )
+            
+            if (itemIndex !== -1) {
+              updatedItems[itemIndex].okutulan = (updatedItems[itemIndex].okutulan || 0) + addedCount
+              updatedItems[itemIndex].isPrepared = updatedItems[itemIndex].okutulan >= updatedItems[itemIndex].quantity
+              hasChanges = true
+            }
+          })
+        }
+        
+        if (hasChanges) {
+          setItems(updatedItems)
+          updateStats(updatedItems)
+        }
+      } else {
+        playErrorSound()
+        showMessage(`❌ ${result.message}`, 'error')
+      }
+    } catch (error) {
+      console.error('❌ Koli barkodu işleme hatası:', error)
+      playErrorSound()
+      showMessage(`❌ ${error.response?.data?.message || error.message || 'Koli barkodu işlenemedi'}`, 'error')
     }
   }
 
@@ -1972,6 +2047,19 @@ const DocumentDetailPage = () => {
                 </label>
               </div>
               
+              {/* Koli Modu Checkbox */}
+              <div className="flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer bg-white/20 backdrop-blur-sm px-3 py-2.5 rounded-lg border-2 border-white/30 hover:bg-white/30 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={koliMode}
+                    onChange={(e) => setKoliMode(e.target.checked)}
+                    className="w-5 h-5 cursor-pointer accent-blue-600"
+                  />
+                  <span className="text-white font-semibold text-sm">📦 Koli</span>
+                </label>
+              </div>
+              
               <div className="flex-1 relative">
                 <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/70" />
                 <input
@@ -1979,10 +2067,18 @@ const DocumentDetailPage = () => {
                   type="text"
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
-                  placeholder={deleteMode ? "Silmek için barkod okutun (ITS için karekod gerekli)..." : "Barkod okutun (ITS: karekod, DGR/UTS: normal barkod veya 100*Barkod)"}
+                  placeholder={
+                    deleteMode 
+                      ? "Silmek için barkod okutun (ITS için karekod gerekli)..." 
+                      : koliMode
+                      ? "Koli barkodu okutun..."
+                      : "Barkod okutun (ITS: karekod, DGR/UTS: normal barkod veya 100*Barkod)"
+                  }
                   className={`w-full pl-11 pr-4 py-2.5 text-base backdrop-blur-sm border-2 rounded-lg text-white placeholder-white/70 focus:border-white focus:outline-none transition-all ${
                     deleteMode 
-                      ? 'bg-red-500/30 border-red-300/50 focus:bg-red-500/40' 
+                      ? 'bg-red-500/30 border-red-300/50 focus:bg-red-500/40'
+                      : koliMode
+                      ? 'bg-blue-500/30 border-blue-300/50 focus:bg-blue-500/40'
                       : 'bg-white/20 border-white/30 focus:bg-white/30'
                   }`}
                   autoComplete="off"
@@ -2035,13 +2131,17 @@ const DocumentDetailPage = () => {
               : 'bg-yellow-600'
             : deleteMode 
             ? 'bg-red-700'
+            : koliMode
+            ? 'bg-blue-700'
             : 'bg-primary-700'
         }`}>
           <p className="text-white font-medium text-center text-sm h-5 leading-5 overflow-hidden text-ellipsis whitespace-nowrap">
             {message 
               ? message.text 
               : deleteMode 
-              ? '🗑️ SİLME MODU AKTİF - ITS: Karekod okutun | DGR/UTS: Normal barkod okutun' 
+              ? '🗑️ SİLME MODU AKTİF - ITS: Karekod okutun | DGR/UTS: Normal barkod okutun'
+              : koliMode
+              ? '📦 KOLİ MODU AKTİF - Koli barkodu okutun'
               : '📱 ITS ürünler için KAREKOD (2D) zorunlu | DGR/UTS için normal barkod (Toplu: 100*Barkod)'}
           </p>
         </div>

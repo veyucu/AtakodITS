@@ -26,6 +26,8 @@ BEGIN
         NOTE NVARCHAR(500) NULL,
         VERSION NVARCHAR(10) NULL,
         XML_CONTENT NVARCHAR(MAX) NULL,
+        DURUM VARCHAR(3) NULL,
+        BILDIRIM_TARIHI DATETIME NULL,
         CREATED_DATE DATETIME DEFAULT GETDATE()
     )
     
@@ -59,6 +61,8 @@ BEGIN
         EXPIRATION_DATE DATE NULL,                  -- Son kullanma tarihi
         PRODUCTION_DATE DATE NULL,                  -- Üretim tarihi
         PO_NUMBER NVARCHAR(50) NULL,                -- Sipariş numarası
+        DURUM VARCHAR(20) NULL,
+        BILDIRIM_TARIHI DATETIME NULL,
         CREATED_DATE DATETIME DEFAULT GETDATE()
     )
     
@@ -84,5 +88,42 @@ END
 GO
 
 PRINT 'PTS Tabloları hazır'
+GO
+
+-- Migration: AKTBLPTSMAS tablosuna DURUM ve BILDIRIM_TARIHI kolonları ekle
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'AKTBLPTSMAS') AND type in (N'U'))
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'AKTBLPTSMAS') AND name = 'DURUM')
+    BEGIN
+        ALTER TABLE AKTBLPTSMAS ADD DURUM VARCHAR(3) NULL
+        PRINT 'AKTBLPTSMAS tablosuna DURUM kolonu eklendi'
+    END
+    
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'AKTBLPTSMAS') AND name = 'BILDIRIM_TARIHI')
+    BEGIN
+        ALTER TABLE AKTBLPTSMAS ADD BILDIRIM_TARIHI DATETIME NULL
+        PRINT 'AKTBLPTSMAS tablosuna BILDIRIM_TARIHI kolonu eklendi'
+    END
+END
+GO
+
+-- Migration: AKTBLPTSTRA tablosuna DURUM ve BILDIRIM_TARIHI kolonları ekle
+IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'AKTBLPTSTRA') AND type in (N'U'))
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'AKTBLPTSTRA') AND name = 'DURUM')
+    BEGIN
+        ALTER TABLE AKTBLPTSTRA ADD DURUM VARCHAR(20) NULL
+        PRINT 'AKTBLPTSTRA tablosuna DURUM kolonu eklendi'
+    END
+    
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'AKTBLPTSTRA') AND name = 'BILDIRIM_TARIHI')
+    BEGIN
+        ALTER TABLE AKTBLPTSTRA ADD BILDIRIM_TARIHI DATETIME NULL
+        PRINT 'AKTBLPTSTRA tablosuna BILDIRIM_TARIHI kolonu eklendi'
+    END
+END
+GO
+
+PRINT 'PTS Migration tamamlandı'
 GO
 

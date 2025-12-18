@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Package, Home, Truck, Search } from 'lucide-react'
 import { AgGridReact } from 'ag-grid-react'
@@ -6,16 +6,52 @@ import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import apiService from '../services/apiService'
 
+// Badge Renderer - Sayısal değerler için
+const BadgeRenderer = ({ value, type = 'default' }) => {
+  const styles = {
+    kalem: 'bg-blue-100 text-blue-700 border border-blue-300',
+    adet: 'bg-green-100 text-green-700 border border-green-300',
+    default: 'bg-gray-100 text-gray-700 border border-gray-300'
+  }
+  
+  if (!value && value !== 0) return null
+  
+  return (
+    <span className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold ${styles[type]}`}>
+      {value}
+    </span>
+  )
+}
+
 const PTSPage = () => {
   const navigate = useNavigate()
-  const barcodeInputRef = useRef(null)
+  const gridRef = useRef(null)
   
-  const [barcode, setBarcode] = useState('')
-  const [packages, setPackages] = useState([])
+  // LocalStorage'dan tarih ayarlarını oku
+  const getStoredValue = (key, defaultValue) => {
+    try {
+      const stored = localStorage.getItem(key)
+      return stored !== null ? stored : defaultValue
+    } catch {
+      return defaultValue
+    }
+  }
+  
   const [message, setMessage] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(() => 
+    getStoredValue('pts_startDate', new Date().toISOString().split('T')[0])
+  )
+  const [endDate, setEndDate] = useState(() => 
+    getStoredValue('pts_endDate', new Date().toISOString().split('T')[0])
+  )
+  const [dateFilterType, setDateFilterType] = useState(() => 
+    getStoredValue('pts_dateFilterType', 'created')
+  )
+  const [listData, setListData] = useState([]) // Grid için liste verisi
+  const [searchText, setSearchText] = useState(() => 
+    getStoredValue('pts_searchText', '')
+  ) // Arama metni
   
   // İndirme modal state
   const [showDownloadModal, setShowDownloadModal] = useState(false)
@@ -28,69 +64,62 @@ const PTSPage = () => {
     status: 'idle' // idle, searching, downloading, completed, error
   })
 
+  // Tarih ayarlarını localStorage'a kaydet
+  useEffect(() => {
+    localStorage.setItem('pts_startDate', startDate)
+  }, [startDate])
+
+  useEffect(() => {
+    localStorage.setItem('pts_endDate', endDate)
+  }, [endDate])
+
+  useEffect(() => {
+    localStorage.setItem('pts_dateFilterType', dateFilterType)
+  }, [dateFilterType])
+
+  useEffect(() => {
+    localStorage.setItem('pts_searchText', searchText)
+  }, [searchText])
+
   // Mesaj göster
   const showMessage = (text, type = 'info') => {
     setMessage({ text, type })
     setTimeout(() => setMessage(null), 5000)
   }
 
-  // Transfer ID ile paket sorgula
-  const handleBarcodeScan = async (e) => {
-    e.preventDefault()
-    
-    if (!barcode || barcode.length < 5) {
-      showMessage('⚠️ Geçersiz Transfer ID!', 'error')
+  // Veritabanındaki kayıtları listele
+  const handleListPackages = useCallback(async () => {
+    if (!startDate || !endDate) {
+      showMessage('⚠️ Başlangıç ve bitiş tarihi seçin', 'error')
+      return
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      showMessage('⚠️ Başlangıç tarihi bitiş tarihinden büyük olamaz', 'error')
       return
     }
 
     try {
       setLoading(true)
-      showMessage('🔍 Paket sorgulanıyor...', 'info')
-      
-      // PTS'den paket bilgisini sorgula ve indir
-      const response = await apiService.queryPackage(barcode)
-      
-      if (response.success && response.data) {
-        // Paketi listeye ekle
-        const packageData = response.data
-        
-        // XML'i localStorage'a kaydet (manuel kontrol için)
-        if (packageData._rawXML) {
-          const xmlKey = `pts_xml_${barcode}`
-          localStorage.setItem(xmlKey, packageData._rawXML)
-          console.log(`💾 XML kaydedildi: ${xmlKey} (${packageData._rawXML.length} karakter)`)
-          console.log(`📄 İlk 500 karakter:`, packageData._rawXML.substring(0, 500))
-        }
-        
-        const newPackage = {
-          id: Date.now(),
-          transferId: barcode,
-          timestamp: new Date().toLocaleString('tr-TR'),
-          documentNumber: packageData.documentNumber || '',
-          documentDate: packageData.documentDate || '',
-          sourceGLN: packageData.sourceGLN || '',
-          destinationGLN: packageData.destinationGLN || '',
-          productCount: packageData.products?.length || 0,
-          products: packageData.products || []
-        }
-        
-        setPackages([newPackage, ...packages])
-        setBarcode('')
-        showMessage(`✅ Paket bilgisi alındı - ${newPackage.productCount} ürün bulundu`, 'success')
-      } else {
-        showMessage(`❌ ${response.message || 'Paket sorgulanamadı'}`, 'error')
+
+      const response = await apiService.listPTSPackages(startDate, endDate, dateFilterType)
+
+      if (!response.success) {
+        showMessage(`❌ ${response.message || 'Kayıtlar listelenemedi'}`, 'error')
+        return
       }
-      
-      // Input'a focus geri dön
-      barcodeInputRef.current?.focus()
-      
+
+      const data = response.data || []
+      setListData(data)
+      // Başarı mesajı kaldırıldı
+
     } catch (error) {
-      console.error('Paket sorgulama hatası:', error)
-      showMessage('❌ Paket sorgulanamadı', 'error')
+      console.error('Liste hatası:', error)
+      showMessage('❌ Kayıtlar listelenemedi', 'error')
     } finally {
       setLoading(false)
     }
-  }
+  }, [startDate, endDate, dateFilterType])
 
   // Tarih aralığına göre paketleri indir ve veritabanına kaydet
   const handleSearchByDate = async () => {
@@ -124,7 +153,6 @@ const PTSPage = () => {
           ...prev,
           status: 'error'
         }))
-        showMessage(`❌ ${searchResponse.message || 'Paket listesi alınamadı'}`, 'error')
         return
       }
 
@@ -136,7 +164,6 @@ const PTSPage = () => {
           status: 'completed',
           total: 0
         }))
-        showMessage('ℹ️ Belirtilen tarih aralığında paket bulunamadı', 'warning')
         return
       }
 
@@ -164,7 +191,7 @@ const PTSPage = () => {
         }
       )
       
-      showMessage(`✅ İndirme tamamlandı!`, 'success')
+      // Mesaj kaldırıldı - modal'da zaten gösteriliyor
       
     } catch (error) {
       console.error('Toplu paket indirme hatası:', error)
@@ -172,190 +199,179 @@ const PTSPage = () => {
         ...prev,
         status: 'error'
       }))
-      showMessage('❌ Paketler indirilemedi', 'error')
     }
   }
 
-  // Paketi sil
-  const handleDeletePackage = (id) => {
-    setPackages(packages.filter(p => p.id !== id))
-    showMessage('🗑️ Paket silindi', 'info')
-  }
-
-  // Tümünü temizle
-  const handleClearAll = () => {
-    if (packages.length === 0) return
-    
-    if (confirm('Tüm paketler silinecek. Emin misiniz?')) {
-      setPackages([])
-      showMessage('🗑️ Tüm paketler temizlendi', 'info')
+  // Sayfa yüklendiğinde veya geri gelindiğinde otomatik listele
+  useEffect(() => {
+    const shouldAutoLoad = localStorage.getItem('pts_autoLoad')
+    if (shouldAutoLoad === 'true') {
+      localStorage.removeItem('pts_autoLoad')
+      // Biraz gecikme ekleyerek state'lerin hazır olmasını sağla
+      setTimeout(() => {
+        handleListPackages()
+      }, 100)
     }
-  }
+  }, [handleListPackages]) // handleListPackages değiştiğinde çalış
 
-  // LocalStorage'daki XML'leri göster
-  const handleShowStoredXML = () => {
-    const xmlKeys = Object.keys(localStorage).filter(key => key.startsWith('pts_xml_'))
+  // Arama filtresi uygula - Tüm alanlarda ara
+  const filteredData = useMemo(() => {
+    if (!searchText.trim()) return listData
+
+    const searchLower = searchText.toLowerCase().trim()
     
-    if (xmlKeys.length === 0) {
-      alert('LocalStorage\'da kayıtlı XML bulunamadı. Önce paket sorgulayın.')
-      return
+    return listData.filter(item => {
+      // Transfer ID, Belge No, Source GLN ve Cari İsim'de ara
+      const transferId = (item.TRANSFER_ID || '').toString().toLowerCase()
+      const documentNumber = (item.DOCUMENT_NUMBER || '').toString().toLowerCase()
+      const sourceGln = (item.SOURCE_GLN || '').toString().toLowerCase()
+      const cariIsim = (item.SOURCE_GLN_NAME || '').toString().toLowerCase()
+      
+      return transferId.includes(searchLower) ||
+             documentNumber.includes(searchLower) ||
+             sourceGln.includes(searchLower) ||
+             cariIsim.includes(searchLower)
+    })
+  }, [listData, searchText])
+
+  // Column State Yönetimi
+  const saveColumnState = useCallback(() => {
+    if (gridRef.current && gridRef.current.api) {
+      const columnState = gridRef.current.api.getColumnState()
+      localStorage.setItem('pts_columnState', JSON.stringify(columnState))
     }
-    
-    const xmlList = xmlKeys.map(key => {
-      const transferId = key.replace('pts_xml_', '')
-      const xml = localStorage.getItem(key)
-      return `\n\n════════════════════════════════\nTransfer ID: ${transferId}\nUzunluk: ${xml.length} karakter\n════════════════════════════════\n\n${xml}\n`
-    }).join('\n')
-    
-    console.log('📄 LocalStorage\'daki XML\'ler:', xmlList)
-    alert(`${xmlKeys.length} adet XML bulundu.\n\nBrowser Console\'a (F12) yazdırıldı.\n\nXML\'leri görmek için Console\'u açın.`)
-  }
+  }, [])
 
-  // İstatistikler
-  const stats = {
-    total: packages.length,
-    totalProducts: packages.reduce((sum, pkg) => sum + pkg.productCount, 0)
-  }
+  const loadColumnState = useCallback(() => {
+    try {
+      const savedState = localStorage.getItem('pts_columnState')
+      if (savedState && gridRef.current && gridRef.current.api) {
+        const columnState = JSON.parse(savedState)
+        gridRef.current.api.applyColumnState({ state: columnState, applyOrder: true })
+      }
+    } catch (error) {
+      console.error('Column state yükleme hatası:', error)
+    }
+  }, [])
 
-  // Seçili paketin detayını göster
-  const [selectedPackageId, setSelectedPackageId] = useState(null)
+  const onGridReady = useCallback((params) => {
+    // Grid hazır olduğunda column state'i yükle
+    setTimeout(() => loadColumnState(), 100)
+  }, [loadColumnState])
 
   // AG Grid Kolon Tanımları
-  const columnDefs = useMemo(() => [
-    {
-      headerName: '',
-      width: 50,
-      cellRenderer: (params) => {
-        const isExpanded = selectedPackageId === params.data.id
-        return `
-          <button 
-            class="w-full h-full flex items-center justify-center hover:bg-gray-100"
-            onclick="window.togglePTSPackage(${params.data.id})"
-          >
-            ${isExpanded ? '▼' : '▶'}
-          </button>
-        `
-      }
-    },
+  // Liste görünümü için kolon tanımları
+  const listColumnDefs = useMemo(() => [
     {
       headerName: 'Transfer ID',
-      field: 'transferId',
+      field: 'TRANSFER_ID',
       width: 180,
-      cellClass: 'font-mono font-bold text-blue-600'
-    },
-    {
-      headerName: 'Belge No',
-      field: 'documentNumber',
-      width: 150,
-      cellClass: 'font-semibold'
+      cellClass: 'font-mono font-bold text-blue-600 cursor-pointer',
+      filter: 'agTextColumnFilter'
     },
     {
       headerName: 'Belge Tarihi',
-      field: 'documentDate',
-      width: 120,
-      cellClass: 'text-center'
-    },
-    {
-      headerName: 'Kaynak GLN',
-      field: 'sourceGLN',
-      width: 160,
-      cellClass: 'font-mono text-sm'
-    },
-    {
-      headerName: 'Hedef GLN',
-      field: 'destinationGLN',
-      width: 160,
-      cellClass: 'font-mono text-sm'
-    },
-    {
-      headerName: 'Ürün Sayısı',
-      field: 'productCount',
-      width: 110,
-      cellClass: 'text-center font-bold text-green-600'
-    },
-    {
-      headerName: 'Sorgu Zamanı',
-      field: 'timestamp',
-      width: 160,
-      cellClass: 'text-gray-600 text-sm'
-    },
-    {
-      headerName: 'İşlem',
-      width: 80,
-      cellRenderer: (params) => {
-        return `
-          <button 
-            class="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-            onclick="window.deletePTSPackage(${params.data.id})"
-          >
-            Sil
-          </button>
-        `
-      }
-    }
-  ], [selectedPackageId])
-
-  // Ürün detayları için kolon tanımları
-  const productColumnDefs = useMemo(() => [
-    {
-      headerName: 'GTIN',
-      field: 'gtin',
-      width: 180,
-      cellClass: 'font-mono font-bold'
-    },
-    {
-      headerName: 'Seri No',
-      field: 'serialNumber',
-      width: 280,
-      cellClass: 'font-mono text-red-600 font-bold'
-    },
-    {
-      headerName: 'Lot No',
-      field: 'lotNumber',
-      width: 150,
-      cellClass: 'font-mono'
-    },
-    {
-      headerName: 'Son Kullanma',
-      field: 'expirationDate',
+      field: 'DOCUMENT_DATE',
       width: 130,
-      cellClass: 'text-center'
+      cellClass: 'text-center',
+      valueFormatter: (params) => {
+        if (!params.value) return ''
+        const date = new Date(params.value)
+        return date.toLocaleDateString('tr-TR')
+      },
+      filter: 'agDateColumnFilter'
     },
     {
-      headerName: 'Carrier Label',
-      field: 'carrierLabel',
-      flex: 1,
-      cellClass: 'font-mono text-sm'
+      headerName: 'Belge No',
+      field: 'DOCUMENT_NUMBER',
+      width: 150,
+      cellClass: 'font-semibold',
+      filter: 'agTextColumnFilter'
+    },
+    {
+      headerName: 'Source GLN',
+      field: 'SOURCE_GLN',
+      width: 160,
+      cellClass: 'font-mono text-sm',
+      filter: 'agTextColumnFilter'
+    },
+    {
+      headerName: 'Cari İsim',
+      field: 'SOURCE_GLN_NAME',
+      width: 200,
+      cellClass: 'font-semibold',
+      filter: 'agTextColumnFilter'
+    },
+    {
+      headerName: 'Kalem',
+      field: 'UNIQUE_GTIN_COUNT',
+      width: 110,
+      cellClass: 'text-center',
+      filter: 'agNumberColumnFilter',
+      cellRenderer: (params) => <BadgeRenderer value={params.value} type="kalem" />
+    },
+    {
+      headerName: 'Adet',
+      field: 'TOTAL_PRODUCT_COUNT',
+      width: 110,
+      cellClass: 'text-center',
+      filter: 'agNumberColumnFilter',
+      cellRenderer: (params) => <BadgeRenderer value={params.value} type="adet" />
+    },
+    {
+      headerName: 'Kayıt Tarihi',
+      field: 'CREATED_DATE',
+      width: 150,
+      cellClass: 'text-center text-gray-600',
+      valueFormatter: (params) => {
+        if (!params.value) return ''
+        const date = new Date(params.value)
+        return date.toLocaleString('tr-TR')
+      },
+      filter: 'agDateColumnFilter'
+    },
+    {
+      headerName: 'Durum',
+      field: 'DURUM',
+      width: 120,
+      cellClass: 'text-center font-semibold',
+      filter: 'agTextColumnFilter'
+    },
+    {
+      headerName: 'Bildirim Tarihi',
+      field: 'BILDIRIM_TARIHI',
+      width: 150,
+      cellClass: 'text-center text-gray-600',
+      valueFormatter: (params) => {
+        if (!params.value) return ''
+        const date = new Date(params.value)
+        return date.toLocaleString('tr-TR')
+      },
+      filter: 'agDateColumnFilter'
+    },
+    {
+      headerName: 'Aksiyon Tipi',
+      field: 'ACTION_TYPE',
+      width: 120,
+      cellClass: 'text-center',
+      filter: 'agTextColumnFilter'
+    },
+    {
+      headerName: 'Note',
+      field: 'NOTE',
+      width: 200,
+      cellClass: 'text-sm text-gray-600',
+      filter: 'agTextColumnFilter'
     }
   ], [])
-
-  // Grid options
-  const defaultColDef = useMemo(() => ({
-    sortable: true,
-    filter: true,
-    resizable: true
-  }), [])
-
-  // Global functions
-  if (typeof window !== 'undefined') {
-    window.deletePTSPackage = (id) => {
-      handleDeletePackage(id)
-    }
-    window.togglePTSPackage = (id) => {
-      setSelectedPackageId(selectedPackageId === id ? null : id)
-    }
-  }
-
-  // Seçili paketin ürünlerini bul
-  const selectedPackage = packages.find(p => p.id === selectedPackageId)
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-gray-200">
         <div className="px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* Sol - Başlık ve Tarih Aralığı */}
+          <div className="flex items-center gap-4">
+            {/* Sol - Başlık ve Arama */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/')}
@@ -367,60 +383,78 @@ const PTSPage = () => {
               <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
                 <Truck className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-lg font-bold text-gray-900">PTS - Paket Transfer Sistemi</h1>
+              <h1 className="text-lg font-bold text-gray-900">PTS</h1>
               
+              {/* Arama Input */}
+              <div className="relative w-96 ml-4">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  placeholder="Transfer ID, Belge No, Source GLN veya Cari İsim..."
+                  className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Sağ - İşlem Butonları ve Filtreler */}
+            <div className="flex items-center gap-3 ml-auto">
+
+              {/* İndir Butonu */}
+              <button
+                type="button"
+                onClick={handleSearchByDate}
+                disabled={loading}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded shadow-lg hover:shadow-xl hover:bg-green-700 transition-all disabled:opacity-50"
+              >
+                📥 İndir
+              </button>
+
               {/* Tarih Aralığı */}
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-2">
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={loading}
                 />
-                <span className="text-gray-500">-</span>
+                <span className="text-gray-400 font-bold">→</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={loading}
                 />
-                <button
-                  type="button"
-                  onClick={handleSearchByDate}
-                  disabled={loading}
-                  className="px-4 py-1 bg-green-600 text-white text-sm rounded font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-1"
-                >
-                  📥 İndir
-                </button>
               </div>
-            </div>
 
-            {/* Sağ - İstatistikler */}
-            <div className="flex items-center gap-2">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded px-3 py-1.5 text-white shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5" />
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xs font-medium opacity-90">Paket:</span>
-                    <span className="text-base font-bold">{stats.total}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-green-500 to-green-600 rounded px-3 py-1.5 text-white shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5" />
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xs font-medium opacity-90">Ürün:</span>
-                    <span className="text-base font-bold">{stats.totalProducts}</span>
-                  </div>
-                </div>
-              </div>
+              {/* Tarih Tipi Seçimi */}
+              <select
+                value={dateFilterType}
+                onChange={(e) => setDateFilterType(e.target.value)}
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                disabled={loading}
+              >
+                <option value="created">Kayıt Tarihi</option>
+                <option value="document">Belge Tarihi</option>
+              </select>
+
+              {/* Listele Butonu */}
+              <button
+                type="button"
+                onClick={handleListPackages}
+                disabled={loading}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded shadow-lg hover:shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50"
+              >
+                📋 Listele
+              </button>
             </div>
           </div>
         </div>
       </div>
+
 
       {/* Mesaj Alanı */}
       {message && (
@@ -436,111 +470,60 @@ const PTSPage = () => {
         </div>
       )}
 
-      {/* Sorgulama Alanı */}
-      <div className="px-6 py-4 bg-white border-b border-gray-200">
-        {/* Transfer ID ile Tekil Sorgulama */}
-        <form onSubmit={handleBarcodeScan} className="flex gap-3 items-center">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                ref={barcodeInputRef}
-                type="text"
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                placeholder="Transfer ID ile tekil sorgulama..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-mono"
-                disabled={loading}
-              />
-            </div>
-          </div>
-          
-          <button
-            type="submit"
-            disabled={loading || !barcode}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl flex items-center gap-2"
-          >
-            <Search className="w-5 h-5" />
-            Sorgula
-          </button>
-
-          <button
-            type="button"
-            onClick={handleClearAll}
-            disabled={loading || packages.length === 0}
-            className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
-          >
-            Tümünü Temizle
-          </button>
-
-          <button
-            type="button"
-            onClick={handleShowStoredXML}
-            disabled={loading}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
-          >
-            XML'leri Göster
-          </button>
-        </form>
-      </div>
-
       {/* Paket Listesi - AG Grid */}
       <div className="flex-1 px-6 py-4 flex flex-col gap-4">
-        {packages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
-            <Package className="w-16 h-16 mb-4" />
-            <p className="text-lg font-medium">Henüz paket sorgulanmadı</p>
-            <p className="text-sm">Transfer ID veya tarih aralığı ile paket sorgulayın</p>
+        {listData.length > 0 ? (
+          /* Liste Görünümü (Veritabanından Getirilen Kayıtlar) */
+          <div className="ag-theme-alpine" style={{ height: 'calc(100vh - 200px)' }}>
+            <AgGridReact
+              ref={gridRef}
+              rowData={filteredData}
+              columnDefs={listColumnDefs}
+              defaultColDef={{
+                sortable: true,
+                filter: true,
+                resizable: true,
+                headerClass: 'ag-header-cell-center'
+              }}
+              animateRows={true}
+              rowHeight={50}
+              headerHeight={48}
+              pagination={true}
+              paginationPageSize={100}
+              paginationPageSizeSelector={[25, 50, 100, 200]}
+              localeText={{
+                page: 'Sayfa',
+                to: '-',
+                of: '/',
+                next: 'Sonraki',
+                last: 'Son',
+                first: 'İlk',
+                previous: 'Önceki',
+                loadingOoo: 'Yükleniyor...',
+                noRowsToShow: 'Gösterilecek kayıt yok',
+                pageSizeSelectorLabel: 'Sayfa Başına:'
+              }}
+              onGridReady={onGridReady}
+              onColumnMoved={saveColumnState}
+              onColumnResized={saveColumnState}
+              onSortChanged={saveColumnState}
+              onRowDoubleClicked={(event) => {
+                // Çift tıklayınca PTSDetailPage'e git
+                const transferId = event.data.TRANSFER_ID
+                if (transferId) {
+                  // Geri gelince otomatik yenileme için işaretle
+                  localStorage.setItem('pts_autoLoad', 'true')
+                  navigate(`/pts/${transferId}`)
+                }
+              }}
+            />
           </div>
         ) : (
-          <>
-            {/* Paketler Grid */}
-            <div className="ag-theme-alpine" style={{ height: '400px' }}>
-              <AgGridReact
-                rowData={packages}
-                columnDefs={columnDefs}
-                defaultColDef={defaultColDef}
-                animateRows={true}
-                rowHeight={50}
-                headerHeight={48}
-              />
-            </div>
-
-            {/* Seçili Paketin Ürünleri */}
-            {selectedPackage && (
-              <div className="flex-1 border border-gray-300 rounded-lg bg-white">
-                <div className="p-4 bg-gray-50 border-b border-gray-300 rounded-t-lg">
-                  <h3 className="text-lg font-bold text-gray-700">
-                    Paket İçeriği - Transfer ID: {selectedPackage.transferId}
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {selectedPackage.products.length} ürün bulundu
-                  </p>
-                </div>
-                
-                {selectedPackage.products.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    Bu pakette ürün bulunamadı
-                  </div>
-                ) : (
-                  <div className="ag-theme-alpine" style={{ height: 'calc(100% - 80px)' }}>
-                    <AgGridReact
-                      rowData={selectedPackage.products}
-                      columnDefs={productColumnDefs}
-                      defaultColDef={{
-                        sortable: true,
-                        filter: true,
-                        resizable: true
-                      }}
-                      animateRows={true}
-                      rowHeight={42}
-                      headerHeight={44}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <Package className="w-16 h-16 mb-4" />
+            <p className="text-lg font-medium">Henüz kayıt listelenmedi</p>
+            <p className="text-sm">Tarih aralığı seçip "Listele" butonuna tıklayın</p>
+          </div>
         )}
       </div>
 
