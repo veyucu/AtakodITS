@@ -1957,9 +1957,13 @@ const DocumentDetailPage = () => {
                   autoComplete="off"
                 />
               </div>
+              {/* Hidden submit button for Enter key to work */}
+              <button type="submit" className="hidden" aria-hidden="true" />
+              
               {deleteMode ? (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleBarcodeScan}
                   className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-red-600 text-white hover:bg-red-700"
                 >
                   Sil
