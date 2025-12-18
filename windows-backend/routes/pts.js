@@ -103,23 +103,27 @@ router.post('/download-bulk', async (req, res) => {
 
     for (let i = 0; i < transferIds.length; i++) {
       const transferId = transferIds[i]
+      const transferIdStr = String(transferId) // String'e dönüştür
 
       try {
-        // Daha önce indirilmiş mi kontrol et
-        const existingCheck = await ptsDbService.getPackageData(transferId)
+        // Daha önce indirilmiş mi kontrol et (NETSIS.AKTBLPTSMAS)
+        console.log(`🔍 Kontrol ediliyor: ${transferIdStr} (${i + 1}/${transferIds.length})`)
+        const existingCheck = await ptsDbService.getPackageData(transferIdStr)
         
         if (existingCheck.success && existingCheck.data) {
           results.skipped++
           results.packages.push({
-            transferId,
+            transferId: transferIdStr,
             status: 'skipped',
             message: 'Daha önce indirilmiş'
           })
+          console.log(`⏭️  ${transferIdStr} zaten veritabanında, atlanıyor`)
           continue
         }
 
         // Paketi indir
-        const downloadResult = await ptsService.downloadPackage(transferId, settings)
+        console.log(`📥 İndiriliyor: ${transferIdStr}`)
+        const downloadResult = await ptsService.downloadPackage(transferIdStr, settings)
         
         if (downloadResult.success) {
           // Veritabanına kaydet
@@ -128,11 +132,11 @@ router.post('/download-bulk', async (req, res) => {
           if (saveResult.success) {
             results.downloaded++
             results.packages.push({
-              transferId,
+              transferId: transferIdStr,
               status: 'success',
               productCount: downloadResult.data?.products?.length || 0
             })
-            console.log(`✅ ${transferId} veritabanına kaydedildi`)
+            console.log(`✅ ${transferIdStr} veritabanına kaydedildi (${downloadResult.data?.products?.length || 0} ürün)`)
           } else {
             results.failed++
             results.packages.push({
