@@ -558,77 +558,167 @@ const PTSPage = () => {
 
       {/* İndirme Progress Modal */}
       {showDownloadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              📥 Paket İndirme
-            </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-gray-200">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">
+                  Paket İndirme
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {downloadProgress.status === 'searching' && 'Paketler aranıyor...'}
+                  {downloadProgress.status === 'downloading' && 'İndirme devam ediyor...'}
+                  {downloadProgress.status === 'completed' && 'İşlem tamamlandı'}
+                  {downloadProgress.status === 'error' && 'Hata oluştu'}
+                </p>
+              </div>
+            </div>
 
-            {/* Status mesajı */}
-            <div className="mb-4">
+            {/* Status Card */}
+            <div className="mb-6">
               {downloadProgress.status === 'searching' && (
-                <p className="text-gray-600">🔍 Paketler aranıyor...</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div>
+                    <p className="font-semibold text-blue-900">Paketler Aranıyor</p>
+                    <p className="text-sm text-blue-700">Lütfen bekleyin...</p>
+                  </div>
+                </div>
               )}
+              
               {downloadProgress.status === 'downloading' && (
-                <p className="text-gray-600">⬇️ Paketler indiriliyor...</p>
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="animate-bounce">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-blue-900">Paketler İndiriliyor</p>
+                      <p className="text-sm text-blue-700">
+                        {downloadProgress.downloaded + downloadProgress.skipped} / {downloadProgress.total} paket işlendi
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="relative">
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600 h-3 transition-all duration-300 ease-out relative overflow-hidden"
+                        style={{
+                          width: `${Math.min(100, ((downloadProgress.downloaded + downloadProgress.skipped) / downloadProgress.total) * 100)}%`
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-shimmer"></div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2 text-center font-semibold">
+                      {Math.round(((downloadProgress.downloaded + downloadProgress.skipped) / downloadProgress.total) * 100)}%
+                    </p>
+                  </div>
+                </div>
               )}
+
               {downloadProgress.status === 'completed' && (
-                <p className="text-green-600 font-semibold">✅ İndirme tamamlandı!</p>
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center animate-scaleIn">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-green-900 text-lg">İşlem Tamamlandı!</p>
+                      <p className="text-sm text-green-700">Tüm paketler başarıyla işlendi</p>
+                    </div>
+                  </div>
+                </div>
               )}
+
               {downloadProgress.status === 'error' && (
-                <p className="text-red-600 font-semibold">❌ İndirme başarısız!</p>
+                <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-red-900 text-lg">Hata Oluştu</p>
+                      <p className="text-sm text-red-700">İndirme işlemi başarısız oldu</p>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* İstatistikler */}
+            {/* İstatistikler Grid */}
             {downloadProgress.total > 0 && (
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Toplam Paket:</span>
-                  <span className="font-bold text-gray-900">{downloadProgress.total}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">İndirilen:</span>
-                  <span className="font-bold text-green-600">{downloadProgress.downloaded}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Zaten Mevcut:</span>
-                  <span className="font-bold text-blue-600">{downloadProgress.skipped}</span>
-                </div>
-                {downloadProgress.failed > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Başarısız:</span>
-                    <span className="font-bold text-red-600">{downloadProgress.failed}</span>
-                  </div>
-                )}
-
-                {/* Progress Bar */}
-                {downloadProgress.status === 'downloading' && (
-                  <div className="mt-4">
-                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 transition-all duration-500 rounded-full flex items-center justify-center"
-                        style={{
-                          width: `${((downloadProgress.downloaded + downloadProgress.skipped) / downloadProgress.total) * 100}%`
-                        }}
-                      >
-                        <span className="text-xs text-white font-bold">
-                          {Math.round(((downloadProgress.downloaded + downloadProgress.skipped) / downloadProgress.total) * 100)}%
-                        </span>
-                      </div>
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {/* Toplam */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Toplam</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-1">{downloadProgress.total}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      {downloadProgress.downloaded + downloadProgress.skipped} / {downloadProgress.total}
-                    </p>
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Package className="w-6 h-6 text-gray-600" />
+                    </div>
                   </div>
-                )}
+                </div>
 
-                {/* Tamamlama Progress */}
-                {downloadProgress.status === 'completed' && (
-                  <div className="mt-4">
-                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                      <div className="bg-gradient-to-r from-green-500 to-green-600 h-4 w-full transition-all duration-500 rounded-full flex items-center justify-center">
-                        <span className="text-xs text-white font-bold">100%</span>
+                {/* İndirilen */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-green-700 font-medium uppercase tracking-wide">İndirilen</p>
+                      <p className="text-3xl font-bold text-green-600 mt-1">{downloadProgress.downloaded}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Atlandı (Zaten Mevcut) */}
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium uppercase tracking-wide">Atlandı</p>
+                      <p className="text-3xl font-bold text-blue-600 mt-1">{downloadProgress.skipped}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-600 mt-2 font-medium">
+                    📁 Zaten veritabanında
+                  </p>
+                </div>
+
+                {/* Başarısız */}
+                {downloadProgress.failed > 0 && (
+                  <div className="bg-gradient-to-br from-red-50 to-orange-50 border border-red-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-red-700 font-medium uppercase tracking-wide">Başarısız</p>
+                        <p className="text-3xl font-bold text-red-600 mt-1">{downloadProgress.failed}</p>
+                      </div>
+                      <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
                       </div>
                     </div>
                   </div>
@@ -637,11 +727,11 @@ const PTSPage = () => {
             )}
 
             {/* Butonlar */}
-            <div className="flex gap-3 justify-end mt-6">
+            <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
               {(downloadProgress.status === 'completed' || downloadProgress.status === 'error') && (
                 <button
                   onClick={() => setShowDownloadModal(false)}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   Kapat
                 </button>
