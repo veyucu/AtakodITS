@@ -1957,26 +1957,32 @@ const DocumentDetailPage = () => {
                   autoComplete="off"
                 />
               </div>
-              <button
-                type="submit"
-                className={`px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg ${
-                  deleteMode
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-white text-primary-600 hover:bg-gray-100'
-                }`}
-              >
-                {deleteMode ? 'Sil' : 'Onayla'}
-              </button>
-              
-              {!deleteMode && (
+              {deleteMode ? (
                 <button
-                  type="button"
-                  onClick={() => setShowBulkScanModal(true)}
-                  className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
-                  title="Toplu ITS karekod okutma"
+                  type="submit"
+                  className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-red-600 text-white hover:bg-red-700"
                 >
-                  📋 Toplu Karekod
+                  Sil
                 </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkScanModal(true)}
+                    className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
+                    title="Toplu ITS karekod okutma"
+                  >
+                    📋 Toplu Karekod
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fetchDocument}
+                    className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
+                    title="Grid'i yenile"
+                  >
+                    🔄 Yenile
+                  </button>
+                </>
               )}
             </div>
           </form>
