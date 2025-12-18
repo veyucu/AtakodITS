@@ -70,6 +70,14 @@ const DocumentDetailPage = () => {
     return 'Belge'
   }
 
+  // Update statistics
+  const updateStats = useCallback((currentItems) => {
+    const total = currentItems.length
+    const prepared = currentItems.filter(item => item.isPrepared).length
+    const remaining = total - prepared
+    setStats({ total, prepared, remaining })
+  }, [])
+
   // Fetch document function - reusable
   const fetchDocument = useCallback(async () => {
     try {
@@ -141,14 +149,6 @@ const DocumentDetailPage = () => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showITSModal, showUTSModal])
-
-  // Update statistics
-  const updateStats = useCallback((currentItems) => {
-    const total = currentItems.length
-    const prepared = currentItems.filter(item => item.isPrepared).length
-    const remaining = total - prepared
-    setStats({ total, prepared, remaining })
-  }, [])
 
   // Calculate totals for footer
   const totals = useMemo(() => {
