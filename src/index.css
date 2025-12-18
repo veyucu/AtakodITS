@@ -78,3 +78,152 @@
 .ag-theme-alpine .ag-row-pinned-bottom .ag-cell:hover {
   background-color: #f9fafb !important;
 }
+
+/* PTS Grid Özel Stilleri */
+.ag-theme-alpine .ag-header {
+  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+  font-weight: 600;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.ag-theme-alpine .ag-header-cell {
+  padding: 12px 8px;
+}
+
+.ag-theme-alpine .ag-row {
+  border-bottom: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.ag-theme-alpine .ag-row:hover {
+  background-color: #eff6ff !important;
+  transform: scale(1.001);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.ag-theme-alpine .ag-row.cursor-pointer {
+  cursor: pointer;
+}
+
+.ag-theme-alpine .ag-cell {
+  display: flex;
+  align-items: center;
+  line-height: 1.5;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Badge Stilleri */
+.ag-theme-alpine .badge-kalem,
+.ag-theme-alpine .badge-adet {
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ag-theme-alpine .badge-kalem {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.ag-theme-alpine .badge-adet {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+/* TanStack Table Özel Stilleri */
+.tanstack-table-row-group {
+  animation: slideIn 0.3s ease-out;
+}
+
+.tanstack-table-row-detail {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Save button pulse animation - More prominent */
+@keyframes pulseSave {
+  0%, 100% {
+    background-color: #2563eb; /* blue-600 */
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.9), 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    transform: scale(1);
+  }
+  50% {
+    background-color: #f59e0b; /* amber-500 */
+    box-shadow: 0 0 0 12px rgba(251, 191, 36, 0), 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    transform: scale(1.1);
+  }
+}
+
+.animate-pulse-save {
+  animation: pulseSave 1s ease-in-out infinite;
+}
+
+.animate-pulse-save:hover {
+  animation: pulseSave 0.7s ease-in-out infinite;
+}
+
+/* Table scroll shadow */
+.table-container {
+  position: relative;
+}
+
+.table-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  background: linear-gradient(to left, rgba(255,255,255,0.8), transparent);
+  pointer-events: none;
+}
+
+/* Smooth transitions for all table elements */
+table tr {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+table td {
+  transition: background-color 0.15s ease;
+}
+
+/* AG Grid Header Checkbox Centering */
+.ag-theme-alpine .ag-header-cell-center {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ag-theme-alpine .ag-header-cell-center .ag-header-cell-comp-wrapper {
+  justify-content: center !important;
+  width: 100%;
+}
+
+.ag-theme-alpine .ag-header-cell-center .ag-checkbox {
+  margin: 0 auto;
+}

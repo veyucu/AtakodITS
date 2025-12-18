@@ -39,6 +39,15 @@ const DocumentDetailPage = () => {
   const [selectedUTSRecords, setSelectedUTSRecords] = useState([])
   const [utsLoading, setUtsLoading] = useState(false)
   const [utsModalMessage, setUtsModalMessage] = useState(null) // Modal içi mesajlar için
+  const [utsHasChanges, setUtsHasChanges] = useState(false) // Grid'de değişiklik var mı?
+
+  // Toplu Okutma Modal State'leri
+  const [showBulkScanModal, setShowBulkScanModal] = useState(false)
+  const [bulkBarcodeText, setBulkBarcodeText] = useState('')
+  const [bulkScanLoading, setBulkScanLoading] = useState(false)
+  const [bulkScanResults, setBulkScanResults] = useState(null)
+  const bulkTextareaRef = useRef(null)
+  const bulkLineNumbersRef = useRef(null)
 
   // Belge tipini belirle
   const getDocumentTypeName = (docType, tipi) => {
@@ -98,6 +107,39 @@ const DocumentDetailPage = () => {
     }, 100)
     return () => clearTimeout(timer)
   }, [items, message])
+
+  // Otomatik barkod okutma: Herhangi bir tuşa basıldığında barkod input'una focus et
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Modal açıksa iptal et
+      if (showITSModal || showUTSModal) return
+      
+      // Input/textarea aktifse iptal et (zaten bir yerde yazıyoruz)
+      const activeElement = document.activeElement
+      if (activeElement.tagName === 'INPUT' || 
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.isContentEditable) {
+        return
+      }
+      
+      // Özel tuşlar için iptal et (Ctrl, Alt, F1-F12, Arrow keys, vb.)
+      if (e.ctrlKey || e.altKey || e.metaKey || 
+          e.key === 'Escape' || e.key === 'Tab' || 
+          e.key.startsWith('F') || e.key.startsWith('Arrow')) {
+        return
+      }
+      
+      // Barkod input'una focus et (karakter girişi yapılacak)
+      if (barcodeInputRef.current && !barcodeInputRef.current.contains(activeElement)) {
+        barcodeInputRef.current.focus()
+        // Tuşu barkod input'una iletmek için event'i yeniden tetiklemiyoruz,
+        // tarayıcı otomatik olarak focused element'e yazacak
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showITSModal, showUTSModal])
 
   // Update statistics
   const updateStats = (currentItems) => {
@@ -361,7 +403,9 @@ const DocumentDetailPage = () => {
       width: 50,
       pinned: 'left',
       suppressMenu: true,
-      editable: false
+      editable: false,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      headerClass: 'ag-header-cell-center'
     },
     {
       headerName: '#',
@@ -511,7 +555,9 @@ const DocumentDetailPage = () => {
       headerCheckboxSelection: true,
       width: 50,
       pinned: 'left',
-      suppressMenu: true
+      suppressMenu: true,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      headerClass: 'ag-header-cell-center'
     },
     {
       headerName: '#',
@@ -599,6 +645,249 @@ const DocumentDetailPage = () => {
     barcodeInputRef.current?.focus()
   }
 
+  // Toplu Okutma - Scroll Senkronizasyonu
+  const handleBulkTextareaScroll = () => {
+    if (bulkTextareaRef.current && bulkLineNumbersRef.current) {
+      bulkLineNumbersRef.current.scrollTop = bulkTextareaRef.current.scrollTop
+    }
+  }
+
+  // ITS Karekod Parse Fonksiyonu (GS1 DataMatrix)
+  const parseITSBarcode = (barcode) => {
+    try {
+      // GS1 format: 01GTIN21SERINO17MIAD10LOT
+      const gtinMatch = barcode.match(/01(\d{14})/)
+      const serialMatch = barcode.match(/21([^\x1D]+)/)
+      const expiryMatch = barcode.match(/17(\d{6})/)
+      const lotMatch = barcode.match(/10([^\x1D]+)/)
+
+      if (!gtinMatch) {
+        return null
+      }
+
+      const gtin = gtinMatch[1]
+      const serialNumber = serialMatch ? serialMatch[1] : ''
+      const expiryDate = expiryMatch ? expiryMatch[1] : ''
+      const lotNumber = lotMatch ? lotMatch[1] : ''
+
+      return {
+        gtin: gtin,
+        serialNumber: serialNumber,
+        expiryDate: expiryDate,
+        lotNumber: lotNumber
+      }
+    } catch (error) {
+      console.error('ITS karekod parse hatası:', error)
+      return null
+    }
+  }
+
+  // Toplu ITS Karekod Okutma İşlemi
+  const handleBulkScan = async () => {
+    if (!bulkBarcodeText.trim()) {
+      setMessage({ type: 'warning', text: '⚠️ Lütfen karekod girin' })
+      return
+    }
+
+    setBulkScanLoading(true)
+    setBulkScanResults(null)
+
+    // Satırlara ayır ve boş satırları temizle
+    const lines = bulkBarcodeText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+
+    if (lines.length === 0) {
+      setMessage({ type: 'warning', text: '⚠️ Geçerli karekod bulunamadı' })
+      setBulkScanLoading(false)
+      return
+    }
+
+    const results = {
+      total: lines.length,
+      success: 0,
+      failed: 0,
+      errors: []
+    }
+
+    // Her satır için işlem yap (Sadece ITS Karekod)
+    for (let i = 0; i < lines.length; i++) {
+      const barcode = lines[i]
+      
+      try {
+        // ITS Karekod kontrolü (Sadece ITS desteklenir)
+        const isITSBarcode = barcode.startsWith('01') && barcode.length > 30
+
+        if (!isITSBarcode) {
+          throw new Error('Sadece ITS karekod (2D barkod) desteklenir!')
+        }
+
+        // ITS işlemi
+        await handleITSBarcodeProcess(barcode)
+        
+        results.success++
+      } catch (error) {
+        results.failed++
+        results.errors.push(`${i + 1}. satır: ${error.message || 'Bilinmeyen hata'}`)
+      }
+    }
+
+    setBulkScanResults(results)
+    setBulkScanLoading(false)
+
+    // Belgeyi yenile
+    const response = await apiService.getDocumentById(order.id)
+    if (response.success && response.data) {
+      setOrder(response.data)
+      setItems(response.data.items || [])
+      updateStats(response.data.items || [])
+    }
+
+    // Başarı/hata mesajı
+    if (results.failed === 0) {
+      setMessage({ type: 'success', text: `✅ ${results.success} barkod başarıyla işlendi!` })
+      playSuccessSound()
+      // Modal'ı kapat
+      setTimeout(() => {
+        setShowBulkScanModal(false)
+        setBulkBarcodeText('')
+        setBulkScanResults(null)
+      }, 2000)
+    } else {
+      setMessage({ type: 'warning', text: `⚠️ ${results.success} başarılı, ${results.failed} başarısız` })
+      playWarningSound()
+    }
+  }
+
+  // ITS barkod işlemi (toplu okutma için)
+  const handleITSBarcodeProcess = async (itsBarcode) => {
+    const parsedData = parseITSBarcode(itsBarcode)
+    if (!parsedData) {
+      throw new Error('Geçersiz ITS karekod formatı')
+    }
+
+    const itemIndex = items.findIndex(item => {
+      const normalizedGtin = item.barcode?.replace(/^0+/, '')
+      const normalizedParsedGtin = parsedData.gtin?.replace(/^0+/, '')
+      return normalizedGtin === normalizedParsedGtin || item.stokKodu === parsedData.gtin
+    })
+
+    if (itemIndex === -1) {
+      throw new Error(`Ürün bulunamadı: ${parsedData.gtin}`)
+    }
+
+    const item = items[itemIndex]
+
+    if (item.turu !== 'ITS') {
+      throw new Error(`${item.productName} - ITS ürünü değil!`)
+    }
+
+    let belgeTarihiFormatted
+    if (order.orderDate) {
+      const date = new Date(order.orderDate)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    } else {
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    }
+
+    const result = await apiService.saveITSBarcode({
+      barcode: itsBarcode,
+      documentId: order.id,
+      itemId: item.itemId,
+      stokKodu: item.stokKodu,
+      belgeTip: item.stharHtur,
+      gckod: item.stharGckod || '',
+      belgeNo: order.orderNo,
+      belgeTarihi: belgeTarihiFormatted,
+      docType: order.docType,
+      expectedQuantity: item.quantity,
+      cariKodu: order.customerCode,
+      kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER'
+    })
+
+    if (!result.success) {
+      // Backend'den gelen detaylı hata mesajını kullan
+      const errorMessage = result.message || result.error || 'Kayıt başarısız!'
+      throw new Error(errorMessage)
+    }
+  }
+
+  // Normal barkod işlemi (toplu okutma için)
+  const handleNormalBarcodeProcess = async (scannedBarcode) => {
+    let quantity = 1
+    let actualBarcode = scannedBarcode
+
+    if (scannedBarcode.includes('*')) {
+      const parts = scannedBarcode.split('*')
+      if (parts.length === 2 && !isNaN(parts[0])) {
+        quantity = parseInt(parts[0])
+        actualBarcode = parts[1]
+      }
+    }
+
+    const itemIndex = items.findIndex(item => item.barcode === actualBarcode || item.stokKodu === actualBarcode)
+
+    if (itemIndex === -1) {
+      throw new Error(`Ürün bulunamadı: ${actualBarcode}`)
+    }
+
+    const item = items[itemIndex]
+
+    if (item.turu === 'ITS') {
+      throw new Error(`${item.productName} - ITS ürünüdür! Karekod gerekli!`)
+    }
+
+    if (item.turu === 'UTS') {
+      throw new Error(`${item.productName} - UTS ürünü için manuel giriş gerekli!`)
+    }
+
+    let belgeTarihiFormatted
+    if (order.orderDate) {
+      const date = new Date(order.orderDate)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    } else {
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+      belgeTarihiFormatted = `${year}-${month}-${day}`
+    }
+
+    for (let i = 0; i < quantity; i++) {
+      const result = await apiService.saveDGRBarcode({
+        barcode: actualBarcode,
+        documentId: order.id,
+        itemId: item.itemId,
+        stokKodu: item.stokKodu,
+        belgeTip: item.stharHtur,
+        gckod: item.stharGckod || '',
+        belgeNo: order.orderNo,
+        belgeTarihi: belgeTarihiFormatted,
+        docType: order.docType,
+        expectedQuantity: item.quantity,
+        cariKodu: order.customerCode,
+        kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER'
+      })
+
+      if (!result.success) {
+        // Backend'den gelen detaylı hata mesajını kullan
+        const errorMessage = result.message || result.error || 'Kayıt başarısız!'
+        throw new Error(errorMessage)
+      }
+    }
+  }
+
   // Normal Barkod İşlemi (DGR/UTS Ürünleri - ITS DEĞİL!)
   const handleNormalBarcode = async (scannedBarcode) => {
     // Toplu okutma kontrolü: 100*Barkod formatı
@@ -667,7 +956,9 @@ const DocumentDetailPage = () => {
         belgeNo: order.orderNo,
         belgeTarihi: belgeTarihiFormatted, // Belge tarihi (saat yok)
         docType: order.docType,
-        expectedQuantity: item.quantity // Miktar kontrolü için
+        expectedQuantity: item.quantity, // Miktar kontrolü için
+        cariKodu: order.customerCode,    // Belgedeki CARI_KODU
+        kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER' // Sisteme giriş yapan kullanıcı
       })
       
       if (!result.success) {
@@ -899,7 +1190,9 @@ const DocumentDetailPage = () => {
         belgeNo: order.orderNo,
         belgeTarihi: belgeTarihiFormatted, // Belge tarihi (saat yok)
         docType: order.docType,
-        expectedQuantity: item.quantity // Miktar kontrolü için
+        expectedQuantity: item.quantity, // Miktar kontrolü için
+        cariKodu: order.customerCode,    // Belgedeki CARI_KODU
+        kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER' // Sisteme giriş yapan kullanıcı
       })
       
       if (result.success) {
@@ -979,6 +1272,7 @@ const DocumentDetailPage = () => {
       setSelectedUTSItem(item)
       setShowUTSModal(true)
       setUtsLoading(true)
+      setUtsHasChanges(false) // Temiz başlangıç
       
       // UTS kayıtlarını getir
       const response = await apiService.getUTSBarcodeRecords(order.id, item.itemId)
@@ -1014,13 +1308,25 @@ const DocumentDetailPage = () => {
   }
 
   // UTS Modal Kapat
-  const handleCloseUTSModal = () => {
-    setShowUTSModal(false)
-    setSelectedUTSItem(null)
-    setUtsRecords([])
-    setSelectedUTSRecords([])
-    setUtsModalMessage(null) // Modal mesajını temizle
-  }
+  const handleCloseUTSModal = (skipWarning = false) => {
+    // Eğer skipWarning bir event ise (onClick'ten geliyorsa), false olarak ayarla
+    const shouldSkipWarning = typeof skipWarning === 'boolean' ? skipWarning : false;
+    
+    // Kaydedilmemiş değişiklik varsa uyar (ama kaydet butonundan geliyorsa uyarma)
+    if (!shouldSkipWarning && utsHasChanges) {
+      const confirmClose = confirm('⚠️ Ekrandaki veriler kaydedilmemiştir. Modal kapatılsın mı?\n\nEmin misiniz?');
+      if (!confirmClose) {
+        return; // Modal'ı kapatma
+      }
+    }
+    
+    setShowUTSModal(false);
+    setSelectedUTSItem(null);
+    setUtsRecords([]);
+    setSelectedUTSRecords([]);
+    setUtsModalMessage(null); // Modal mesajını temizle
+    setUtsHasChanges(false); // Değişiklik flag'ini temizle
+  };
 
   // UTS Kayıtlarını Sil
   const handleDeleteUTSRecords = () => {
@@ -1042,6 +1348,7 @@ const DocumentDetailPage = () => {
     
     setUtsRecords(filteredRecords)
     setSelectedUTSRecords([])
+    setUtsHasChanges(true) // Değişiklik yapıldı
     showUTSMessage(`✅ ${selectedUTSRecords.length} kayıt grid'den kaldırıldı. "Kaydet" butonuna basın.`, 'success')
     playSuccessSound()
   }
@@ -1058,6 +1365,7 @@ const DocumentDetailPage = () => {
       isNew: true
     }
     setUtsRecords([...utsRecords, newRow])
+    setUtsHasChanges(true) // Değişiklik yapıldı
     
     // Grid'i scroll et yeni satıra
     setTimeout(() => {
@@ -1211,12 +1519,15 @@ const DocumentDetailPage = () => {
         belgeTarihi: belgeTarihiFormatted,
         docType: order.docType,
         expectedQuantity: selectedUTSItem.quantity,
-        barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu
+        barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
+        cariKodu: order.customerCode,    // Belgedeki CARI_KODU
+        kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER' // Sisteme giriş yapan kullanıcı
       })
 
       if (result.success) {
         showUTSMessage(`✅ ${result.message}`, 'success')
         playSuccessSound()
+        setUtsHasChanges(false) // Değişiklikler kaydedildi
       } else {
         showUTSMessage(`❌ ${result.message}`, 'error')
         playErrorSound()
@@ -1252,9 +1563,9 @@ const DocumentDetailPage = () => {
         updateStats(docResponse.data.items || [])
       }
 
-      // Başarılı kayıt sonrası modal'ı kapat
+      // Başarılı kayıt sonrası modal'ı kapat (uyarı gösterme)
       setTimeout(() => {
-        handleCloseUTSModal()
+        handleCloseUTSModal(true) // skipWarning = true
       }, 1000) // 1 saniye sonra kapat (başarı mesajını göster)
       
     } catch (error) {
@@ -1656,6 +1967,17 @@ const DocumentDetailPage = () => {
               >
                 {deleteMode ? 'Sil' : 'Onayla'}
               </button>
+              
+              {!deleteMode && (
+                <button
+                  type="button"
+                  onClick={() => setShowBulkScanModal(true)}
+                  className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
+                  title="Toplu ITS karekod okutma"
+                >
+                  📋 Toplu Karekod
+                </button>
+              )}
             </div>
           </form>
         </div>
@@ -1789,6 +2111,7 @@ const DocumentDetailPage = () => {
                       const allRows = []
                       event.api.forEachNode(node => allRows.push(node.data))
                       setUtsRecords([...allRows])
+                      setUtsHasChanges(true) // Değişiklik yapıldı
                     }}
                     animateRows={true}
                     enableCellTextSelection={true}
@@ -1801,6 +2124,12 @@ const DocumentDetailPage = () => {
               {/* Action Bar - Fixed at Bottom */}
               <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                 <button
+                  onClick={() => alert(`State Kontrol:\n\nutsHasChanges = ${utsHasChanges}\n\nBu değer "true" olmalı!`)}
+                  className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors shadow-lg"
+                >
+                  🧪
+                </button>
+                <button
                   onClick={handleAddNewUTSRow}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg flex items-center gap-2"
                 >
@@ -1808,7 +2137,7 @@ const DocumentDetailPage = () => {
                 </button>
                 <button
                   onClick={handleSaveAllUTSRecords}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2"
+                  className={`px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2 ${utsHasChanges ? 'animate-pulse-save' : ''}`}
                 >
                   💾 Kaydet
                 </button>
@@ -1955,6 +2284,140 @@ const DocumentDetailPage = () => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toplu Okutma Modal */}
+      {showBulkScanModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-primary-600 to-primary-700 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Barcode className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Toplu ITS Karekod Okutma</h2>
+                  <p className="text-xs text-white/80">Her satıra bir ITS karekod (2D) yazın</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBulkScanModal(false)
+                  setBulkBarcodeText('')
+                  setBulkScanResults(null)
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                disabled={bulkScanLoading}
+              >
+                <XCircle className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex-1 flex flex-col gap-4 overflow-y-auto">
+              {/* Textarea with Line Numbers */}
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  ITS Karekod Listesi
+                  <span className="text-gray-500 font-normal ml-2">(Her satıra bir ITS karekod)</span>
+                </label>
+                <div className="flex border-2 border-gray-300 rounded-lg focus-within:border-primary-500 overflow-hidden" style={{ height: '256px' }}>
+                  {/* Line Numbers */}
+                  <div 
+                    ref={bulkLineNumbersRef}
+                    className="bg-gray-100 px-3 py-3 font-mono text-sm text-gray-500 text-right select-none border-r border-gray-300 overflow-hidden" 
+                    style={{ minWidth: '50px', maxHeight: '256px', overflowY: 'hidden' }}
+                  >
+                    {bulkBarcodeText.split('\n').map((_, index) => (
+                      <div key={index} style={{ lineHeight: '24px', height: '24px' }}>
+                        {index + 1}
+                      </div>
+                    ))}
+                    {bulkBarcodeText === '' && <div style={{ lineHeight: '24px', height: '24px' }}>1</div>}
+                  </div>
+                  {/* Textarea */}
+                  <textarea
+                    ref={bulkTextareaRef}
+                    value={bulkBarcodeText}
+                    onChange={(e) => setBulkBarcodeText(e.target.value)}
+                    onScroll={handleBulkTextareaScroll}
+                    className="flex-1 px-4 py-3 border-0 focus:outline-none font-mono text-sm resize-none"
+                    placeholder="010867978996572117081600001234&#10;010867978996572117081600005678&#10;010867978996572117081600009999"
+                    disabled={bulkScanLoading}
+                    autoFocus
+                    style={{ height: '256px', lineHeight: '24px' }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  💡 Sadece ITS karekod (2D barkod, 01... ile başlayan) desteklenir
+                </p>
+              </div>
+
+              {/* Results */}
+              {bulkScanResults && (
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h3 className="font-semibold text-gray-900 mb-3">İşlem Sonuçları</h3>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="bg-white rounded-lg p-3 text-center border border-gray-200">
+                      <p className="text-2xl font-bold text-gray-900">{bulkScanResults.total}</p>
+                      <p className="text-xs text-gray-600">Toplam</p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-3 text-center border border-green-200">
+                      <p className="text-2xl font-bold text-green-700">{bulkScanResults.success}</p>
+                      <p className="text-xs text-green-600">Başarılı</p>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-3 text-center border border-red-200">
+                      <p className="text-2xl font-bold text-red-700">{bulkScanResults.failed}</p>
+                      <p className="text-xs text-red-600">Başarısız</p>
+                    </div>
+                  </div>
+                  
+                  {bulkScanResults.errors.length > 0 && (
+                    <div className="max-h-32 overflow-y-auto">
+                      <p className="text-xs font-semibold text-red-700 mb-2">Hatalar:</p>
+                      {bulkScanResults.errors.map((error, index) => (
+                        <p key={index} className="text-xs text-red-600 mb-1">• {error}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowBulkScanModal(false)
+                  setBulkBarcodeText('')
+                  setBulkScanResults(null)
+                }}
+                className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                disabled={bulkScanLoading}
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleBulkScan}
+                className="px-6 py-2.5 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                disabled={bulkScanLoading || !bulkBarcodeText.trim()}
+              >
+                {bulkScanLoading ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Kaydet</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

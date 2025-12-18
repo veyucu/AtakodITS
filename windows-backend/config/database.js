@@ -16,6 +16,8 @@ const config = {
     min: 0,
     idleTimeoutMillis: 30000
   },
+  connectionTimeout: 30000, // 30 saniye
+  requestTimeout: 60000, // 60 saniye - büyük sorgular için artırıldı
   // Türkçe karakter desteği için
   beforeConnect: (conn) => {
     conn.on('connect', (err) => {

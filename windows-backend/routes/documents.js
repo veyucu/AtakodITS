@@ -257,7 +257,7 @@ router.post('/its-barcode', async (req, res) => {
     // 3. KAYIT_TIPI belirle
     const kayitTipi = docType === '6' ? 'M' : 'A' // Sipariş = M, Fatura = A
     
-    // 4. TBLSERITRA'ya kaydet
+    // 4. AKTBLITSUTS'a kaydet
     const saveResult = await documentService.saveITSBarcode({
       kayitTipi,
       seriNo: parsedData.seriNo,
@@ -273,7 +273,10 @@ router.post('/its-barcode', async (req, res) => {
       subeKodu,
       depoKod: '0',
       ilcGtin: parsedData.barkod,  // Okutulan Barkod
-      expectedQuantity             // Miktar kontrolü için
+      expectedQuantity,            // Miktar kontrolü için
+      ftirsip,                     // Belge tipi: '6'=Sipariş, '2'=Alış, '1'=Satış
+      cariKodu: req.body.cariKodu,         // Belgedeki CARI_KODU (ZORUNLU)
+      kullanici: req.body.kullanici        // Sisteme giriş yapan kullanıcı (ZORUNLU)
     })
     
     // Duplicate kontrolü
@@ -347,7 +350,10 @@ router.post('/uts-barcode', async (req, res) => {
       belgeTip,
       subeKodu,
       ilcGtin: barcode,
-      expectedQuantity
+      expectedQuantity,
+      ftirsip,                     // Belge tipi: '6'=Sipariş, '2'=Alış, '1'=Satış
+      cariKodu: req.body.cariKodu,         // Belgedeki CARI_KODU (ZORUNLU)
+      kullanici: req.body.kullanici        // Sisteme giriş yapan kullanıcı (ZORUNLU)
     })
     
     if (!saveResult.success) {
@@ -413,7 +419,10 @@ router.post('/uts-records/bulk-save', async (req, res) => {
       subeKodu,
       gckod,
       ilcGtin: barcode,
-      expectedQuantity
+      expectedQuantity,
+      ftirsip,                              // Belge tipi: '6'=Sipariş, '2'=Alış, '1'=Satış
+      cariKodu: req.body.cariKodu,          // Belgedeki CARI_KODU
+      kullanici: req.body.kullanici         // Sisteme giriş yapan kullanıcı
     })
     
     res.json({
@@ -467,7 +476,10 @@ router.post('/dgr-barcode', async (req, res) => {
       belgeTip,
       subeKodu,
       ilcGtin: barcode,  // Okutulan Barkod
-      expectedQuantity   // Miktar kontrolü için
+      expectedQuantity,   // Miktar kontrolü için
+      ftirsip,            // Belge tipi: '6'=Sipariş, '2'=Alış, '1'=Satış
+      cariKodu: req.body.cariKodu || '',  // Belgedeki CARI_KODU
+      kullanici: req.body.kullanici || ''  // Sisteme giriş yapan kullanıcı
     })
     
     if (!saveResult.success) {

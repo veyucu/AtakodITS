@@ -50,12 +50,39 @@ function parseITSBarcode(barcode) {
     }
     position += 2
 
-    // 4. Serial Number - 17'ye kadar değişken uzunlukta
+    // 4. Serial Number - Sonraki AI'ya kadar değişken uzunlukta (max 20 karakter)
     const serialStartPos = position
-    const expiryAIPos = barcode.indexOf('17', position)
+    const maxSerialLength = 20
+    const searchEndPos = Math.min(serialStartPos + maxSerialLength, barcode.length - 8) // -8: '17' + 6 digit miad için yer
+    
+    // 17 AI'sını ara ve sonrasındaki 6 karakterin geçerli tarih olduğunu kontrol et
+    let expiryAIPos = -1
+    
+    for (let i = serialStartPos; i <= searchEndPos; i++) {
+      if (barcode.substring(i, i + 2) === '17') {
+        // 17'den sonraki 6 karakter var mı ve rakam mı?
+        const dateStr = barcode.substring(i + 2, i + 8)
+        if (dateStr.length === 6 && /^\d{6}$/.test(dateStr)) {
+          // Tarih formatı doğru mu kontrol et (YYMMDD)
+          const mm = parseInt(dateStr.substring(2, 4))
+          const dd = parseInt(dateStr.substring(4, 6))
+          
+          // Ay 01-12, gün 01-31 arası olmalı
+          if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+            // Seri no min 4 karakter olmalı
+            if (i - serialStartPos >= 4) {
+              expiryAIPos = i
+              break
+            }
+          }
+        }
+      }
+    }
+    
     if (expiryAIPos === -1) {
       throw new Error('Expiry Date AI (17) bulunamadı')
     }
+    
     result.seriNo = barcode.substring(serialStartPos, expiryAIPos)
     position = expiryAIPos + 2 // 17'yi atla
 
@@ -66,14 +93,29 @@ function parseITSBarcode(barcode) {
     }
     position += 6
 
-    // 6. Lot/Batch AI (10)
+    // 6. Lot/Batch AI (10) - ZORUNLU
     if (barcode.substring(position, position + 2) !== '10') {
       throw new Error('Lot/Batch AI (10) bulunamadı')
     }
     position += 2
 
-    // 7. Lot/Batch - Kalan karakterler
+    // 7. Lot/Batch - Sonraki AI'ya kadar veya sonuna kadar
+    // Bir sonraki AI'yı bul (iki rakam ile başlar)
+    let lotEndPos = position
+    for (let i = position + 2; i < barcode.length - 1; i++) {
+      const nextTwo = barcode.substring(i, i + 2)
+      // Eğer iki rakam varsa ve yaygın bir AI ise (17, 21, 72, 29, vb.)
+      if (/^\d{2}$/.test(nextTwo) && ['17', '21', '10', '72', '29', '91', '92', '93'].includes(nextTwo)) {
+        lotEndPos = i
+        break
+      }
+    }
+    if (lotEndPos === position) {
+      // Başka AI bulunamadı, sonuna kadar lot
     result.lot = barcode.substring(position)
+    } else {
+      result.lot = barcode.substring(position, lotEndPos)
+    }
 
     // Validasyon
     if (!result.barkod || !result.seriNo || !result.miad || !result.lot) {

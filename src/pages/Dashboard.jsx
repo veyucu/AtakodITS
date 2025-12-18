@@ -5,7 +5,8 @@ import {
   LogOut, 
   User, 
   ArrowRight,
-  Truck
+  Truck,
+  Settings
 } from 'lucide-react'
 
 const Dashboard = () => {
@@ -57,22 +58,22 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <button
             onClick={() => navigate('/documents')}
             className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-8 text-left group border-2 border-transparent hover:border-purple-200"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-4">
                 <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-600 transition-colors">
                   <Package className="w-8 h-8 text-purple-600 group-hover:text-white transition-colors" />
+                </div>
+                <ArrowRight className="w-6 h-6 text-gray-400 group-hover:text-purple-600 transition-colors" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 mb-1">Ürün Hazırlama</h3>
                   <p className="text-sm text-gray-500">Ürün hazırlama işlemlerini başlat</p>
                 </div>
-              </div>
-              <ArrowRight className="w-6 h-6 text-gray-400 group-hover:text-purple-600 transition-colors" />
             </div>
           </button>
 
@@ -80,17 +81,35 @@ const Dashboard = () => {
             onClick={() => navigate('/pts')}
             className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-8 text-left group border-2 border-transparent hover:border-blue-200"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-4">
                 <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-600 transition-colors">
                   <Truck className="w-8 h-8 text-blue-600 group-hover:text-white transition-colors" />
+                </div>
+                <ArrowRight className="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 mb-1">PTS</h3>
                   <p className="text-sm text-gray-500">Paket Transfer Sistemi</p>
                 </div>
               </div>
-              <ArrowRight className="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
+          </button>
+
+          <button
+            onClick={() => navigate('/settings')}
+            className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-8 text-left group border-2 border-transparent hover:border-orange-200"
+          >
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-16 h-16 bg-orange-100 rounded-xl flex items-center justify-center group-hover:bg-orange-600 transition-colors">
+                  <Settings className="w-8 h-8 text-orange-600 group-hover:text-white transition-colors" />
+                </div>
+                <ArrowRight className="w-6 h-6 text-gray-400 group-hover:text-orange-600 transition-colors" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1">Ayarlar</h3>
+                <p className="text-sm text-gray-500">ITS ve ERP entegrasyon ayarları</p>
+              </div>
             </div>
           </button>
         </div>

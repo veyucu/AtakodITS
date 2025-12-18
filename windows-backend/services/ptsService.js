@@ -1,29 +1,53 @@
 import axios from 'axios'
 import AdmZip from 'adm-zip'
 import xml2js from 'xml2js'
+import * as ptsDbService from './ptsDbService.js'
+import * as settingsHelper from '../utils/settingsHelper.js'
 
-// PTS Web Servis Entegrasyonu - Gerçek API aktif
-// PTS Web Servis Bilgileri
-const PTS_CONFIG = {
-  username: '86800010845240000',
-  password: '1981aa',
-  glnNo: '8680001084524',
-  // ITS REST API Base URL (NetProITS BildirimHelper.ItsHost)
-  // Üretim: https://its2.saglik.gov.tr
-  baseUrl: process.env.PTS_BASE_URL || 'https://its2.saglik.gov.tr',
-  tokenUrl: '/token/app/token',
-  searchUrl: '/pts/app/search',
-  getPackageUrl: '/pts/app/GetPackage',
-  // Simülasyon modu (geliştirme için)
-  simulationMode: false // Gerçek API'yi kullan
+// PTS Web Servis Entegrasyonu - Ayarlardan yüklenir
+let PTS_CONFIG = null
+
+/**
+ * Ayarlardan PTS config'i yükle
+ * @param {Object} frontendSettings - Frontend'den gelen ayarlar (opsiyonel)
+ */
+function loadPTSConfig(frontendSettings = null) {
+  if (frontendSettings) {
+    settingsHelper.updateSettings(frontendSettings)
+  }
+  
+  const creds = settingsHelper.getITSCredentials()
+  
+  PTS_CONFIG = {
+    username: creds.username,
+    password: creds.password,
+    glnNo: creds.glnNo,
+    baseUrl: creds.baseUrl,
+    tokenUrl: settingsHelper.getSetting('itsTokenUrl', '/token/app/token'),
+    searchUrl: settingsHelper.getSetting('itsPaketSorguUrl', '/pts/app/search'),
+    getPackageUrl: settingsHelper.getSetting('itsPaketIndirUrl', '/pts/app/GetPackage'),
+    sendPackageUrl: settingsHelper.getSetting('itsPaketGonderUrl', '/pts/app/SendPackage'),
+    simulationMode: false
+  }
+  
+  return PTS_CONFIG
 }
+
+// İlk yüklemede default ayarları yükle
+loadPTSConfig()
 
 
 /**
  * PTS Token Alma
+ * @param {Object} settings - Frontend ayarları (opsiyonel)
  * @returns {Promise<string|null>}
  */
-async function getAccessToken() {
+async function getAccessToken(settings = null) {
+  // Ayarlar verildiyse güncelle
+  if (settings) {
+    loadPTSConfig(settings)
+  }
+  
   // Simülasyon modu
   if (PTS_CONFIG.simulationMode) {
     console.log('🎭 Simülasyon modunda - Mock token dönülüyor')
@@ -73,9 +97,14 @@ async function getAccessToken() {
  * PTS'den paket listesi sorgula (tarih aralığında)
  * @param {Date} startDate - Başlangıç tarihi
  * @param {Date} endDate - Bitiş tarihi
+ * @param {Object} settings - Frontend ayarları (opsiyonel)
  * @returns {Promise<Object>}
  */
-async function searchPackages(startDate, endDate) {
+async function searchPackages(startDate, endDate, settings = null) {
+  // Ayarlar verildiyse güncelle
+  if (settings) {
+    loadPTSConfig(settings)
+  }
   // Simülasyon modu
   if (PTS_CONFIG.simulationMode) {
     console.log('🎭 Simülasyon modunda - Mock paket listesi dönülüyor')
@@ -138,9 +167,14 @@ async function searchPackages(startDate, endDate) {
 /**
  * PTS'den paket indir (Transfer ID ile)
  * @param {string} transferId - Transfer ID
+ * @param {Object} settings - Frontend ayarları (opsiyonel)
  * @returns {Promise<Object>}
  */
-async function downloadPackage(transferId) {
+async function downloadPackage(transferId, settings = null) {
+  // Ayarlar verildiyse güncelle
+  if (settings) {
+    loadPTSConfig(settings)
+  }
   // Simülasyon modu
   if (PTS_CONFIG.simulationMode) {
     console.log(`🎭 Simülasyon modunda - Mock paket verisi dönülüyor: ${transferId}`)
@@ -237,43 +271,96 @@ async function downloadPackage(transferId) {
 
     console.log('🔍 XML Root Keys:', Object.keys(xmlData))
 
-    // XML'den bilgileri çıkar  
-    const root = xmlData.package || xmlData.shipmentNotification || xmlData
+    // XML'den bilgileri çıkar - transfer tag'ini destekle
+    const root = xmlData.transfer || xmlData.package || xmlData.shipmentNotification || xmlData
     console.log('📦 Root Keys:', Object.keys(root))
+    
     const packageInfo = {
       transferId,
       documentNumber: root.documentNumber?.[0] || '',
       documentDate: root.documentDate?.[0] || '',
       sourceGLN: root.sourceGLN?.[0] || '',
       destinationGLN: root.destinationGLN?.[0] || '',
+      actionType: root.actionType?.[0] || '',
+      shipTo: root.shipTo?.[0] || '',
+      note: root.note?.[0] || '',
+      version: root.version?.[0] || '',
       products: []
     }
 
-    // Carrier ve productList'i parse et
-    if (root.carrier) {
-      for (const carrier of root.carrier) {
-        const carrierLabel = carrier.$.carrierLabel || ''
-        
+    // Recursive carrier ve productList parse fonksiyonu
+    // parentCarrierLabel: Bir üst seviyedeki carrier'ın label'ı
+    // level: Carrier hiyerarşi seviyesi (1: Palet, 2: Koli, 3: Alt koli, vb.)
+    const parseCarrier = (carrier, parentCarrierLabel = null, level = 1) => {
+      const carrierLabel = carrier.$?.carrierLabel || null
+      const containerType = carrier.$?.containerType || ''
+      
+      // ÖNEMLİ: Carrier'ın kendisi için bir kayıt ekle (SERIAL_NUMBER olmadan)
+      // Bu sayede koli/palet barkodu okutulduğunda bulunabilir
+      if (carrierLabel) {
+        packageInfo.products.push({
+          carrierLabel,
+          parentCarrierLabel,
+          containerType,
+          carrierLevel: level,
+          gtin: null,
+          expirationDate: null,
+          productionDate: null,
+          lotNumber: null,
+          serialNumber: null, // Carrier kaydı - ürün değil
+          poNumber: null
+        })
+      }
+      
+      // ProductList'i parse et (Ürünler)
         if (carrier.productList) {
           for (const product of carrier.productList) {
             const gtin = product.$.GTIN || ''
             const expirationDate = product.$.expirationDate || product.$.ExpirationDate || ''
+          const productionDate = product.$.productionDate || product.$.ProductionDate || ''
             const lotNumber = product.$.lotNumber || product.$.LotNumber || ''
+          const poNumber = product.$.PONumber || ''
             
-            // Her serial number için ürün ekle
-            const serialNumbers = product._ ? [product._] : (Array.isArray(product) ? product : [])
+          // Serial numbers - productList altındaki serialNumber tag'lerini bul
+          if (product.serialNumber) {
+            const serialNumbers = Array.isArray(product.serialNumber) ? product.serialNumber : [product.serialNumber]
             
             for (const sn of serialNumbers) {
+              const serialNumberValue = typeof sn === 'string' ? sn : (sn._ || sn)
+              
+              // Ürün kaydı - hangi carrier'da olduğu bilgisiyle
               packageInfo.products.push({
                 carrierLabel,
+                parentCarrierLabel,
+                containerType,
+                carrierLevel: level,
                 gtin,
                 expirationDate,
+                productionDate,
                 lotNumber,
-                serialNumber: sn
+                serialNumber: serialNumberValue,
+                poNumber
               })
             }
           }
         }
+      }
+      
+      // Alt carrier'ları recursive parse et
+      if (carrier.carrier) {
+        const subCarriers = Array.isArray(carrier.carrier) ? carrier.carrier : [carrier.carrier]
+        for (const subCarrier of subCarriers) {
+          // Alt carrier'ın parent'ı mevcut carrier, level +1
+          parseCarrier(subCarrier, carrierLabel, level + 1)
+        }
+      }
+    }
+
+    // Carrier ve productList'i parse et
+    if (root.carrier) {
+      const carriers = Array.isArray(root.carrier) ? root.carrier : [root.carrier]
+      for (const carrier of carriers) {
+        parseCarrier(carrier)
       }
     }
 
@@ -285,6 +372,24 @@ async function downloadPackage(transferId) {
       destinationGLN: packageInfo.destinationGLN,
       productCount: packageInfo.products.length
     })
+
+    // Veritabanına kaydet
+    const dataToSave = {
+      ...packageInfo,
+      _rawXML: xmlContent
+    }
+    
+    try {
+      const saveResult = await ptsDbService.savePackageData(dataToSave)
+      if (saveResult.success) {
+        console.log(`💾 Paket veritabanına kaydedildi: ${transferId}`)
+      } else {
+        console.error(`❌ Veritabanına kaydetme hatası: ${saveResult.message}`)
+      }
+    } catch (dbError) {
+      console.error('❌ Veritabanı kayıt hatası:', dbError.message)
+      // Veritabanı hatası olsa bile paket verisini döndür
+    }
 
     return {
       success: true,
@@ -307,14 +412,15 @@ async function downloadPackage(transferId) {
 /**
  * Transfer ID ile paket detayı sorgula
  * @param {string} transferId - Transfer ID
+ * @param {Object} settings - Frontend ayarları (opsiyonel)
  * @returns {Promise<Object>}
  */
-async function queryPackage(transferId) {
+async function queryPackage(transferId, settings = null) {
   try {
     console.log(`🔍 Paket sorgulanıyor: ${transferId}`)
     
     // Paketi indir ve detaylarını döndür
-    return await downloadPackage(transferId)
+    return await downloadPackage(transferId, settings)
 
   } catch (error) {
     console.error('❌ Paket sorgulama hatası:', error)
@@ -332,6 +438,7 @@ export {
   searchPackages,
   downloadPackage,
   queryPackage,
+  loadPTSConfig,
   PTS_CONFIG
 }
 

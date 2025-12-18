@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 // Axios instance oluştur
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000, // 60 saniye - büyük veri setleri için artırıldı
   headers: {
     'Content-Type': 'application/json'
   }
@@ -283,10 +283,10 @@ const apiService = {
   // ==================== PTS İşlemleri ====================
 
   // Tarih aralığında paket listesi sorgula
-  searchPackages: async (startDate, endDate) => {
+  searchPackages: async (startDate, endDate, settings = null) => {
     try {
       console.log('🔍 PTS\'den paket listesi sorgulanıyor:', startDate, endDate)
-      const response = await apiClient.post('/pts/search', { startDate, endDate })
+      const response = await apiClient.post('/pts/search', { startDate, endDate, settings })
       console.log('✅ PTS yanıtı:', response.data)
       return response.data
     } catch (error) {
@@ -298,16 +298,49 @@ const apiService = {
     }
   },
 
-  // Transfer ID ile paket sorgula
-  queryPackage: async (transferId) => {
+  // Tarih aralığındaki paketleri toplu indir ve veritabanına kaydet
+  downloadBulkPackages: async (startDate, endDate, settings = null) => {
     try {
-      const response = await apiClient.get(`/pts/query/${transferId}`)
+      console.log('📥 Toplu paket indirme başlıyor:', startDate, endDate)
+      const response = await apiClient.post('/pts/download-bulk', { startDate, endDate, settings })
+      console.log('✅ Toplu indirme tamamlandı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ Toplu indirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Paketler indirilemedi'
+      }
+    }
+  },
+
+  // Transfer ID ile paket sorgula
+  queryPackage: async (transferId, settings = null) => {
+    try {
+      const body = settings ? { settings } : {}
+      const response = await apiClient.post(`/pts/query/${transferId}`, body)
       return response.data
     } catch (error) {
       console.error('❌ PTS sorgulama hatası:', error)
       return {
         success: false,
         message: error.response?.data?.message || error.message || 'Paket sorgulanamadı'
+      }
+    }
+  },
+
+  // Toplu paket indirme (tarih aralığı)
+  downloadBulkPackages: async (startDate, endDate, settings = null) => {
+    try {
+      console.log('📥 Toplu paket indirme başlıyor:', startDate, endDate)
+      const response = await apiClient.post('/pts/download-bulk', { startDate, endDate, settings })
+      console.log('✅ Toplu indirme tamamlandı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ Toplu indirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Toplu indirme başarısız'
       }
     }
   },
@@ -338,6 +371,79 @@ const apiService = {
       return {
         success: false,
         message: error.response?.data?.message || error.message || 'PTS konfigürasyonu alınamadı'
+      }
+    }
+  },
+
+  // Veritabanından Transfer ID ile paket getir
+  getPackageFromDB: async (transferId) => {
+    try {
+      const response = await apiClient.get(`/pts/database/${transferId}`)
+      return response.data
+    } catch (error) {
+      console.error('❌ DB paket getirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Paket getirilemedi'
+      }
+    }
+  },
+
+  // Veritabanından paket listesi getir (tarih filtreli)
+  getPackagesFromDB: async (startDate, endDate, dateFilterType = 'created', settings = null) => {
+    try {
+      const params = new URLSearchParams()
+      if (startDate) params.append('startDate', startDate)
+      if (endDate) params.append('endDate', endDate)
+      if (dateFilterType) params.append('dateFilterType', dateFilterType)
+      
+      // Ayarlardan kolon adlarını ekle
+      if (settings?.itsSettings?.cariGlnColumn) {
+        params.append('cariGlnColumn', settings.itsSettings.cariGlnColumn)
+      }
+      if (settings?.itsSettings?.stockBarcodeColumn) {
+        params.append('stockBarcodeColumn', settings.itsSettings.stockBarcodeColumn)
+      }
+      
+      console.log('📋 API isteği:', { startDate, endDate, dateFilterType, cariGlnColumn: settings?.itsSettings?.cariGlnColumn })
+      
+      const response = await apiClient.get(`/pts/database/list?${params.toString()}`)
+      return response.data
+    } catch (error) {
+      console.error('❌ DB paket listesi hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Paket listesi alınamadı',
+        data: []
+      }
+    }
+  },
+
+  // Carrier label (koli barkodu) ile ürünleri getir
+  getProductsByCarrier: async (carrierLabel) => {
+    try {
+      console.log('📦 Carrier ürünleri getiriliyor:', carrierLabel)
+      const response = await apiClient.get(`/pts/carrier/${carrierLabel}`)
+      return response.data
+    } catch (error) {
+      console.error('❌ Carrier ürün getirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Carrier ürünleri alınamadı'
+      }
+    }
+  },
+
+  // Transfer ID ve carrier label ile detaylı bilgi getir
+  getCarrierDetails: async (transferId, carrierLabel) => {
+    try {
+      const response = await apiClient.get(`/pts/carrier-details/${transferId}/${carrierLabel}`)
+      return response.data
+    } catch (error) {
+      console.error('❌ Carrier detay getirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Carrier detayları alınamadı'
       }
     }
   }

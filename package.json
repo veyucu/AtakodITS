@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
     "ag-grid-community": "^31.0.3",
     "ag-grid-react": "^31.0.3",
     "axios": "^1.6.7",

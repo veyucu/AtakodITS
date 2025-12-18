@@ -3,6 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import documentsRouter from './routes/documents.js';
 import ptsRouter from './routes/pts.js';
+import itsRouter from './routes/its.js';
+import * as ptsDbService from './services/ptsDbService.js';
+import * as itsDbService from './services/itsDbService.js';
 
 dotenv.config();
 
@@ -37,6 +40,7 @@ app.get('/api/test', (req, res) => {
 // Routes
 app.use('/api/documents', documentsRouter);
 app.use('/api/pts', ptsRouter);
+app.use('/api/its', itsRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -55,8 +59,39 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Server başlatma ve tabloları hazırlama
+async function startServer() {
+  try {
+    // PTS tablolarını oluştur (varsa kontrol et)
+    console.log('📋 PTS tabloları kontrol ediliyor...');
+    const ptsTablesResult = await ptsDbService.createTablesIfNotExists();
+    
+    if (ptsTablesResult.success) {
+      console.log('✅ PTS tabloları hazır');
+    } else {
+      console.error('⚠️ PTS tabloları oluşturulamadı:', ptsTablesResult.error);
+    }
+    
+    // ITS tablolarını oluştur (varsa kontrol et)
+    console.log('📋 ITS tabloları kontrol ediliyor...');
+    const itsTablesResult = await itsDbService.createTablesIfNotExists();
+    
+    if (itsTablesResult.success) {
+      console.log('✅ ITS tabloları hazır');
+    } else {
+      console.error('⚠️ ITS tabloları oluşturulamadı:', itsTablesResult.error);
+    }
+    
+    // Server'ı başlat
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
 });
+  } catch (error) {
+    console.error('❌ Server başlatma hatası:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 

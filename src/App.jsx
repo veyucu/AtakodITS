@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard'
 import DocumentsPage from './pages/DocumentsPage'
 import DocumentDetailPage from './pages/DocumentDetailPage'
 import PTSPage from './pages/PTSPage'
+import PTSDetailPage from './pages/PTSDetailPage'
+import SettingsPage from './pages/SettingsPage'
 
 function App() {
   return (
@@ -48,6 +50,24 @@ function App() {
             element={
               <ProtectedRoute>
                 <PTSPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/pts/:transferId" 
+            element={
+              <ProtectedRoute>
+                <PTSDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             } 
           />
