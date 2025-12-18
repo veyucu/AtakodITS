@@ -1,4 +1,4 @@
-import { getConnection } from '../config/database.js'
+import { getPTSConnection } from '../config/database.js'
 import sql from 'mssql'
 import iconv from 'iconv-lite'
 
@@ -53,7 +53,7 @@ const fixTurkishChars = (str) => {
  */
 async function createTablesIfNotExists() {
   try {
-    const pool = await getConnection()
+    const pool = await getPTSConnection()
     
     // Master tablo kontrolü ve oluşturma
     const checkMasterTable = await pool.request().query(`
@@ -303,7 +303,7 @@ async function createTablesIfNotExists() {
  */
 async function savePackageData(packageData) {
   try {
-    const pool = await getConnection()
+    const pool = await getPTSConnection()
     const transaction = new sql.Transaction(pool)
     
     await transaction.begin()
@@ -460,7 +460,7 @@ async function savePackageData(packageData) {
  */
 async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', stockBarcodeColumn = 'TBLSTSABIT.STOK_KODU') {
   try {
-    const pool = await getConnection()
+    const pool = await getPTSConnection()
     
     // Kolon adlarını parse et (TBLCASABIT.EMAIL -> EMAIL)
     const parsedCariColumn = cariGlnColumn.includes('.') ? cariGlnColumn.split('.')[1] : cariGlnColumn
@@ -551,7 +551,7 @@ async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', st
  */
 async function listPackages(startDate, endDate, dateFilterType = 'created', cariGlnColumn = 'TBLCASABIT.EMAIL', stockBarcodeColumn = 'TBLSTSABIT.STOK_KODU') {
   try {
-    const pool = await getConnection()
+    const pool = await getPTSConnection()
     const request = pool.request()
     
     // Kolon adını parse et (TBLCASABIT.EMAIL -> EMAIL)
@@ -629,7 +629,7 @@ async function listPackages(startDate, endDate, dateFilterType = 'created', cari
  */
 async function getProductsByCarrierLabel(carrierLabel) {
   try {
-    const pool = await getConnection()
+    const pool = await getPTSConnection()
     
     // Önce bu barkodun sistemde olup olmadığını kontrol et
     const checkRequest = pool.request()
@@ -814,7 +814,7 @@ function buildCarrierTree(records) {
  */
 async function getCarrierDetails(transferId, carrierLabel) {
   try {
-    const pool = await getConnection()
+    const pool = await getPTSConnection()
     
     const request = pool.request()
     request.input('transferId', sql.NVarChar(50), transferId)
@@ -883,7 +883,7 @@ async function getCarrierDetails(transferId, carrierLabel) {
  */
 export async function getAllTransfers() {
   try {
-    const pool = await getConnection()
+    const pool = await getPTSConnection()
     
     const query = `
       SELECT 

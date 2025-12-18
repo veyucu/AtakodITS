@@ -81,7 +81,7 @@ const PTSPage = () => {
     }
   }
 
-  // Tarih aralığına göre paket listesi çek
+  // Tarih aralığına göre paketleri indir ve veritabanına kaydet
   const handleSearchByDate = async () => {
     if (!startDate || !endDate) {
       showMessage('⚠️ Başlangıç ve bitiş tarihi seçin', 'error')
@@ -95,71 +95,28 @@ const PTSPage = () => {
 
     try {
       setLoading(true)
-      showMessage('🔍 Paketler aranıyor...', 'info')
+      showMessage('📥 Paketler indiriliyor ve veritabanına kaydediliyor...', 'info')
       
-      // PTS'den transfer ID listesi al
-      const searchResponse = await apiService.searchPackages(startDate, endDate)
+      // Toplu paket indirme ve veritabanına kaydetme
+      const response = await apiService.downloadBulkPackages(startDate, endDate)
       
-      if (!searchResponse.success) {
-        showMessage(`❌ ${searchResponse.message || 'Paket listesi alınamadı'}`, 'error')
+      if (!response.success) {
+        showMessage(`❌ ${response.message || 'Paketler indirilemedi'}`, 'error')
         return
       }
 
-      const transferIds = searchResponse.data || []
+      const { downloadedCount, savedCount, failedCount } = response.data || {}
       
-      if (transferIds.length === 0) {
-        showMessage('ℹ️ Belirtilen tarih aralığında paket bulunamadı', 'warning')
-        return
-      }
-
-      showMessage(`📦 ${transferIds.length} paket bulundu, indiriliyor...`, 'info')
-
-      // Her transfer ID için paket detayını indir
-      const newPackages = []
-      for (let i = 0; i < transferIds.length; i++) {
-        try {
-          const transferId = transferIds[i]
-          showMessage(`⬇️ Paket indiriliyor: ${i + 1}/${transferIds.length}`, 'info')
-          
-          const response = await apiService.queryPackage(transferId)
-          
-          if (response.success && response.data) {
-            const packageData = response.data
-            console.log('📦 Paket verisi:', packageData)
-            
-            // XML'i localStorage'a kaydet (manuel kontrol için)
-            if (packageData._rawXML) {
-              const xmlKey = `pts_xml_${transferId}`
-              localStorage.setItem(xmlKey, packageData._rawXML)
-              console.log(`💾 XML kaydedildi: ${xmlKey} (${packageData._rawXML.length} karakter)`)
-              console.log(`📄 İlk 500 karakter:`, packageData._rawXML.substring(0, 500))
-            }
-            
-            newPackages.push({
-              id: Date.now() + i,
-              transferId: transferId,
-              timestamp: new Date().toLocaleString('tr-TR'),
-              documentNumber: packageData.documentNumber || '',
-              documentDate: packageData.documentDate || '',
-              sourceGLN: packageData.sourceGLN || '',
-              destinationGLN: packageData.destinationGLN || '',
-              productCount: packageData.products?.length || 0,
-              products: packageData.products || []
-            })
-          } else {
-            console.error('❌ Paket indirme başarısız:', response.message)
-          }
-        } catch (error) {
-          console.error(`Transfer ${transferIds[i]} indirme hatası:`, error)
-        }
-      }
-
-      setPackages([...newPackages, ...packages])
-      showMessage(`✅ ${newPackages.length} paket başarıyla indirildi`, 'success')
+      showMessage(
+        `✅ ${downloadedCount || 0} paket indirildi, ${savedCount || 0} paket veritabanına kaydedildi${
+          failedCount > 0 ? `, ${failedCount} paket başarısız` : ''
+        }`, 
+        'success'
+      )
       
     } catch (error) {
-      console.error('Tarih aralığı sorgulama hatası:', error)
-      showMessage('❌ Paket listesi alınamadı', 'error')
+      console.error('Toplu paket indirme hatası:', error)
+      showMessage('❌ Paketler indirilemedi', 'error')
     } finally {
       setLoading(false)
     }
@@ -344,8 +301,8 @@ const PTSPage = () => {
       <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-gray-200">
         <div className="px-6 py-3">
           <div className="flex items-center justify-between gap-4">
-            {/* Sol - Başlık */}
-            <div className="flex items-center gap-2">
+            {/* Sol - Başlık ve Tarih Aralığı */}
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/')}
                 className="w-8 h-8 bg-gray-600 rounded flex items-center justify-center hover:bg-gray-700 transition-colors shadow-lg hover:shadow-xl"
@@ -357,9 +314,36 @@ const PTSPage = () => {
                 <Truck className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-lg font-bold text-gray-900">PTS - Paket Transfer Sistemi</h1>
+              
+              {/* Tarih Aralığı */}
+              <div className="flex items-center gap-2 ml-4">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+                <span className="text-gray-500">-</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={handleSearchByDate}
+                  disabled={loading}
+                  className="px-4 py-1 bg-green-600 text-white text-sm rounded font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-1"
+                >
+                  📥 İndir
+                </button>
+              </div>
             </div>
 
-            {/* Orta - İstatistikler */}
+            {/* Sağ - İstatistikler */}
             <div className="flex items-center gap-2">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded px-3 py-1.5 text-white shadow-sm">
                 <div className="flex items-center gap-2">
@@ -400,44 +384,6 @@ const PTSPage = () => {
 
       {/* Sorgulama Alanı */}
       <div className="px-6 py-4 bg-white border-b border-gray-200">
-        {/* Tarih Aralığı Sorgulama */}
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Tarih Aralığına Göre Paket Listesi</h3>
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Başlangıç Tarihi</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={loading}
-              />
-            </div>
-            
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Bitiş Tarihi</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={loading}
-              />
-            </div>
-            
-            <button
-              type="button"
-              onClick={handleSearchByDate}
-              disabled={loading}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl flex items-center gap-2"
-            >
-              <Search className="w-5 h-5" />
-              Paketleri Listele
-            </button>
-          </div>
-        </div>
-
         {/* Transfer ID ile Tekil Sorgulama */}
         <form onSubmit={handleBarcodeScan} className="flex gap-3 items-center">
           <div className="flex-1">
