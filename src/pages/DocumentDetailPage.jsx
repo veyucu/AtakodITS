@@ -2330,7 +2330,7 @@ const DocumentDetailPage = () => {
                       ? "📦 Koli barkodu okutun..."
                       : "📱 Barkod okutun (ITS: karekod, DGR/UTS: normal barkod veya 100*Barkod)"
                   }
-                  className={`w-full pl-14 pr-4 py-3 text-xl font-mono font-bold rounded-lg shadow-2xl focus:outline-none transition-all ${
+                  className={`w-full pl-14 pr-4 py-2 text-xl font-mono font-bold rounded-lg shadow-2xl focus:outline-none transition-all ${
                     deleteMode && koliMode
                       ? 'bg-white text-orange-700 border-4 border-orange-500 placeholder-orange-400 focus:ring-4 focus:ring-orange-300'
                       : deleteMode 
