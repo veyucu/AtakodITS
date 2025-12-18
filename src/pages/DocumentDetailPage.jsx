@@ -151,6 +151,20 @@ const DocumentDetailPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showITSModal, showUTSModal])
 
+  // ITS Modal ESC tuşu desteği
+  useEffect(() => {
+    if (!showITSModal) return
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        handleCloseITSModal()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [showITSModal])
+
   // Calculate totals for footer
   const totals = useMemo(() => {
     const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0)
