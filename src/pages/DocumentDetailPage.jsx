@@ -233,10 +233,27 @@ const DocumentDetailPage = () => {
       field: 'productName',
       flex: 1,
       minWidth: 300,
-      cellClass: 'font-bold',
+      cellRenderer: (params) => {
+        if (params.node.rowPinned === 'bottom') {
+          return (
+            <div style={{ 
+              width: '100%', 
+              textAlign: 'right', 
+              fontWeight: 'bold', 
+              paddingRight: '12px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center'
+            }}>
+              {params.value}
+            </div>
+          )
+        }
+        return <div style={{ fontWeight: 'bold' }}>{params.value}</div>
+      },
       cellStyle: (params) => {
         if (params.node.rowPinned === 'bottom') {
-          return { textAlign: 'right', backgroundColor: '#f9fafb' }
+          return { backgroundColor: '#f9fafb' }
         }
         return {}
       }
@@ -2092,9 +2109,10 @@ const DocumentDetailPage = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate('/documents')}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 transition-all shadow-sm"
+                className="w-8 h-8 flex items-center justify-center rounded bg-gray-600 hover:bg-gray-700 transition-all shadow-lg hover:shadow-xl"
+                title="Geri Dön"
               >
-                <ArrowLeft className="w-3.5 h-3.5 text-gray-700" />
+                <ArrowLeft className="w-5 h-5 text-white" />
               </button>
               <div className={`px-3 py-1 rounded-lg border shadow-sm ${
                 order.docType === '6' 
@@ -2215,57 +2233,97 @@ const DocumentDetailPage = () => {
         </div>
       </div>
 
-      {/* Barcode Scanner - Compact */}
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600">
-        <div className="px-6 py-2">
+      {/* Barcode Scanner - Enhanced & Prominent */}
+      <div className={`transition-all duration-300 ${
+        deleteMode && koliMode
+          ? 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600'
+          : deleteMode
+          ? 'bg-gradient-to-r from-red-500 via-red-600 to-red-700'
+          : koliMode
+          ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600'
+          : 'bg-gradient-to-r from-primary-500 to-primary-600'
+      }`}>
+        <div className="px-6 py-3">
           <form onSubmit={handleBarcodeScan}>
-            <div className="flex gap-3 items-center">
+            <div className="flex gap-2 items-center">
               {/* Silme Modu Checkbox */}
               <div className="flex items-center">
-                <label className="flex items-center gap-2 cursor-pointer bg-white/20 backdrop-blur-sm px-3 py-2.5 rounded-lg border-2 border-white/30 hover:bg-white/30 transition-all">
+                <label className={`flex items-center gap-2 cursor-pointer backdrop-blur-sm px-3 py-1.5 rounded shadow-lg hover:shadow-xl transition-all ${
+                  deleteMode 
+                    ? 'bg-white text-red-600 ring-2 ring-white/50' 
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}>
                   <input
                     type="checkbox"
                     checked={deleteMode}
-                    onChange={(e) => setDeleteMode(e.target.checked)}
-                    className="w-5 h-5 cursor-pointer accent-red-600"
+                    onChange={(e) => {
+                      setDeleteMode(e.target.checked)
+                      // Checkbox değiştikten sonra barkod input'una focus et
+                      setTimeout(() => {
+                        barcodeInputRef.current?.focus()
+                      }, 0)
+                    }}
+                    className="w-4 h-4 cursor-pointer accent-red-600"
                   />
-                  <span className="text-white font-semibold text-sm">Sil</span>
+                  <span className="font-semibold text-sm">🗑️ Sil</span>
                 </label>
               </div>
               
               {/* Koli Modu Checkbox */}
               <div className="flex items-center">
-                <label className="flex items-center gap-2 cursor-pointer bg-white/20 backdrop-blur-sm px-3 py-2.5 rounded-lg border-2 border-white/30 hover:bg-white/30 transition-all">
+                <label className={`flex items-center gap-2 cursor-pointer backdrop-blur-sm px-3 py-1.5 rounded shadow-lg hover:shadow-xl transition-all ${
+                  koliMode 
+                    ? 'bg-white text-emerald-600 ring-2 ring-white/50' 
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}>
                   <input
                     type="checkbox"
                     checked={koliMode}
-                    onChange={(e) => setKoliMode(e.target.checked)}
-                    className="w-5 h-5 cursor-pointer accent-blue-600"
+                    onChange={(e) => {
+                      setKoliMode(e.target.checked)
+                      // Checkbox değiştikten sonra barkod input'una focus et
+                      setTimeout(() => {
+                        barcodeInputRef.current?.focus()
+                      }, 0)
+                    }}
+                    className="w-4 h-4 cursor-pointer accent-emerald-600"
                   />
-                  <span className="text-white font-semibold text-sm">📦 Koli</span>
+                  <span className="font-semibold text-sm">📦 Koli</span>
                 </label>
               </div>
               
               <div className="flex-1 relative">
-                <Barcode className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/70" />
+                <Barcode className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 transition-all ${
+                  deleteMode && koliMode
+                    ? 'text-orange-600'
+                    : deleteMode
+                    ? 'text-red-600'
+                    : koliMode
+                    ? 'text-emerald-600'
+                    : 'text-gray-400'
+                }`} />
                 <input
                   ref={barcodeInputRef}
                   type="text"
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   placeholder={
-                    deleteMode 
-                      ? "Silmek için barkod okutun (ITS için karekod gerekli)..." 
+                    deleteMode && koliMode
+                      ? "⚠️ KOLİ SİLME MODU - Koli barkodu okutun..."
+                      : deleteMode 
+                      ? "🗑️ Silmek için barkod okutun (ITS için karekod gerekli)..." 
                       : koliMode
-                      ? "Koli barkodu okutun..."
-                      : "Barkod okutun (ITS: karekod, DGR/UTS: normal barkod veya 100*Barkod)"
+                      ? "📦 Koli barkodu okutun..."
+                      : "📱 Barkod okutun (ITS: karekod, DGR/UTS: normal barkod veya 100*Barkod)"
                   }
-                  className={`w-full pl-11 pr-4 py-2.5 text-base backdrop-blur-sm border-2 rounded-lg text-white placeholder-white/70 focus:border-white focus:outline-none transition-all ${
-                    deleteMode 
-                      ? 'bg-red-500/30 border-red-300/50 focus:bg-red-500/40'
+                  className={`w-full pl-14 pr-4 py-3 text-xl font-mono font-bold rounded-lg shadow-2xl focus:outline-none transition-all ${
+                    deleteMode && koliMode
+                      ? 'bg-white text-orange-700 border-4 border-orange-500 placeholder-orange-400 focus:ring-4 focus:ring-orange-300'
+                      : deleteMode 
+                      ? 'bg-white text-red-700 border-4 border-red-500 placeholder-red-400 focus:ring-4 focus:ring-red-300'
                       : koliMode
-                      ? 'bg-blue-500/30 border-blue-300/50 focus:bg-blue-500/40'
-                      : 'bg-white/20 border-white/30 focus:bg-white/30'
+                      ? 'bg-white text-emerald-700 border-4 border-emerald-500 placeholder-emerald-400 focus:ring-4 focus:ring-emerald-300'
+                      : 'bg-white text-gray-900 border-4 border-white placeholder-gray-400 focus:ring-4 focus:ring-blue-300'
                   }`}
                   autoComplete="off"
                 />
@@ -2277,7 +2335,7 @@ const DocumentDetailPage = () => {
                 <button
                   type="button"
                   onClick={handleBarcodeScan}
-                  className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-red-600 text-white hover:bg-red-700"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-red-600 text-white hover:bg-red-700"
                 >
                   Sil
                 </button>
@@ -2286,7 +2344,7 @@ const DocumentDetailPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowBulkScanModal(true)}
-                    className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
                     title="Toplu ITS karekod okutma"
                   >
                     📋 Toplu Karekod
@@ -2294,7 +2352,7 @@ const DocumentDetailPage = () => {
                   <button
                     type="button"
                     onClick={fetchDocument}
-                    className="px-6 py-2.5 font-semibold rounded-lg transition-colors shadow-lg bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-white/90 text-primary-600 hover:bg-white border-2 border-white/50"
                     title="Grid'i yenile"
                   >
                     🔄 Yenile
@@ -2305,8 +2363,8 @@ const DocumentDetailPage = () => {
           </form>
         </div>
         
-        {/* Message Strip - Fixed Below Barcode Scanner - Fixed Height */}
-        <div className={`px-6 py-2.5 transition-all ${
+        {/* Message Strip - Enhanced with Mode Colors */}
+        <div className={`px-6 py-2 transition-all duration-300 shadow-inner ${
           message 
             ? message.type === 'success' 
               ? 'bg-green-600' 
@@ -2315,15 +2373,19 @@ const DocumentDetailPage = () => {
               : message.type === 'info'
               ? 'bg-blue-600'
               : 'bg-yellow-600'
+            : deleteMode && koliMode
+            ? 'bg-orange-600'
             : deleteMode 
             ? 'bg-red-700'
             : koliMode
-            ? 'bg-blue-700'
+            ? 'bg-emerald-700'
             : 'bg-primary-700'
         }`}>
-          <p className="text-white font-medium text-center text-sm h-5 leading-5 overflow-hidden text-ellipsis whitespace-nowrap">
+          <p className="text-white font-bold text-center text-base h-6 leading-6 overflow-hidden text-ellipsis whitespace-nowrap">
             {message 
               ? message.text 
+              : deleteMode && koliMode
+              ? '⚠️ KOLİ SİLME MODU AKTİF - Koli barkodu okutarak tüm içeriği silebilirsiniz!'
               : deleteMode 
               ? '🗑️ SİLME MODU AKTİF - ITS: Karekod okutun | DGR/UTS: Normal barkod okutun'
               : koliMode
@@ -2452,20 +2514,20 @@ const DocumentDetailPage = () => {
               <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                 <button
                   onClick={handleAddNewUTSRow}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg flex items-center gap-2"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-green-600 text-white hover:bg-green-700"
                 >
                   ➕ Yeni Satır Ekle
                 </button>
                 <button
                   onClick={handleSaveAllUTSRecords}
-                  className={`px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2 ${utsHasChanges ? 'animate-pulse-save' : ''}`}
+                  className={`flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-blue-600 text-white hover:bg-blue-700 ${utsHasChanges ? 'animate-pulse-save' : ''}`}
                 >
                   💾 Kaydet
                 </button>
                 <button
                   onClick={handleDeleteUTSRecords}
                   disabled={selectedUTSRecords.length === 0}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   🗑️ Seçilenleri Sil
                 </button>
@@ -2548,13 +2610,13 @@ const DocumentDetailPage = () => {
                     <button
                       onClick={handleDeleteITSRecords}
                       disabled={selectedRecords.length === 0}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Seçilenleri Sil
                     </button>
                     <button
                       onClick={() => setItsModalView('text')}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg"
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-blue-600 text-white hover:bg-blue-700"
                     >
                       📄 Karekodları Göster
                     </button>
@@ -2589,13 +2651,13 @@ const DocumentDetailPage = () => {
                   <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
                     <button
                       onClick={() => setItsModalView('grid')}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors shadow-lg"
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-gray-600 text-white hover:bg-gray-700"
                     >
                       ← Tabloya Dön
                     </button>
                     <button
                       onClick={handleCopyAllBarcodes}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-lg"
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-green-600 text-white hover:bg-green-700"
                     >
                       📋 Tümünü Kopyala
                     </button>
@@ -2717,14 +2779,14 @@ const DocumentDetailPage = () => {
                   setBulkBarcodeText('')
                   setBulkScanResults(null)
                 }}
-                className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                 disabled={bulkScanLoading}
               >
                 İptal
               </button>
               <button
                 onClick={handleBulkScan}
-                className="px-6 py-2.5 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded shadow-lg hover:shadow-xl transition-all bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={bulkScanLoading || !bulkBarcodeText.trim()}
               >
                 {bulkScanLoading ? (
