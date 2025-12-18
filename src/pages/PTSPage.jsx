@@ -147,36 +147,24 @@ const PTSPage = () => {
         status: 'downloading'
       }))
 
-      // Toplu paket indirme ve veritabanına kaydetme
-      const response = await apiService.downloadBulkPackages(startDate, endDate)
-      
-      if (!response.success) {
-        setDownloadProgress(prev => ({
-          ...prev,
-          status: 'error'
-        }))
-        showMessage(`❌ ${response.message || 'Paketler indirilemedi'}`, 'error')
-        return
-      }
-
-      const { downloaded, skipped, failed } = response.data || {}
-      
-      // Son durumu güncelle
-      setDownloadProgress(prev => ({
-        ...prev,
-        current: prev.total,
-        downloaded: downloaded || 0,
-        skipped: skipped || 0,
-        failed: failed || 0,
-        status: 'completed'
-      }))
-      
-      showMessage(
-        `✅ ${downloaded || 0} paket indirildi, ${skipped || 0} paket zaten mevcut${
-          failed > 0 ? `, ${failed} paket başarısız` : ''
-        }`, 
-        'success'
+      // SSE ile real-time progress
+      await apiService.downloadBulkPackagesStream(
+        startDate, 
+        endDate, 
+        (progressData) => {
+          // Her progress güncellemesinde state'i güncelle
+          setDownloadProgress({
+            total: progressData.total || 0,
+            current: progressData.current || 0,
+            downloaded: progressData.downloaded || 0,
+            skipped: progressData.skipped || 0,
+            failed: progressData.failed || 0,
+            status: progressData.status
+          })
+        }
       )
+      
+      showMessage(`✅ İndirme tamamlandı!`, 'success')
       
     } catch (error) {
       console.error('Toplu paket indirme hatası:', error)

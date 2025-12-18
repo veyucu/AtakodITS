@@ -54,7 +54,8 @@ router.post('/search', async (req, res) => {
  * POST /api/pts/download-bulk
  * Tarih aralığındaki paketleri toplu indir ve veritabanına kaydet
  */
-router.post('/download-bulk', async (req, res) => {
+// SSE ile real-time progress güncellemesi
+router.post('/download-bulk-stream', async (req, res) => {
   try {
     const { startDate, endDate, settings } = req.body
 
@@ -65,9 +66,229 @@ router.post('/download-bulk', async (req, res) => {
       })
     }
 
-    console.log('📥 Toplu paket indirme başlıyor:', { startDate, endDate })
+    // SSE headers
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no') // Nginx buffering'i kapat
+
+    console.log('📥 Toplu paket indirme başlıyor (SSE):', { startDate, endDate })
+
+    // Helper function to send SSE message
+    const sendProgress = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`)
+    }
 
     // 1. Transfer ID listesini al
+    sendProgress({ status: 'searching', message: 'Paketler aranıyor...' })
+    
+    const searchResult = await ptsService.searchPackages(startDate, endDate, settings)
+    
+    if (!searchResult.success) {
+      sendProgress({ status: 'error', message: searchResult.message })
+      res.end()
+      return
+    }
+
+    const transferIds = searchResult.data || []
+    
+    if (transferIds.length === 0) {
+      sendProgress({ 
+        status: 'completed', 
+        total: 0, 
+        downloaded: 0, 
+        skipped: 0, 
+        failed: 0,
+        message: 'Belirtilen tarih aralığında paket bulunamadı' 
+      })
+      res.end()
+      return
+    }
+
+    console.log(`📦 ${transferIds.length} paket bulundu`)
+    sendProgress({ 
+      status: 'downloading', 
+      total: transferIds.length,
+      downloaded: 0,
+      skipped: 0,
+      failed: 0,
+      message: `${transferIds.length} paket bulundu, indirme başlıyor...` 
+    })
+
+    // 2. Her paketi indir ve kaydet
+    const results = {
+      total: transferIds.length,
+      downloaded: 0,
+      skipped: 0,
+      failed: 0,
+      packages: []
+    }
+
+    for (let i = 0; i < transferIds.length; i++) {
+      const transferId = transferIds[i]
+      const transferIdStr = String(transferId)
+
+      try {
+        // Daha önce indirilmiş mi kontrol et
+        console.log(`🔍 Kontrol ediliyor: ${transferIdStr} (${i + 1}/${transferIds.length})`)
+        const existingCheck = await ptsDbService.getPackageData(transferIdStr)
+        
+        if (existingCheck.success && existingCheck.data) {
+          results.skipped++
+          results.packages.push({
+            transferId: transferIdStr,
+            status: 'skipped',
+            message: 'Daha önce indirilmiş'
+          })
+          console.log(`⏭️  ${transferIdStr} zaten veritabanında, atlanıyor`)
+          
+          // Progress güncelle
+          sendProgress({
+            status: 'downloading',
+            total: results.total,
+            downloaded: results.downloaded,
+            skipped: results.skipped,
+            failed: results.failed,
+            current: i + 1,
+            message: `${transferIdStr} atlandı (${i + 1}/${transferIds.length})`
+          })
+          continue
+        }
+
+        // Paketi indir
+        console.log(`📥 İndiriliyor: ${transferIdStr}`)
+        sendProgress({
+          status: 'downloading',
+          total: results.total,
+          downloaded: results.downloaded,
+          skipped: results.skipped,
+          failed: results.failed,
+          current: i + 1,
+          message: `${transferIdStr} indiriliyor... (${i + 1}/${transferIds.length})`
+        })
+        
+        const downloadResult = await ptsService.downloadPackage(transferIdStr, settings)
+        
+        if (downloadResult.success) {
+          const saveResult = await ptsDbService.savePackageData(downloadResult.data)
+          
+          if (saveResult.success) {
+            results.downloaded++
+            results.packages.push({
+              transferId: transferIdStr,
+              status: 'success',
+              productCount: downloadResult.data?.products?.length || 0
+            })
+            console.log(`✅ ${transferIdStr} veritabanına kaydedildi (${downloadResult.data?.products?.length || 0} ürün)`)
+            
+            // Progress güncelle
+            sendProgress({
+              status: 'downloading',
+              total: results.total,
+              downloaded: results.downloaded,
+              skipped: results.skipped,
+              failed: results.failed,
+              current: i + 1,
+              message: `${transferIdStr} kaydedildi (${i + 1}/${transferIds.length})`
+            })
+          } else {
+            results.failed++
+            results.packages.push({
+              transferId: transferIdStr,
+              status: 'failed',
+              message: `Kayıt hatası: ${saveResult.message}`
+            })
+            console.error(`❌ ${transferIdStr} veritabanına kaydedilemedi:`, saveResult.message)
+            
+            sendProgress({
+              status: 'downloading',
+              total: results.total,
+              downloaded: results.downloaded,
+              skipped: results.skipped,
+              failed: results.failed,
+              current: i + 1,
+              message: `${transferIdStr} başarısız (${i + 1}/${transferIds.length})`
+            })
+          }
+        } else {
+          results.failed++
+          results.packages.push({
+            transferId: transferIdStr,
+            status: 'failed',
+            message: downloadResult.message
+          })
+          console.error(`❌ Hata: ${transferIdStr} - ${downloadResult.message}`)
+          
+          sendProgress({
+            status: 'downloading',
+            total: results.total,
+            downloaded: results.downloaded,
+            skipped: results.skipped,
+            failed: results.failed,
+            current: i + 1,
+            message: `${transferIdStr} başarısız (${i + 1}/${transferIds.length})`
+          })
+        }
+
+      } catch (error) {
+        results.failed++
+        results.packages.push({
+          transferId: String(transferId),
+          status: 'failed',
+          message: error.message
+        })
+        console.error(`❌ ${transferId} indirme hatası:`, error.message)
+        
+        sendProgress({
+          status: 'downloading',
+          total: results.total,
+          downloaded: results.downloaded,
+          skipped: results.skipped,
+          failed: results.failed,
+          current: i + 1,
+          message: `${String(transferId)} hata (${i + 1}/${transferIds.length})`
+        })
+      }
+    }
+
+    console.log('📊 Toplu indirme tamamlandı:', results)
+
+    // Son durum
+    sendProgress({
+      status: 'completed',
+      total: results.total,
+      downloaded: results.downloaded,
+      skipped: results.skipped,
+      failed: results.failed,
+      message: `Tamamlandı! ${results.downloaded} indirildi, ${results.skipped} atlandı, ${results.failed} hata`
+    })
+
+    res.end()
+
+  } catch (error) {
+    console.error('❌ SSE toplu indirme hatası:', error)
+    res.write(`data: ${JSON.stringify({
+      status: 'error',
+      message: error.message
+    })}\n\n`)
+    res.end()
+  }
+})
+
+// Eski endpoint (yedek - non-streaming) - Artık kullanılmıyor
+router.post('/download-bulk-old', async (req, res) => {
+  try {
+    const { startDate, endDate, settings } = req.body
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Başlangıç ve bitiş tarihi gerekli'
+      })
+    }
+
+    console.log('📥 Toplu paket indirme başlıyor (OLD):', { startDate, endDate })
+
     const searchResult = await ptsService.searchPackages(startDate, endDate, settings)
     
     if (!searchResult.success) {
@@ -83,96 +304,46 @@ router.post('/download-bulk', async (req, res) => {
           total: 0,
           downloaded: 0,
           skipped: 0,
-          failed: 0,
-          packages: []
-        },
-        message: 'Belirtilen tarih aralığında paket bulunamadı'
+          failed: 0
+        }
       })
     }
 
-    console.log(`📦 ${transferIds.length} paket bulundu`)
-
-    // 2. Her paketi indir ve kaydet
     const results = {
       total: transferIds.length,
       downloaded: 0,
       skipped: 0,
-      failed: 0,
-      packages: []
+      failed: 0
     }
 
-    for (let i = 0; i < transferIds.length; i++) {
-      const transferId = transferIds[i]
-      const transferIdStr = String(transferId) // String'e dönüştür
-
+    for (const transferId of transferIds) {
+      const transferIdStr = String(transferId)
+      
       try {
-        // Daha önce indirilmiş mi kontrol et (NETSIS.AKTBLPTSMAS)
-        console.log(`🔍 Kontrol ediliyor: ${transferIdStr} (${i + 1}/${transferIds.length})`)
         const existingCheck = await ptsDbService.getPackageData(transferIdStr)
         
         if (existingCheck.success && existingCheck.data) {
           results.skipped++
-          results.packages.push({
-            transferId: transferIdStr,
-            status: 'skipped',
-            message: 'Daha önce indirilmiş'
-          })
-          console.log(`⏭️  ${transferIdStr} zaten veritabanında, atlanıyor`)
           continue
         }
 
-        // Paketi indir
-        console.log(`📥 İndiriliyor: ${transferIdStr}`)
         const downloadResult = await ptsService.downloadPackage(transferIdStr, settings)
         
         if (downloadResult.success) {
-          // Veritabanına kaydet
           const saveResult = await ptsDbService.savePackageData(downloadResult.data)
-          
-          if (saveResult.success) {
-            results.downloaded++
-            results.packages.push({
-              transferId: transferIdStr,
-              status: 'success',
-              productCount: downloadResult.data?.products?.length || 0
-            })
-            console.log(`✅ ${transferIdStr} veritabanına kaydedildi (${downloadResult.data?.products?.length || 0} ürün)`)
-          } else {
-            results.failed++
-            results.packages.push({
-              transferId,
-              status: 'failed',
-              message: `Kayıt hatası: ${saveResult.message}`
-            })
-            console.error(`❌ ${transferId} veritabanına kaydedilemedi:`, saveResult.message)
-          }
+          if (saveResult.success) results.downloaded++
+          else results.failed++
         } else {
           results.failed++
-          results.packages.push({
-            transferId,
-            status: 'failed',
-            message: downloadResult.message
-          })
-          console.error(`❌ Hata: ${transferId} - ${downloadResult.message}`)
         }
-
       } catch (error) {
         results.failed++
-        results.packages.push({
-          transferId,
-          status: 'failed',
-          message: error.message
-        })
-        console.error(`❌ ${transferId} indirme hatası:`, error.message)
       }
     }
 
-    console.log('📊 Toplu indirme tamamlandı:', results)
-
     res.json({
       success: true,
-      data: results,
-      message: `${results.downloaded} paket indirildi, ${results.skipped} atlandı, ${results.failed} hata`
+      data: results
     })
 
   } catch (error) {

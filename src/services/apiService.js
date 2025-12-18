@@ -299,10 +299,84 @@ const apiService = {
   },
 
   // Tarih aralığındaki paketleri toplu indir ve veritabanına kaydet
+  // SSE ile real-time progress
+  downloadBulkPackagesStream: async (startDate, endDate, onProgress, settings = null) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+        const url = `${API_URL}/pts/download-bulk-stream`
+        
+        console.log('📥 SSE Toplu paket indirme başlıyor:', startDate, endDate)
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ startDate, endDate, settings })
+        }).then(response => {
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+
+          const readStream = () => {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                console.log('✅ SSE stream tamamlandı')
+                resolve({ success: true })
+                return
+              }
+
+              buffer += decoder.decode(value, { stream: true })
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6))
+                    console.log('📊 SSE Progress:', data)
+                    onProgress(data)
+                    
+                    if (data.status === 'completed') {
+                      console.log('✅ İndirme tamamlandı:', data)
+                      resolve({ success: true, data })
+                      return
+                    } else if (data.status === 'error') {
+                      console.error('❌ İndirme hatası:', data)
+                      reject(new Error(data.message))
+                      return
+                    }
+                  } catch (e) {
+                    console.error('SSE parse error:', e, line)
+                  }
+                }
+              }
+
+              readStream()
+            }).catch(error => {
+              console.error('Stream read error:', error)
+              reject(error)
+            })
+          }
+
+          readStream()
+        }).catch(error => {
+          console.error('Fetch error:', error)
+          reject(error)
+        })
+
+      } catch (error) {
+        console.error('Download stream error:', error)
+        reject(error)
+      }
+    })
+  },
+
   downloadBulkPackages: async (startDate, endDate, settings = null) => {
     try {
       console.log('📥 Toplu paket indirme başlıyor:', startDate, endDate)
-      const response = await apiClient.post('/pts/download-bulk', { startDate, endDate, settings })
+      const response = await apiClient.post('/pts/download-bulk-old', { startDate, endDate, settings })
       console.log('✅ Toplu indirme tamamlandı:', response.data)
       return response.data
     } catch (error) {
