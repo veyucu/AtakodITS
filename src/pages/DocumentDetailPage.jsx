@@ -2325,10 +2325,10 @@ const DocumentDetailPage = () => {
                     deleteMode && koliMode
                       ? "⚠️ KOLİ SİLME MODU - Koli barkodu okutun..."
                       : deleteMode 
-                      ? "🗑️ Silmek için barkod okutun (ITS için karekod gerekli)..." 
+                      ? "🗑️ Silmek için karekod veya barkod okutun..." 
                       : koliMode
                       ? "📦 Koli barkodu okutun..."
-                      : "📱 Barkod okutun (ITS: karekod, DGR/UTS: normal barkod veya 100*Barkod)"
+                      : "📱 Karekod veya barkod okutun..."
                   }
                   className={`w-full pl-14 pr-4 py-2 text-xl font-mono font-bold rounded-lg shadow-2xl focus:outline-none transition-all ${
                     deleteMode && koliMode
@@ -2399,12 +2399,12 @@ const DocumentDetailPage = () => {
             {message 
               ? message.text 
               : deleteMode && koliMode
-              ? '⚠️ KOLİ SİLME MODU AKTİF - Koli barkodu okutarak tüm içeriği silebilirsiniz!'
+              ? '⚠️ KOLİ SİLME MODU AKTİF - Koli barkodu okutarak tüm koli içeriğini silebilirsiniz!'
               : deleteMode 
-              ? '🗑️ SİLME MODU AKTİF - ITS: Karekod okutun | DGR/UTS: Normal barkod okutun'
+              ? '🗑️ SİLME MODU AKTİF - Karekod veya barkod okutun.'
               : koliMode
-              ? '📦 KOLİ MODU AKTİF - Koli barkodu okutun'
-              : '📱 ITS ürünler için KAREKOD (2D) zorunlu | DGR/UTS için normal barkod (Toplu: 100*Barkod)'}
+              ? '📦 KOLİ MODU AKTİF - Koli barkodu okutun.'
+              : '📱 ITSli ürünler için karekod zorunlu. UTS/DGR ürünler için barkod girebilirsiniz. (Toplu : 100*Barkod)'}
           </p>
         </div>
       </div>
