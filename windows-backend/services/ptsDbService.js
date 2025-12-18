@@ -455,85 +455,37 @@ async function savePackageData(packageData) {
 }
 
 /**
- * Transfer ID ile paket verilerini getir
+ * Transfer ID ile paket verilerini getir (sadece varlık kontrolü için)
  * @param {string} transferId - Transfer ID
- * @param {string} cariGlnColumn - Cari GLN kolon adı (örn: EMAIL veya TBLCASABIT.EMAIL)
- * @param {string} stockBarcodeColumn - Stok barkod kolon adı (örn: STOK_KODU veya TBLSTSABIT.STOK_KODU)
+ * @param {string} cariGlnColumn - Cari GLN kolon adı (kullanılmıyor, geriye dönük uyumluluk için)
+ * @param {string} stockBarcodeColumn - Stok barkod kolon adı (kullanılmıyor, geriye dönük uyumluluk için)
  * @returns {Promise<Object>}
  */
 async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', stockBarcodeColumn = 'TBLSTSABIT.STOK_KODU') {
   try {
     const pool = await getPTSConnection()
     
-    // Kolon adlarını parse et (TBLCASABIT.EMAIL -> EMAIL)
-    const parsedCariColumn = cariGlnColumn.includes('.') ? cariGlnColumn.split('.')[1] : cariGlnColumn
-    const parsedStockColumn = stockBarcodeColumn.includes('.') ? stockBarcodeColumn.split('.')[1] : stockBarcodeColumn
-    
-    console.log('📦 Paket detayı:', { transferId, cariGlnColumn, parsedCariColumn, stockBarcodeColumn, parsedStockColumn })
-    
-    // Master kayıt
+    // Sadece master kayıt kontrolü (NETSIS.AKTBLPTSMAS)
     const masterRequest = pool.request()
-    masterRequest.input('transferId', sql.NVarChar(50), transferId)
+    masterRequest.input('transferId', sql.NVarChar(50), String(transferId))
     const masterResult = await masterRequest.query(`
       SELECT * FROM AKTBLPTSMAS WHERE TRANSFER_ID = @transferId
     `)
     
     if (masterResult.recordset.length === 0) {
+      console.log(`❌ Paket bulunamadı: ${transferId}`)
       return {
         success: false,
         message: 'Paket bulunamadı'
       }
     }
     
-    const master = masterResult.recordset[0]
+    console.log(`✅ Paket mevcut: ${transferId}`)
     
-    // Cari bilgilerini getir (Türkçe karakter düzeltmesi ile)
-    try {
-      const cariRequest = pool.request()
-      cariRequest.input('sourceGLN', sql.NVarChar(50), master.SOURCE_GLN)
-      const cariResult = await cariRequest.query(`
-        SELECT TOP 1 CARI_ISIM, CARI_ILCE, CARI_IL
-        FROM TBLCASABIT WITH (NOLOCK)
-        WHERE ${parsedCariColumn} = @sourceGLN
-      `)
-      if (cariResult.recordset.length > 0) {
-        master.SOURCE_GLN_NAME = fixTurkishChars(cariResult.recordset[0].CARI_ISIM)
-        master.SOURCE_GLN_ILCE = fixTurkishChars(cariResult.recordset[0].CARI_ILCE)
-        master.SOURCE_GLN_IL = fixTurkishChars(cariResult.recordset[0].CARI_IL)
-      }
-    } catch (cariError) {
-      console.log('⚠️ Cari bilgileri bulunamadı:', master.SOURCE_GLN, cariError.message)
-    }
-    
-    // Transaction kayıtları - GTIN'in başındaki sıfırı silerek stok adı eşleştir (Türkçe karakter düzeltmesi ile)
-    const transRequest = pool.request()
-    transRequest.input('transferId', sql.NVarChar(50), transferId)
-    const transResult = await transRequest.query(`
-      SELECT 
-        t.*,
-        s.STOK_ADI
-      FROM AKTBLPTSTRA t WITH (NOLOCK)
-      LEFT JOIN TBLSTSABIT s WITH (NOLOCK) ON s.${parsedStockColumn} = 
-        CASE 
-          WHEN LEFT(t.GTIN, 1) = '0' THEN SUBSTRING(t.GTIN, 2, LEN(t.GTIN) - 1)
-          ELSE t.GTIN
-        END
-      WHERE t.TRANSFER_ID = @transferId
-      ORDER BY t.GTIN, t.SERIAL_NUMBER
-    `)
-    
-    // Stok adlarını Türkçe karakter düzeltmesi ile kaydet
-    const products = transResult.recordset.map(row => ({
-      ...row,
-      STOK_ADI: fixTurkishChars(row.STOK_ADI)
-    }))
-    
+    // Basit varlık kontrolü için sadece master kaydı dön
     return {
       success: true,
-      data: {
-        ...master,
-        products
-      }
+      data: masterResult.recordset[0]
     }
     
   } catch (error) {
