@@ -9,12 +9,17 @@ import {
 } from 'lucide-react'
 import apiService from '../services/apiService'
 import { log } from '../utils/debug'
+import { useSound } from '../hooks/useSound'
+import { parseITSBarcode } from '../utils/barcodeParser'
 
 const DocumentDetailPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const barcodeInputRef = useRef(null)
   const utsGridRef = useRef(null)
+  
+  // Custom Hooks
+  const { playSuccessSound, playErrorSound, playWarningSound } = useSound()
   
   const [order, setOrder] = useState(null)
   const [items, setItems] = useState([])
@@ -720,113 +725,6 @@ const DocumentDetailPage = () => {
   const handleBulkTextareaScroll = () => {
     if (bulkTextareaRef.current && bulkLineNumbersRef.current) {
       bulkLineNumbersRef.current.scrollTop = bulkTextareaRef.current.scrollTop
-    }
-  }
-
-  // ITS Karekod Parse Fonksiyonu (Backend ile aynı)
-  const parseITSBarcode = (barcode) => {
-    try {
-      let position = 0
-      const result = {
-        gtin: '',
-        serialNumber: '',
-        expiryDate: '',
-        lotNumber: '',
-        raw: barcode
-      }
-
-      // Boşluk ve özel karakterleri temizle
-      barcode = barcode.trim().replace(/\s+/g, '')
-
-      // 1. GTIN (01) - İlk 2 karakter
-      if (!barcode.startsWith('01')) {
-        console.error('Geçersiz ITS karekod formatı - 01 ile başlamalı')
-        return null
-      }
-      position += 2
-
-      // 2. GTIN - Sonraki 14 karakter
-      const gtinFull = barcode.substring(position, position + 14)
-      if (gtinFull.length < 14) {
-        console.error('Geçersiz GTIN uzunluğu')
-        return null
-      }
-      result.gtin = gtinFull
-      position += 14
-
-      // 3. Serial Number AI (21)
-      if (barcode.substring(position, position + 2) !== '21') {
-        console.error('Serial Number AI (21) bulunamadı')
-        return null
-      }
-      position += 2
-
-      // 4. Serial Number - 17 AI'sına kadar (tarih kontrolü ile)
-      const serialStartPos = position
-      const maxSerialLength = 20
-      const searchEndPos = Math.min(serialStartPos + maxSerialLength, barcode.length - 8)
-      
-      let expiryAIPos = -1
-      
-      for (let i = serialStartPos; i <= searchEndPos; i++) {
-        if (barcode.substring(i, i + 2) === '17') {
-          // 17'den sonraki 6 karakter var mı ve rakam mı?
-          const dateStr = barcode.substring(i + 2, i + 8)
-          if (dateStr.length === 6 && /^\d{6}$/.test(dateStr)) {
-            // Tarih formatı doğru mu kontrol et (YYMMDD)
-            const mm = parseInt(dateStr.substring(2, 4))
-            const dd = parseInt(dateStr.substring(4, 6))
-            
-            // Ay 01-12, gün 01-31 arası olmalı
-            if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
-              // Seri no min 4 karakter olmalı
-              if (i - serialStartPos >= 4) {
-                expiryAIPos = i
-                break
-              }
-            }
-          }
-        }
-      }
-      
-      if (expiryAIPos === -1) {
-        console.error('Expiry Date AI (17) bulunamadı')
-        return null
-      }
-      
-      result.serialNumber = barcode.substring(serialStartPos, expiryAIPos)
-      position = expiryAIPos + 2 // 17'yi atla
-
-      // 5. Expiry Date (YYMMDD) - 6 karakter
-      result.expiryDate = barcode.substring(position, position + 6)
-      if (result.expiryDate.length !== 6) {
-        console.error('Geçersiz miad formatı (YYMMDD)')
-        return null
-      }
-      position += 6
-
-      // 6. Lot/Batch AI (10)
-      if (barcode.substring(position, position + 2) !== '10') {
-        console.error('Lot/Batch AI (10) bulunamadı')
-        return null
-      }
-      position += 2
-
-      // 7. Lot/Batch - String sonuna kadar (lot son alandır)
-      result.lotNumber = barcode.substring(position).replace(/\x1D/g, '').trim()
-
-      // Validasyon
-      if (!result.gtin || !result.serialNumber || !result.expiryDate || !result.lotNumber) {
-        console.error('Eksik karekod bilgisi')
-        return null
-      }
-
-      log('✅ ITS Karekod Parse Başarılı:', result)
-      return result
-
-    } catch (error) {
-      console.error('ITS karekod parse hatası:', error)
-      return null
     }
   }
 
@@ -1991,73 +1889,6 @@ const DocumentDetailPage = () => {
     } catch (error) {
       console.error('ITS kayıt silme hatası:', error)
       alert('❌ Kayıtlar silinemedi')
-    }
-  }
-
-  // Sound effects - Web Audio API ile gerçek ses
-  const playSuccessSound = () => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-      
-      oscillator.frequency.value = 800 // Başarı için yüksek ton
-      oscillator.type = 'sine'
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15)
-      
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.15)
-    } catch (error) {
-      log('Success beep!')
-    }
-  }
-
-  const playErrorSound = () => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-      
-      oscillator.frequency.value = 200 // Hata için düşük ton
-      oscillator.type = 'sawtooth'
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-      
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.3)
-    } catch (error) {
-      log('Error beep!')
-    }
-  }
-
-  const playWarningSound = () => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-      
-      oscillator.frequency.value = 500 // Uyarı için orta ton
-      oscillator.type = 'square'
-      
-      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
-      
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.2)
-    } catch (error) {
-      log('Warning beep!')
     }
   }
 
