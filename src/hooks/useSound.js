@@ -28,7 +28,7 @@ export const useSound = () => {
         audioContext.close()
       }, 200)
     } catch (e) {
-      console.log('Ses çalınamadı:', e)
+      // Ses çalınamadı - sessizce devam et
     }
   }, [])
 
@@ -55,7 +55,7 @@ export const useSound = () => {
         audioContext.close()
       }, 300)
     } catch (e) {
-      console.log('Ses çalınamadı:', e)
+      // Ses çalınamadı - sessizce devam et
     }
   }, [])
 
@@ -79,7 +79,7 @@ export const useSound = () => {
         audioContext.close()
       }, 150)
     } catch (e) {
-      console.log('Ses çalınamadı:', e)
+      // Ses çalınamadı - sessizce devam et
     }
   }, [])
 

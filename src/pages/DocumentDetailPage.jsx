@@ -8,6 +8,7 @@ import {
   AlertTriangle, User, MapPin, Calendar, Hash, FileText
 } from 'lucide-react'
 import apiService from '../services/apiService'
+import { log } from '../utils/debug'
 
 const DocumentDetailPage = () => {
   const { id } = useParams()
@@ -83,13 +84,13 @@ const DocumentDetailPage = () => {
   const fetchDocument = useCallback(async () => {
     try {
       setLoading(true)
-      console.log('Fetching document with ID:', id)
+      log('Fetching document with ID:', id)
       const response = await apiService.getDocumentById(id)
-      console.log('API Response:', response)
+      log('API Response:', response)
       
       if (response.success && response.data) {
         const doc = response.data
-        console.log('Document data:', doc)
+        log('Document data:', doc)
         setOrder(doc)
         setItems(doc.items || [])
         updateStats(doc.items || [])
@@ -820,7 +821,7 @@ const DocumentDetailPage = () => {
         return null
       }
 
-      console.log('✅ ITS Karekod Parse Başarılı:', result)
+      log('✅ ITS Karekod Parse Başarılı:', result)
       return result
 
     } catch (error) {
@@ -1038,7 +1039,7 @@ const DocumentDetailPage = () => {
   // Koli Barkodu İşlemi (ITS için)
   const handleCarrierBarcode = async (carrierLabel) => {
     try {
-      console.log('📦 Koli barkodu okutuldu:', carrierLabel)
+      log('📦 Koli barkodu okutuldu:', carrierLabel)
       showMessage('📦 Koli işleniyor...', 'info')
       
       const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -1099,7 +1100,7 @@ const DocumentDetailPage = () => {
   // Koli Barkodu Silme İşlemi (ITS için)
   const handleDeleteCarrierBarcode = async (carrierLabel) => {
     try {
-      console.log('🗑️ Koli barkodu siliniyor:', carrierLabel)
+      log('🗑️ Koli barkodu siliniyor:', carrierLabel)
       showMessage('🗑️ Koli siliniyor...', 'info')
       
       const result = await apiService.deleteCarrierBarcode({
@@ -1274,7 +1275,7 @@ const DocumentDetailPage = () => {
   // ITS Barkod Silme İşlemi
   const handleDeleteITSBarcode = async (itsBarcode) => {
     try {
-      console.log('🗑️ ITS Barkod siliniyor:', itsBarcode.substring(0, 50) + '...')
+      log('🗑️ ITS Barkod siliniyor:', itsBarcode.substring(0, 50) + '...')
       showMessage('🗑️ Siliniyor...', 'info')
       
       // Karekodu parse et (aynı fonksiyonu kullan!)
@@ -1286,7 +1287,7 @@ const DocumentDetailPage = () => {
         return
       }
       
-      console.log('✅ Parse edildi:', parsedData)
+      log('✅ Parse edildi:', parsedData)
       
       // Ürünü bul
       const itemIndex = items.findIndex(item => {
@@ -1320,7 +1321,7 @@ const DocumentDetailPage = () => {
       )
       
       if (result.success) {
-        console.log('✅ ITS Barkod silindi!')
+        log('✅ ITS Barkod silindi!')
         
         // Grid'i yenile
         const docResponse = await apiService.getDocumentById(order.id)
@@ -1349,7 +1350,7 @@ const DocumentDetailPage = () => {
   // DGR/UTS Barkod Silme İşlemi (ITS DEĞİL!)
   const handleDeleteDGRBarcode = async (scannedBarcode) => {
     try {
-      console.log('🗑️ DGR/UTS Barkod siliniyor:', scannedBarcode)
+      log('🗑️ DGR/UTS Barkod siliniyor:', scannedBarcode)
       showMessage('🗑️ Siliniyor...', 'info')
       
       // Ürünü bul
@@ -1379,7 +1380,7 @@ const DocumentDetailPage = () => {
       )
       
       if (result.success) {
-        console.log('✅ DGR Barkod silindi!')
+        log('✅ DGR Barkod silindi!')
         
         // Grid'i yenile
         const docResponse = await apiService.getDocumentById(order.id)
@@ -1408,12 +1409,12 @@ const DocumentDetailPage = () => {
   // ITS Karekod İşlemi
   const handleITSBarcode = async (itsBarcode) => {
     try {
-      console.log('🔍 ITS Karekod okutuldu:', itsBarcode.substring(0, 50) + '...')
+      log('🔍 ITS Karekod okutuldu:', itsBarcode.substring(0, 50) + '...')
       showMessage('📱 İşleniyor...', 'info')
       
       // ITS karekoddan barkodu parse et (basit parse - ilk 01'den sonraki 14 karakter)
       const barkodPart = itsBarcode.substring(3, 16) // 13 digit barkod
-      console.log('📦 Barkod parse edildi:', barkodPart)
+      log('📦 Barkod parse edildi:', barkodPart)
       
       // Ürünü bul
       const itemIndex = items.findIndex(item => item.barcode === barkodPart || item.stokKodu === barkodPart)
@@ -1466,11 +1467,11 @@ const DocumentDetailPage = () => {
       })
       
       if (result.success) {
-        console.log('✅ ITS Karekod başarıyla kaydedildi!')
-        console.log('Ürün:', item.productName)
-        console.log('Seri No:', result.data.seriNo)
-        console.log('Miad:', result.data.miad)
-        console.log('Lot:', result.data.lot)
+        log('✅ ITS Karekod başarıyla kaydedildi!')
+        log('Ürün:', item.productName)
+        log('Seri No:', result.data.seriNo)
+        log('Miad:', result.data.miad)
+        log('Lot:', result.data.lot)
         
         // Ürünü hazırlandı olarak işaretle
         const updatedItems = [...items]
@@ -1899,7 +1900,7 @@ const DocumentDetailPage = () => {
   const handleCopyAllBarcodes = () => {
     const text = generateITSBarcodeTexts()
     navigator.clipboard.writeText(text).then(() => {
-      console.log('✅ Karekodlar kopyalandı!')
+      log('✅ Karekodlar kopyalandı!')
       playSuccessSound()
       alert('✅ Karekodlar panoya kopyalandı!')
     }).catch(err => {
@@ -1971,7 +1972,7 @@ const DocumentDetailPage = () => {
       )
 
       if (result.success) {
-        console.log('✅ ITS kayıtlar silindi:', result.deletedCount)
+        log('✅ ITS kayıtlar silindi:', result.deletedCount)
         // Kayıtları yeniden yükle
         const response = await apiService.getITSBarcodeRecords(order.id, selectedItem.itemId)
         if (response.success) {
@@ -2012,7 +2013,7 @@ const DocumentDetailPage = () => {
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + 0.15)
     } catch (error) {
-      console.log('Success beep!')
+      log('Success beep!')
     }
   }
 
@@ -2034,7 +2035,7 @@ const DocumentDetailPage = () => {
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + 0.3)
     } catch (error) {
-      console.log('Error beep!')
+      log('Error beep!')
     }
   }
 
@@ -2056,7 +2057,7 @@ const DocumentDetailPage = () => {
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + 0.2)
     } catch (error) {
-      console.log('Warning beep!')
+      log('Warning beep!')
     }
   }
 

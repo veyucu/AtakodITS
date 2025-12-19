@@ -1,92 +1,12 @@
 import { getConnection } from '../config/database.js'
 import { getCarrierProductsRecursive } from './ptsDbService.js'
-import iconv from 'iconv-lite'
 import sql from 'mssql'
 import settingsService from './settingsService.js'
+import { fixObjectStrings } from '../utils/stringUtils.js'
 
-// Türkçe karakter düzeltme fonksiyonu - SQL Server CP1254 to UTF-8
-const fixTurkishChars = (str) => {
-  if (!str || typeof str !== 'string') return str
-  
-  try {
-    let fixed = str
-    
-    // SQL Server'dan gelen yanlış encoded metni düzelt
-    // CP1254 (Turkish) -> UTF-8 dönüşümü
-    try {
-      // Önce latin1 olarak encode edip cp1254 olarak decode et
-      const buf = Buffer.from(fixed, 'latin1')
-      fixed = iconv.decode(buf, 'cp1254')
-    } catch (e) {
-      console.log('iconv dönüşüm hatası:', e.message)
-    }
-    
-    // Hala ? veya bozuk karakterler varsa manuel düzelt
-    if (fixed.includes('?') || fixed.match(/[\u0080-\u00FF]/)) {
-      // Karakter karakter düzeltme - SQL Server'dan gelen bozuk karakterler
-      const charMap = {
-        // UTF-8 çift byte sorunları
-        'Ä°': 'İ', 'Ä±': 'ı',
-        'ÅŸ': 'ş', 'Åž': 'Ş',
-        'Ã§': 'ç', 'Ã‡': 'Ç',
-        'ÄŸ': 'ğ', 'Äž': 'Ğ',
-        'Ã¼': 'ü', 'Ãœ': 'Ü',
-        'Ã¶': 'ö', 'Ã–': 'Ö',
-        'Â': '',
-        '�': '',
-        // Single character replacements from CP1254
-        '\u00DD': 'İ', // İ
-        '\u00FD': 'ı', // ı  
-        '\u00DE': 'Ş', // Ş
-        '\u00FE': 'ş', // ş
-        '\u00D0': 'Ğ', // Ğ
-        '\u00F0': 'ğ', // ğ
-      }
-      
-      for (const [wrong, correct] of Object.entries(charMap)) {
-        fixed = fixed.split(wrong).join(correct)
-      }
-    }
-    
-    // ? karakteri context'e göre düzelt
-    // Türkçe kelimelerde ? genelde şu karakterlerdir: ğ, ı, ş, ç, ö, ü, İ
-    fixed = fixed
-      .replace(/\?([AEIOU])/g, 'İ$1') // ?A, ?E -> İA, İE (ISTANBUL -> İSTANBUL)
-      .replace(/([BCDFGHJKLMNPQRSTVWXYZ])\?/g, '$1İ') // Y? -> Yİ (KAYSER? -> KAYSERİ)
-      .replace(/\?([bcdfghjklmnpqrstvwxyz])/g, 'ı$1') // ?n -> ın
-      .replace(/([bcdfghjklmnpqrstvwxyz])\?([aeiou])/g, '$1ı$2') // n?a -> nıa
-    
-    // Başındaki nokta ve gereksiz boşlukları temizle
-    fixed = fixed.replace(/^\.+/, '').trim()
-    
-    return fixed
-  } catch (error) {
-    console.error('Türkçe karakter düzeltme hatası:', error)
-    return str
-  }
-}
-
-// Objedeki tüm string alanları düzelt
-const fixObjectStrings = (obj) => {
-  if (!obj) return obj
-  
-  const fixed = {}
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string') {
-      fixed[key] = fixTurkishChars(value)
-    } else if (Array.isArray(value)) {
-      fixed[key] = value.map(item => 
-        typeof item === 'object' ? fixObjectStrings(item) : 
-        typeof item === 'string' ? fixTurkishChars(item) : item
-      )
-    } else if (typeof value === 'object' && value !== null) {
-      fixed[key] = fixObjectStrings(value)
-    } else {
-      fixed[key] = value
-    }
-  }
-  return fixed
-}
+// Debug mode - production'da false yapılmalı
+const DEBUG = process.env.NODE_ENV !== 'production'
+const log = (...args) => DEBUG && console.log(...args)
 
 const documentService = {
   // Tüm belgeleri getir (tarih filtreli - zorunlu)
@@ -255,7 +175,7 @@ const documentService = {
   // Belirli bir belgeyi getir
   async getDocumentById(subeKodu, ftirsip, fatirs_no) {
     try {
-      console.log('📄 getDocumentById çağrıldı:', { subeKodu, ftirsip, fatirs_no })
+      log('📄 getDocumentById çağrıldı:', { subeKodu, ftirsip, fatirs_no })
       const pool = await getConnection()
       
       // Ayarlardan GLN ve UTS kolon bilgilerini al
@@ -263,7 +183,7 @@ const documentService = {
       const glnInfo = settingsService.parseColumnInfo(settings.cariGlnBilgisi || 'TBLCASABIT.EMAIL')
       const utsInfo = settingsService.parseColumnInfo(settings.cariUtsBilgisi || 'TBLCASABITEK.KULL3S')
       
-      console.log('🔧 Ayarlar:', { 
+      log('🔧 Ayarlar:', { 
         glnTable: glnInfo.table, 
         glnColumn: glnInfo.column,
         utsTable: utsInfo.table,
@@ -348,19 +268,19 @@ const documentService = {
       request.input('fatirs_no', fatirs_no)
       
       const result = await request.query(detailQuery)
-      console.log('📊 SQL Sonuç sayısı:', result.recordset.length)
+      log('📊 SQL Sonuç sayısı:', result.recordset.length)
       
       if (result.recordset.length === 0) {
-        console.log('❌ Belge bulunamadı')
+        log('❌ Belge bulunamadı')
         return null
       }
       
       const row = result.recordset[0]
-      console.log('✅ Belge bulundu:', { FATIRS_NO: row.FATIRS_NO, CARI_ISIM: row.CARI_ISIM })
+      log('✅ Belge bulundu:', { FATIRS_NO: row.FATIRS_NO, CARI_ISIM: row.CARI_ISIM })
       
       // Belge kalemlerini getir
       const items = await this.getDocumentItems(subeKodu, ftirsip, fatirs_no, row.CARI_KODU)
-      console.log('📦 Kalem sayısı:', items.length)
+      log('📦 Kalem sayısı:', items.length)
       
       // Türkçe karakterleri düzelt
       const fixedRow = {
@@ -657,7 +577,7 @@ const documentService = {
         // Silinecek kayıtların CARRIER_LABEL değerleri varsa, 
         // aynı CARRIER_LABEL'a sahip diğer kayıtların da CARRIER_LABEL'ını NULL yap
         if (carrierLabelsToUpdate.size > 0) {
-          console.log('📦 Koli bütünlüğü korunuyor, CARRIER_LABEL değerleri temizleniyor:', Array.from(carrierLabelsToUpdate))
+          log('📦 Koli bütünlüğü korunuyor, CARRIER_LABEL değerleri temizleniyor:', Array.from(carrierLabelsToUpdate))
           
           for (const carrierLabel of carrierLabelsToUpdate) {
             const updateQuery = `
@@ -676,14 +596,14 @@ const documentService = {
             updateRequest.input('turu', turu)
             
             await updateRequest.query(updateQuery)
-            console.log('🔄 Koli bilgisi temizlendi:', carrierLabel)
+            log('🔄 Koli bilgisi temizlendi:', carrierLabel)
           }
         }
       }
       
       // Seri numaralarını tek tek sil
       for (const seriNo of seriNos) {
-        console.log('🔍 Siliniyor - Parametreler:', {
+        log('🔍 Siliniyor - Parametreler:', {
           belgeNo,
           straInc,
           seriNo,
@@ -739,7 +659,7 @@ const documentService = {
         checkRequest.input('turu', turu)
         
         const checkResult = await checkRequest.query(checkExistQuery)
-        console.log('📊 Kayıt kontrolü - Bulunan:', checkResult.recordset.length, checkResult.recordset)
+        log('📊 Kayıt kontrolü - Bulunan:', checkResult.recordset.length, checkResult.recordset)
         
         if (checkResult.recordset.length === 0) {
           console.log(`⚠️ Kayıt bulunamadı! Alternatif kontrol yapılıyor...`)
@@ -766,10 +686,10 @@ const documentService = {
         request.input('turu', turu)
         
         const result = await request.query(query)
-        console.log('🗑️ DELETE Sonucu - Etkilenen Satır Sayısı:', result.rowsAffected[0])
+        log('🗑️ DELETE Sonucu - Etkilenen Satır Sayısı:', result.rowsAffected[0])
         
         if (result.rowsAffected[0] === 0) {
-          console.log('❌ SİLME BAŞARISIZ! Kayıt silinemedi')
+          log('❌ SİLME BAŞARISIZ! Kayıt silinemedi')
         } else {
           console.log(`✅ ${turu} Kayıt Başarıyla Silindi:`, seriNo)
         }
@@ -789,7 +709,7 @@ const documentService = {
     try {
       const pool = await getConnection()
       
-      console.log('🗑️ Koli barkoduna göre ITS kayıtları siliniyor:', carrierLabel)
+      log('🗑️ Koli barkoduna göre ITS kayıtları siliniyor:', carrierLabel)
       
       // docId'yi parse et (format: SUBE_KODU-FTIRSIP-FATIRS_NO)
       const [subeKodu, ftirsip, belgeNo] = docId.split('-')
@@ -813,7 +733,7 @@ const documentService = {
       const selectResult = await selectRequest.query(selectQuery)
       
       if (selectResult.recordset.length === 0) {
-        console.log('⚠️ Silinecek kayıt bulunamadı')
+        log('⚠️ Silinecek kayıt bulunamadı')
         return { 
           success: false, 
           message: 'Bu koli barkodu ile kayıt bulunamadı',
@@ -830,7 +750,7 @@ const documentService = {
       })
       
       console.log(`📦 Silinecek kayıt sayısı: ${totalRecords}`)
-      console.log('📊 GTIN bazında:', gtinCounts)
+      log('📊 GTIN bazında:', gtinCounts)
       
       // Kayıtları sil
       const deleteQuery = `
@@ -888,10 +808,10 @@ const documentService = {
         request.input('straInc', straInc)
         
         await request.query(query)
-        console.log('🗑️ UTS Kayıt Silindi (AKTBLITSUTS):', record.recno || record.siraNo)
+        log('🗑️ UTS Kayıt Silindi (AKTBLITSUTS):', record.recno || record.siraNo)
       }
       
-      console.log('✅ UTS Kayıtlar Başarıyla Silindi:', records.length)
+      log('✅ UTS Kayıtlar Başarıyla Silindi:', records.length)
       return { success: true, deletedCount: records.length }
       
     } catch (error) {
@@ -926,7 +846,7 @@ const documentService = {
         kullanici     // Kullanıcı adı
       } = data
       
-      console.log('💾 ITS Karekod Kaydediliyor (AKTBLITSUTS):', data)
+      log('💾 ITS Karekod Kaydediliyor (AKTBLITSUTS):', data)
       
       // ZORUNLU ALAN KONTROLLERI
       if (!kullanici) {
@@ -972,18 +892,18 @@ const documentService = {
         const newMiktar = 1
         
         if (currentOkutulan + newMiktar > expectedQuantity) {
-          console.log('⚠️⚠️⚠️ MİKTAR AŞIMI! (ITS) ⚠️⚠️⚠️')
-          console.log('Stok Kodu:', stokKodu)
-          console.log('Beklenen Miktar:', expectedQuantity)
-          console.log('Mevcut Okutulan:', currentOkutulan)
-          console.log('Okutulmak İstenen:', newMiktar)
+          log('⚠️⚠️⚠️ MİKTAR AŞIMI! (ITS) ⚠️⚠️⚠️')
+          log('Stok Kodu:', stokKodu)
+          log('Beklenen Miktar:', expectedQuantity)
+          log('Mevcut Okutulan:', currentOkutulan)
+          log('Okutulmak İstenen:', newMiktar)
           return {
             success: false,
             error: 'QUANTITY_EXCEEDED',
             message: `⚠️ Miktar aşımı! Bu üründen ${expectedQuantity} adet okutulması gerekiyor, ${currentOkutulan} adet zaten okutulmuş.`
           }
         }
-        console.log('✓ Miktar kontrolü geçti (ITS):', currentOkutulan + newMiktar, '/', expectedQuantity)
+        log('✓ Miktar kontrolü geçti (ITS):', currentOkutulan + newMiktar, '/', expectedQuantity)
       }
       
       // 2. Aynı seri numarasının daha önce okutulup okutulmadığını kontrol et
@@ -1001,10 +921,10 @@ const documentService = {
       const checkResult = await checkRequest.query(checkQuery)
       
       if (checkResult.recordset[0].KAYIT_SAYISI > 0) {
-        console.log('⚠️⚠️⚠️ DUPLICATE KAREKOD TESPIT EDİLDİ! ⚠️⚠️⚠️')
-        console.log('Seri No:', seriNo)
-        console.log('Belge No:', belgeNo)
-        console.log('Bu karekod daha önce', checkResult.recordset[0].KAYIT_SAYISI, 'kere okutulmuş!')
+        log('⚠️⚠️⚠️ DUPLICATE KAREKOD TESPIT EDİLDİ! ⚠️⚠️⚠️')
+        log('Seri No:', seriNo)
+        log('Belge No:', belgeNo)
+        log('Bu karekod daha önce', checkResult.recordset[0].KAYIT_SAYISI, 'kere okutulmuş!')
         return { 
           success: false, 
           error: 'DUPLICATE',
@@ -1012,7 +932,7 @@ const documentService = {
         }
       }
       
-      console.log('✓ Seri numarası kontrolü geçti, kayıt yapılacak:', seriNo)
+      log('✓ Seri numarası kontrolü geçti, kayıt yapılacak:', seriNo)
       
       const query = `
         INSERT INTO AKTBLITSUTS (
@@ -1060,12 +980,12 @@ const documentService = {
       
       await request.query(query)
       
-      console.log('✅✅✅ ITS KAREKOD BAŞARIYLA KAYDEDİLDİ! ✅✅✅')
-      console.log('Seri No:', seriNo)
-      console.log('Stok Kodu:', stokKodu)
-      console.log('Miad:', acik1)
-      console.log('Lot:', acik2)
-      console.log('Belge No:', belgeNo)
+      log('✅✅✅ ITS KAREKOD BAŞARIYLA KAYDEDİLDİ! ✅✅✅')
+      log('Seri No:', seriNo)
+      log('Stok Kodu:', stokKodu)
+      log('Miad:', acik1)
+      log('Lot:', acik2)
+      log('Belge No:', belgeNo)
       
       return { 
         success: true,
@@ -1104,7 +1024,7 @@ const documentService = {
         miktar = 1    // Kullanıcı "100*BARKOD" gönderirse miktar=100
       } = data
       
-      console.log('💾 DGR Barkod Kaydediliyor (AKTBLITSUTS):', data)
+      log('💾 DGR Barkod Kaydediliyor (AKTBLITSUTS):', data)
       
       // ZORUNLU ALAN KONTROLLERI
       if (!kullanici) {
@@ -1154,8 +1074,8 @@ const documentService = {
         
         // Miktar kontrolü
         if (expectedQuantity && newMiktar > expectedQuantity) {
-          console.log('⚠️ MİKTAR AŞIMI! (DGR UPDATE)')
-          console.log('Beklenen:', expectedQuantity, '/ Mevcut:', currentMiktar, '/ Eklenecek:', miktar)
+          log('⚠️ MİKTAR AŞIMI! (DGR UPDATE)')
+          log('Beklenen:', expectedQuantity, '/ Mevcut:', currentMiktar, '/ Eklenecek:', miktar)
           return {
             success: false,
             error: 'QUANTITY_EXCEEDED',
@@ -1178,7 +1098,7 @@ const documentService = {
         
         await updateRequest.query(updateQuery)
         
-        console.log('✅ DGR Barkod güncellendi:', stokKodu, '- Miktar:', currentMiktar, '→', newMiktar)
+        log('✅ DGR Barkod güncellendi:', stokKodu, '- Miktar:', currentMiktar, '→', newMiktar)
         
         return {
           success: true,
@@ -1214,8 +1134,8 @@ const documentService = {
           const currentTotal = totalCheckResult.recordset[0].TOTAL_OKUTULAN
           
           if (currentTotal + miktar > expectedQuantity) {
-            console.log('⚠️ MİKTAR AŞIMI! (DGR INSERT)')
-            console.log('Beklenen:', expectedQuantity, '/ Mevcut Toplam:', currentTotal, '/ Eklenecek:', miktar)
+            log('⚠️ MİKTAR AŞIMI! (DGR INSERT)')
+            log('Beklenen:', expectedQuantity, '/ Mevcut Toplam:', currentTotal, '/ Eklenecek:', miktar)
             return {
               success: false,
               error: 'QUANTITY_EXCEEDED',
@@ -1262,7 +1182,7 @@ const documentService = {
         
         await insertRequest.query(insertQuery)
         
-        console.log('✅ DGR Barkod kaydedildi:', stokKodu, '- Miktar:', miktar)
+        log('✅ DGR Barkod kaydedildi:', stokKodu, '- Miktar:', miktar)
         
         return {
           success: true,
@@ -1306,7 +1226,7 @@ const documentService = {
         kullanici     // Kullanıcı
       } = data
       
-      console.log('💾 UTS Barkod Kaydediliyor (AKTBLITSUTS):', data)
+      log('💾 UTS Barkod Kaydediliyor (AKTBLITSUTS):', data)
       
       // ZORUNLU ALAN KONTROLLERI
       if (!kullanici) {
@@ -1380,18 +1300,18 @@ const documentService = {
         
         // miktar parametresi kullanıcının girdiği lot miktarı (birden fazla olabilir)
         if (currentOkutulan + miktar > expectedQuantity) {
-          console.log('⚠️⚠️⚠️ MİKTAR AŞIMI! (UTS) ⚠️⚠️⚠️')
-          console.log('Stok Kodu:', stokKodu)
-          console.log('Beklenen Miktar:', expectedQuantity)
-          console.log('Mevcut Okutulan:', currentOkutulan)
-          console.log('Eklenecek Miktar:', miktar)
+          log('⚠️⚠️⚠️ MİKTAR AŞIMI! (UTS) ⚠️⚠️⚠️')
+          log('Stok Kodu:', stokKodu)
+          log('Beklenen Miktar:', expectedQuantity)
+          log('Mevcut Okutulan:', currentOkutulan)
+          log('Eklenecek Miktar:', miktar)
           return {
             success: false,
             error: 'QUANTITY_EXCEEDED',
             message: `⚠️ Miktar aşımı! Bu üründen ${expectedQuantity} adet okutulması gerekiyor, ${currentOkutulan} adet zaten okutulmuş. (Eklemek istenen: ${miktar})`
           }
         }
-        console.log('✓ Miktar kontrolü geçti (UTS):', currentOkutulan + miktar, '/', expectedQuantity)
+        log('✓ Miktar kontrolü geçti (UTS):', currentOkutulan + miktar, '/', expectedQuantity)
       }
       
       // Unique kontroller - Seri No ve Lot No teklik kontrolü
@@ -1418,7 +1338,7 @@ const documentService = {
         const seriCheckResult = await seriCheckRequest.query(seriCheckQuery)
         
         if (seriCheckResult.recordset.length > 0) {
-          console.log('⚠️ DUPLICATE! Aynı Seri No zaten kayıtlı:', seriNo)
+          log('⚠️ DUPLICATE! Aynı Seri No zaten kayıtlı:', seriNo)
           return {
             success: false,
             error: 'DUPLICATE',
@@ -1450,7 +1370,7 @@ const documentService = {
         const lotCheckResult = await lotCheckRequest.query(lotCheckQuery)
         
         if (lotCheckResult.recordset.length > 0) {
-          console.log('⚠️ DUPLICATE! Aynı Lot No zaten kayıtlı:', lotNo)
+          log('⚠️ DUPLICATE! Aynı Lot No zaten kayıtlı:', lotNo)
           return {
             success: false,
             error: 'DUPLICATE',
@@ -1460,7 +1380,7 @@ const documentService = {
       }
       
       // Yeni kayıt oluştur (INSERT)
-      console.log('✓ Yeni kayıt oluşturuluyor...')
+      log('✓ Yeni kayıt oluşturuluyor...')
       
       const insertQuery = `
         INSERT INTO AKTBLITSUTS (
@@ -1510,7 +1430,7 @@ const documentService = {
       
       await insertRequest.query(insertQuery)
       
-      console.log('✅ UTS Barkod kaydedildi (AKTBLITSUTS):', stokKodu, '- Miktar:', miktar)
+      log('✅ UTS Barkod kaydedildi (AKTBLITSUTS):', stokKodu, '- Miktar:', miktar)
       
       return {
         success: true,
@@ -1551,8 +1471,8 @@ const documentService = {
         kullanici         // Sisteme giriş yapan kullanıcı
       } = data
       
-      console.log('💾 UTS Toplu Kayıt İşlemi Başlıyor...')
-      console.log('Toplam Kayıt:', records.length)
+      log('💾 UTS Toplu Kayıt İşlemi Başlıyor...')
+      log('Toplam Kayıt:', records.length)
       
       // Belge Tarih formatı
       const tarihDate = new Date(tarih)
@@ -1583,7 +1503,7 @@ const documentService = {
             await deleteRequest.query(deleteQuery)
           }
           
-          console.log('✅ Silme işlemi tamamlandı')
+          log('✅ Silme işlemi tamamlandı')
         }
         
         // 2. Her satır için INSERT veya UPDATE
@@ -1684,7 +1604,7 @@ const documentService = {
         // Transaction commit
         await transaction.commit()
         
-        console.log('✅✅✅ UTS TOPLU KAYIT BAŞARILI! ✅✅✅')
+        log('✅✅✅ UTS TOPLU KAYIT BAŞARILI! ✅✅✅')
         console.log(`➕ ${insertCount} yeni kayıt eklendi`)
         console.log(`✏️ ${updateCount} kayıt güncellendi`)
         console.log(`🗑️ ${deletedSiraNumbers.length} kayıt silindi`)
@@ -1726,7 +1646,7 @@ const documentService = {
         throw new Error('Kullanıcı bilgisi zorunludur')
       }
       
-      console.log('📦 Koli barkodu işleniyor:', { carrierLabel, docId, ftirsip, cariKodu, kullanici })
+      log('📦 Koli barkodu işleniyor:', { carrierLabel, docId, ftirsip, cariKodu, kullanici })
       
       // docId'yi parse et (format: SUBE_KODU-FTIRSIP-FATIRS_NO)
       const [subeKodu, parsedFtirsip, belgeNo] = docId.split('-')
@@ -1774,8 +1694,8 @@ const documentService = {
       // Belgedeki stok kodlarını topla
       const stockCodes = itemsResult.recordset.map(item => item.GTIN).filter(g => g)
       
-      console.log('📋 Belgedeki ITS ürünleri:', itemsResult.recordset.length)
-      console.log('📋 Stok kodları (GTIN):', stockCodes)
+      log('📋 Belgedeki ITS ürünleri:', itemsResult.recordset.length)
+      log('📋 Stok kodları (GTIN):', stockCodes)
       
       // Koliden ürünleri getir (hiyerarşik)
       const carrierResult = await getCarrierProductsRecursive(carrierLabel, stockCodes)
@@ -1790,8 +1710,8 @@ const documentService = {
         throw new Error('Kolide ürün bulunamadı veya belgede olmayan ürünler var')
       }
       
-      console.log('📦 Kolide bulunan ürün sayısı:', products.length)
-      console.log('📦 Kolide bulunan toplam kayıt:', allRecords.length)
+      log('📦 Kolide bulunan ürün sayısı:', products.length)
+      log('📦 Kolide bulunan toplam kayıt:', allRecords.length)
       
       // Miktar kontrolü - GTIN bazında (temizlenmiş GTIN ile)
       const gtinCountMap = {}
@@ -1801,7 +1721,7 @@ const documentService = {
         gtinCountMap[cleanGtin] = (gtinCountMap[cleanGtin] || 0) + 1
       })
       
-      console.log('📊 Kolide bulunan GTIN sayıları:', gtinCountMap)
+      log('📊 Kolide bulunan GTIN sayıları:', gtinCountMap)
       
       // Her GTIN için miktar kontrolü yap
       for (const item of itemsResult.recordset) {

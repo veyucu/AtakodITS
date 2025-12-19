@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import iconv from 'iconv-lite'
+import { log } from '../utils/logger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -47,7 +48,7 @@ function fixObjectStrings(obj) {
  */
 export async function createTablesIfNotExists() {
   try {
-    console.log('📋 ITS tabloları kontrol ediliyor...')
+    log('📋 ITS tabloları kontrol ediliyor...')
     
     const pool = await getConnection()
     
@@ -64,7 +65,7 @@ export async function createTablesIfNotExists() {
       }
     }
     
-    console.log('✅ ITS tabloları hazır')
+    log('✅ ITS tabloları hazır')
     return { success: true }
   } catch (error) {
     console.error('❌ ITS tabloları oluşturma hatası:', error)

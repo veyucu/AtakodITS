@@ -1,4 +1,5 @@
 // ITS (İlaç Takip Sistemi) Karekod Parser
+import { log } from './logger.js'
 
 /**
  * ITS 2D Karekod Parse Fonksiyonu
@@ -107,7 +108,7 @@ function parseITSBarcode(barcode) {
       throw new Error('Eksik karekod bilgisi')
     }
 
-    console.log('✅ ITS Karekod Parse Başarılı:', result)
+    log('✅ ITS Karekod Parse Başarılı:', result)
     return { success: true, data: result }
 
   } catch (error) {

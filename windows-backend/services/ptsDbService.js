@@ -1,6 +1,7 @@
 import { getPTSConnection, getConnection } from '../config/database.js'
 import sql from 'mssql'
 import iconv from 'iconv-lite'
+import { log } from '../utils/logger.js'
 
 /**
  * Türkçe karakter düzeltme fonksiyonu - SQL Server CP1254 to UTF-8
@@ -62,7 +63,7 @@ async function createTablesIfNotExists() {
     `)
     
     if (checkMasterTable.recordset.length === 0) {
-      console.log('📋 AKTBLPTSMAS tablosu oluşturuluyor...')
+      log('📋 AKTBLPTSMAS tablosu oluşturuluyor...')
       await pool.request().query(`
         CREATE TABLE AKTBLPTSMAS (
           ID INT IDENTITY(1,1) PRIMARY KEY,
@@ -96,9 +97,9 @@ async function createTablesIfNotExists() {
         CREATE INDEX IX_AKTBLPTSMAS_DESTINATION_GLN ON AKTBLPTSMAS(DESTINATION_GLN)
       `)
       
-      console.log('✅ AKTBLPTSMAS tablosu oluşturuldu')
+      log('✅ AKTBLPTSMAS tablosu oluşturuldu')
     } else {
-      console.log('✅ AKTBLPTSMAS tablosu mevcut')
+      log('✅ AKTBLPTSMAS tablosu mevcut')
     }
     
     // Transaction tablo kontrolü ve oluşturma
@@ -108,7 +109,7 @@ async function createTablesIfNotExists() {
     `)
     
     if (checkTransTable.recordset.length === 0) {
-      console.log('📋 AKTBLPTSTRA tablosu oluşturuluyor...')
+      log('📋 AKTBLPTSTRA tablosu oluşturuluyor...')
       await pool.request().query(`
         CREATE TABLE AKTBLPTSTRA (
           ID INT IDENTITY(1,1) PRIMARY KEY,
@@ -154,9 +155,9 @@ async function createTablesIfNotExists() {
         FOREIGN KEY (TRANSFER_ID) REFERENCES AKTBLPTSMAS(TRANSFER_ID)
       `)
       
-      console.log('✅ AKTBLPTSTRA tablosu oluşturuldu')
+      log('✅ AKTBLPTSTRA tablosu oluşturuldu')
     } else {
-      console.log('✅ AKTBLPTSTRA tablosu mevcut')
+      log('✅ AKTBLPTSTRA tablosu mevcut')
       
       // Yeni kolonları ekle (mevcut tabloya)
       try {
@@ -167,10 +168,10 @@ async function createTablesIfNotExists() {
         `)
         
         if (checkParentCol.recordset.length === 0) {
-          console.log('📝 PARENT_CARRIER_LABEL kolonu ekleniyor...')
+          log('📝 PARENT_CARRIER_LABEL kolonu ekleniyor...')
           await pool.request().query(`ALTER TABLE AKTBLPTSTRA ADD PARENT_CARRIER_LABEL NVARCHAR(100) NULL`)
           await pool.request().query(`CREATE INDEX IX_AKTBLPTSTRA_PARENT_CARRIER_LABEL ON AKTBLPTSTRA(PARENT_CARRIER_LABEL)`)
-          console.log('✅ PARENT_CARRIER_LABEL kolonu eklendi')
+          log('✅ PARENT_CARRIER_LABEL kolonu eklendi')
         }
         
         // CARRIER_LEVEL kolonu var mı kontrol et
@@ -180,9 +181,9 @@ async function createTablesIfNotExists() {
         `)
         
         if (checkLevelCol.recordset.length === 0) {
-          console.log('📝 CARRIER_LEVEL kolonu ekleniyor...')
+          log('📝 CARRIER_LEVEL kolonu ekleniyor...')
           await pool.request().query(`ALTER TABLE AKTBLPTSTRA ADD CARRIER_LEVEL INT NULL`)
-          console.log('✅ CARRIER_LEVEL kolonu eklendi')
+          log('✅ CARRIER_LEVEL kolonu eklendi')
         }
         
         // CARRIER_LABEL index'i var mı kontrol et
@@ -192,9 +193,9 @@ async function createTablesIfNotExists() {
         `)
         
         if (checkCarrierIndex.recordset.length === 0) {
-          console.log('📝 CARRIER_LABEL index\'i ekleniyor...')
+          log('📝 CARRIER_LABEL index\'i ekleniyor...')
           await pool.request().query(`CREATE INDEX IX_AKTBLPTSTRA_CARRIER_LABEL ON AKTBLPTSTRA(CARRIER_LABEL)`)
-          console.log('✅ CARRIER_LABEL index\'i eklendi')
+          log('✅ CARRIER_LABEL index\'i eklendi')
         }
         
         // ÖNEMLİ: SERIAL_NUMBER NULL kabul etmeli (carrier kayıtları için)
@@ -205,18 +206,18 @@ async function createTablesIfNotExists() {
         `)
         
         if (checkSerialNull.recordset.length > 0 && checkSerialNull.recordset[0].IS_NULLABLE === 'NO') {
-          console.log('📝 SERIAL_NUMBER kolonu NULL kabul edecek şekilde güncelleniyor...')
+          log('📝 SERIAL_NUMBER kolonu NULL kabul edecek şekilde güncelleniyor...')
           await pool.request().query(`
             ALTER TABLE AKTBLPTSTRA
             ALTER COLUMN SERIAL_NUMBER NVARCHAR(100) NULL
           `)
-          console.log('✅ SERIAL_NUMBER artık NULL kabul ediyor (carrier kayıtları için)')
+          log('✅ SERIAL_NUMBER artık NULL kabul ediyor (carrier kayıtları için)')
         }
         
-        console.log('✅ Tablo yapısı hiyerarşik yapıya güncellendi')
+        log('✅ Tablo yapısı hiyerarşik yapıya güncellendi')
         
         // TRANSFER_ID tipini BIGINT'ten NVARCHAR(50)'ye güncelle
-        console.log('🔄 TRANSFER_ID tipleri kontrol ediliyor...')
+        log('🔄 TRANSFER_ID tipleri kontrol ediliyor...')
         try {
           // TRANSFER_ID'nin tipini kontrol et
           const checkTransferIdType = await pool.request().query(`
@@ -227,7 +228,7 @@ async function createTablesIfNotExists() {
           `)
           
           if (checkTransferIdType.recordset[0]?.DATA_TYPE === 'bigint') {
-            console.log('🔄 TRANSFER_ID tipleri NVARCHAR(50)\'ye dönüştürülüyor...')
+            log('🔄 TRANSFER_ID tipleri NVARCHAR(50)\'ye dönüştürülüyor...')
             
             // Foreign key'i kaldır
             await pool.request().query(`
@@ -281,16 +282,16 @@ async function createTablesIfNotExists() {
               FOREIGN KEY (TRANSFER_ID) REFERENCES AKTBLPTSMAS(TRANSFER_ID)
             `)
             
-            console.log('✅ TRANSFER_ID tipleri NVARCHAR(50) olarak güncellendi')
+            log('✅ TRANSFER_ID tipleri NVARCHAR(50) olarak güncellendi')
           } else {
-            console.log('✅ TRANSFER_ID zaten NVARCHAR tipinde')
+            log('✅ TRANSFER_ID zaten NVARCHAR tipinde')
           }
         } catch (transferIdError) {
-          console.log('⚠️ TRANSFER_ID tip güncellemesi hatası (devam ediliyor):', transferIdError.message)
+          log('⚠️ TRANSFER_ID tip güncellemesi hatası (devam ediliyor):', transferIdError.message)
         }
         
         // DURUM ve BILDIRIM_TARIHI kolonlarını ekle
-        console.log('🔄 DURUM ve BILDIRIM_TARIHI kolonları kontrol ediliyor...')
+        log('🔄 DURUM ve BILDIRIM_TARIHI kolonları kontrol ediliyor...')
         try {
           // AKTBLPTSMAS için DURUM kolonu
           const checkDurumMas = await pool.request().query(`
@@ -299,9 +300,9 @@ async function createTablesIfNotExists() {
           `)
           
           if (checkDurumMas.recordset.length === 0) {
-            console.log('📝 AKTBLPTSMAS tablosuna DURUM kolonu ekleniyor...')
+            log('📝 AKTBLPTSMAS tablosuna DURUM kolonu ekleniyor...')
             await pool.request().query(`ALTER TABLE AKTBLPTSMAS ADD DURUM VARCHAR(20) NULL`)
-            console.log('✅ AKTBLPTSMAS.DURUM kolonu eklendi')
+            log('✅ AKTBLPTSMAS.DURUM kolonu eklendi')
           }
           
           // AKTBLPTSMAS için BILDIRIM_TARIHI kolonu
@@ -311,9 +312,9 @@ async function createTablesIfNotExists() {
           `)
           
           if (checkBildirimMas.recordset.length === 0) {
-            console.log('📝 AKTBLPTSMAS tablosuna BILDIRIM_TARIHI kolonu ekleniyor...')
+            log('📝 AKTBLPTSMAS tablosuna BILDIRIM_TARIHI kolonu ekleniyor...')
             await pool.request().query(`ALTER TABLE AKTBLPTSMAS ADD BILDIRIM_TARIHI DATETIME NULL`)
-            console.log('✅ AKTBLPTSMAS.BILDIRIM_TARIHI kolonu eklendi')
+            log('✅ AKTBLPTSMAS.BILDIRIM_TARIHI kolonu eklendi')
           }
           
           // AKTBLPTSTRA için DURUM kolonu
@@ -323,9 +324,9 @@ async function createTablesIfNotExists() {
           `)
           
           if (checkDurumTra.recordset.length === 0) {
-            console.log('📝 AKTBLPTSTRA tablosuna DURUM kolonu ekleniyor...')
+            log('📝 AKTBLPTSTRA tablosuna DURUM kolonu ekleniyor...')
             await pool.request().query(`ALTER TABLE AKTBLPTSTRA ADD DURUM VARCHAR(20) NULL`)
-            console.log('✅ AKTBLPTSTRA.DURUM kolonu eklendi')
+            log('✅ AKTBLPTSTRA.DURUM kolonu eklendi')
           }
           
           // AKTBLPTSTRA için BILDIRIM_TARIHI kolonu
@@ -335,17 +336,17 @@ async function createTablesIfNotExists() {
           `)
           
           if (checkBildirimTra.recordset.length === 0) {
-            console.log('📝 AKTBLPTSTRA tablosuna BILDIRIM_TARIHI kolonu ekleniyor...')
+            log('📝 AKTBLPTSTRA tablosuna BILDIRIM_TARIHI kolonu ekleniyor...')
             await pool.request().query(`ALTER TABLE AKTBLPTSTRA ADD BILDIRIM_TARIHI DATETIME NULL`)
-            console.log('✅ AKTBLPTSTRA.BILDIRIM_TARIHI kolonu eklendi')
+            log('✅ AKTBLPTSTRA.BILDIRIM_TARIHI kolonu eklendi')
           }
           
-          console.log('✅ DURUM ve BILDIRIM_TARIHI kolonları hazır')
+          log('✅ DURUM ve BILDIRIM_TARIHI kolonları hazır')
         } catch (durumError) {
-          console.log('⚠️ DURUM/BILDIRIM_TARIHI kolon ekleme hatası:', durumError.message)
+          log('⚠️ DURUM/BILDIRIM_TARIHI kolon ekleme hatası:', durumError.message)
         }
       } catch (alterError) {
-        console.log('⚠️ Tablo güncelleme hatası (devam ediliyor):', alterError.message)
+        log('⚠️ Tablo güncelleme hatası (devam ediliyor):', alterError.message)
       }
     }
     
@@ -612,7 +613,7 @@ async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', st
         console.log(`✅ ${stockResult.recordset.length} stok bilgisi bulundu`)
         
         // İlk birkaç sonucu logla (debug)
-        console.log('📦 TBLSTSABIT\'ten dönen ilk 3 kayıt:')
+        log('📦 TBLSTSABIT\'ten dönen ilk 3 kayıt:')
         stockResult.recordset.slice(0, 3).forEach(s => {
           console.log(`  ${stockColumn}: ${s[stockColumn]} -> STOK_ADI: ${s.STOK_ADI}`)
         })
@@ -631,7 +632,7 @@ async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', st
         })
         
         // stockMap içeriğini logla
-        console.log('📦 stockMap anahtarları:', Object.keys(stockMap).slice(0, 3))
+        log('📦 stockMap anahtarları:', Object.keys(stockMap).slice(0, 3))
       } catch (e) {
         console.warn('⚠️ Stok bilgileri alınamadı:', e.message)
       }
@@ -652,7 +653,7 @@ async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', st
     })
     
     // GTIN olan ürünleri logla (debug)
-    console.log('🔍 GTIN olan ilk 3 ürün:')
+    log('🔍 GTIN olan ilk 3 ürün:')
     const productsWithGtin = enrichedProducts.filter(p => p.GTIN)
     productsWithGtin.slice(0, 3).forEach(p => {
       console.log(`  GTIN: ${p.GTIN} -> Clean: ${p.CLEAN_GTIN} -> STOK_ADI: ${p.STOK_ADI || 'NULL'}`)
@@ -724,7 +725,7 @@ async function listPackages(startDate, endDate, dateFilterType = 'created') {
     
     query += ' ORDER BY p.CREATED_DATE DESC'
     
-    console.log('📋 Paket listesi sorgusu:', { startDate, endDate, dateFilterType, dateColumn })
+    log('📋 Paket listesi sorgusu:', { startDate, endDate, dateFilterType, dateColumn })
     
     const result = await ptsRequest.query(query)
     
@@ -764,7 +765,7 @@ async function listPackages(startDate, endDate, dateFilterType = 'created') {
       TOTAL_PRODUCT_COUNT: pkg.TOTAL_PRODUCT_COUNT || 0
     }))
     
-    console.log('✅ Paket sayısı:', packages.length)
+    log('✅ Paket sayısı:', packages.length)
     
     return {
       success: true,

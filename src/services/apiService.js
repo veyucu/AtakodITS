@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { log } from '../utils/debug'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -83,10 +84,10 @@ const apiService = {
   // Get document by ID
   getDocumentById: async (id) => {
     try {
-      console.log('🔍 API İsteği - Belge ID:', id)
-      console.log('🌐 API URL:', `${API_BASE_URL}/documents/${id}`)
+      log('🔍 API İsteği - Belge ID:', id)
+      log('🌐 API URL:', `${API_BASE_URL}/documents/${id}`)
       const response = await apiClient.get(`/documents/${id}`)
-      console.log('✅ API Yanıtı:', response.data)
+      log('✅ API Yanıtı:', response.data)
       // Backend zaten { success: true, data: document } formatında dönüyor
       // Tekrar wrap etmeye gerek yok
       return response.data
@@ -157,9 +158,9 @@ const apiService = {
   // ITS Karekod Okut ve Kaydet
   saveITSBarcode: async (data) => {
     try {
-      console.log('📱 ITS Karekod gönderiliyor:', data)
+      log('📱 ITS Karekod gönderiliyor:', data)
       const response = await apiClient.post('/documents/its-barcode', data)
-      console.log('✅ ITS Karekod yanıtı:', response.data)
+      log('✅ ITS Karekod yanıtı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ ITS Karekod hatası:', error)
@@ -204,9 +205,9 @@ const apiService = {
   // DGR Barkod Okut ve Kaydet (ITS olmayan normal ürünler)
   saveDGRBarcode: async (data) => {
     try {
-      console.log('📦 DGR Barkod gönderiliyor:', data)
+      log('📦 DGR Barkod gönderiliyor:', data)
       const response = await apiClient.post('/documents/dgr-barcode', data)
-      console.log('✅ DGR Barkod yanıtı:', response.data)
+      log('✅ DGR Barkod yanıtı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ DGR Barkod hatası:', error)
@@ -220,9 +221,9 @@ const apiService = {
   // Koli Barkodu Kaydet (ITS için)
   saveCarrierBarcode: async (data) => {
     try {
-      console.log('📦 Koli Barkodu gönderiliyor:', data)
+      log('📦 Koli Barkodu gönderiliyor:', data)
       const response = await apiClient.post('/documents/carrier-barcode', data)
-      console.log('✅ Koli Barkodu yanıtı:', response.data)
+      log('✅ Koli Barkodu yanıtı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ Koli Barkodu hatası:', error)
@@ -233,9 +234,9 @@ const apiService = {
   // Koli Barkodu Sil (ITS için)
   deleteCarrierBarcode: async (data) => {
     try {
-      console.log('🗑️ Koli Barkodu siliniyor:', data)
+      log('🗑️ Koli Barkodu siliniyor:', data)
       const response = await apiClient.delete('/documents/carrier-barcode', { data })
-      console.log('✅ Koli Barkodu silindi:', response.data)
+      log('✅ Koli Barkodu silindi:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ Koli Barkodu silme hatası:', error)
@@ -246,9 +247,9 @@ const apiService = {
   // UTS Barkod Okut ve Kaydet
   saveUTSBarcode: async (data) => {
     try {
-      console.log('🔴 UTS Barkod gönderiliyor:', data)
+      log('🔴 UTS Barkod gönderiliyor:', data)
       const response = await apiClient.post('/documents/uts-barcode', data)
-      console.log('✅ UTS Barkod yanıtı:', response.data)
+      log('✅ UTS Barkod yanıtı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ UTS Barkod hatası:', error)
@@ -293,9 +294,9 @@ const apiService = {
   // UTS Kayıtlarını Toplu Kaydet/Güncelle/Sil
   saveUTSRecords: async (data) => {
     try {
-      console.log('💾 UTS Toplu Kayıt gönderiliyor:', data)
+      log('💾 UTS Toplu Kayıt gönderiliyor:', data)
       const response = await apiClient.post('/documents/uts-records/bulk-save', data)
-      console.log('✅ UTS Toplu Kayıt yanıtı:', response.data)
+      log('✅ UTS Toplu Kayıt yanıtı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ UTS Toplu Kayıt hatası:', error)
@@ -311,9 +312,9 @@ const apiService = {
   // Tarih aralığında paket listesi sorgula
   searchPackages: async (startDate, endDate, settings = null) => {
     try {
-      console.log('🔍 PTS\'den paket listesi sorgulanıyor:', startDate, endDate)
+      log('🔍 PTS\'den paket listesi sorgulanıyor:', startDate, endDate)
       const response = await apiClient.post('/pts/search', { startDate, endDate, settings })
-      console.log('✅ PTS yanıtı:', response.data)
+      log('✅ PTS yanıtı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ PTS arama hatası:', error)
@@ -332,7 +333,7 @@ const apiService = {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
         const url = `${API_URL}/pts/download-bulk-stream`
         
-        console.log('📥 SSE Toplu paket indirme başlıyor:', startDate, endDate)
+        log('📥 SSE Toplu paket indirme başlıyor:', startDate, endDate)
 
         fetch(url, {
           method: 'POST',
@@ -348,7 +349,7 @@ const apiService = {
           const readStream = () => {
             reader.read().then(({ done, value }) => {
               if (done) {
-                console.log('✅ SSE stream tamamlandı')
+                log('✅ SSE stream tamamlandı')
                 resolve({ success: true })
                 return
               }
@@ -361,11 +362,11 @@ const apiService = {
                 if (line.startsWith('data: ')) {
                   try {
                     const data = JSON.parse(line.slice(6))
-                    console.log('📊 SSE Progress:', data)
+                    log('📊 SSE Progress:', data)
                     onProgress(data)
                     
                     if (data.status === 'completed') {
-                      console.log('✅ İndirme tamamlandı:', data)
+                      log('✅ İndirme tamamlandı:', data)
                       resolve({ success: true, data })
                       return
                     } else if (data.status === 'error') {
@@ -417,9 +418,9 @@ const apiService = {
   // Toplu paket indirme (tarih aralığı)
   downloadBulkPackages: async (startDate, endDate, settings = null) => {
     try {
-      console.log('📥 Toplu paket indirme başlıyor:', startDate, endDate)
+      log('📥 Toplu paket indirme başlıyor:', startDate, endDate)
       const response = await apiClient.post('/pts/download-bulk', { startDate, endDate, settings })
-      console.log('✅ Toplu indirme tamamlandı:', response.data)
+      log('✅ Toplu indirme tamamlandı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ Toplu indirme hatası:', error)
@@ -433,9 +434,9 @@ const apiService = {
   // Transfer ID ile paket indir
   downloadPackage: async (transferId) => {
     try {
-      console.log('📥 Paket indiriliyor:', transferId)
+      log('📥 Paket indiriliyor:', transferId)
       const response = await apiClient.post('/pts/download', { transferId })
-      console.log('✅ Paket indirildi:', response.data)
+      log('✅ Paket indirildi:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ Paket indirme hatası:', error)
@@ -490,7 +491,7 @@ const apiService = {
         params.append('stockBarcodeColumn', settings.itsSettings.stockBarcodeColumn)
       }
       
-      console.log('📋 API isteği:', { startDate, endDate, dateFilterType, cariGlnColumn: settings?.itsSettings?.cariGlnColumn })
+      log('📋 API isteği:', { startDate, endDate, dateFilterType, cariGlnColumn: settings?.itsSettings?.cariGlnColumn })
       
       const response = await apiClient.get(`/pts/database/list?${params.toString()}`)
       return response.data
@@ -507,7 +508,7 @@ const apiService = {
   // Carrier label (koli barkodu) ile ürünleri getir
   getProductsByCarrier: async (carrierLabel) => {
     try {
-      console.log('📦 Carrier ürünleri getiriliyor:', carrierLabel)
+      log('📦 Carrier ürünleri getiriliyor:', carrierLabel)
       const response = await apiClient.get(`/pts/carrier/${carrierLabel}`)
       return response.data
     } catch (error) {
@@ -547,13 +548,13 @@ const apiService = {
   // PTS paketlerini listele (tarih aralığı ve filtre tipi ile)
   listPTSPackages: async (startDate, endDate, dateFilterType = 'created') => {
     try {
-      console.log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
+      log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
       const response = await apiClient.post('/pts/list', { 
         startDate, 
         endDate, 
         dateFilterType 
       })
-      console.log('✅ PTS listesi alındı:', response.data)
+      log('✅ PTS listesi alındı:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ PTS liste hatası:', error)

@@ -3,6 +3,7 @@ import AdmZip from 'adm-zip'
 import xml2js from 'xml2js'
 import * as ptsDbService from './ptsDbService.js'
 import * as settingsHelper from '../utils/settingsHelper.js'
+import { log } from '../utils/logger.js'
 
 // PTS Web Servis Entegrasyonu - Ayarlardan yüklenir
 let PTS_CONFIG = null
@@ -50,14 +51,14 @@ async function getAccessToken(settings = null) {
   
   // Simülasyon modu
   if (PTS_CONFIG.simulationMode) {
-    console.log('🎭 Simülasyon modunda - Mock token dönülüyor')
+    log('🎭 Simülasyon modunda - Mock token dönülüyor')
     return 'MOCK_TOKEN_FOR_SIMULATION'
   }
 
   try {
-    console.log('🔑 Token alınıyor...')
-    console.log('URL:', `${PTS_CONFIG.baseUrl}${PTS_CONFIG.tokenUrl}`)
-    console.log('Username:', PTS_CONFIG.username)
+    log('🔑 Token alınıyor...')
+    log('URL:', `${PTS_CONFIG.baseUrl}${PTS_CONFIG.tokenUrl}`)
+    log('Username:', PTS_CONFIG.username)
     
     // NetProITS formatında JSON string olarak gönder
     const requestBody = `{"username":"${PTS_CONFIG.username}","password":"${PTS_CONFIG.password}"}`
@@ -73,7 +74,7 @@ async function getAccessToken(settings = null) {
       }
     )
 
-    console.log('✅ Token alındı:', response.data)
+    log('✅ Token alındı:', response.data)
     
     // Response'dan token'ı al
     const token = response.data?.token || null
@@ -107,7 +108,7 @@ async function searchPackages(startDate, endDate, settings = null) {
   }
   // Simülasyon modu
   if (PTS_CONFIG.simulationMode) {
-    console.log('🎭 Simülasyon modunda - Mock paket listesi dönülüyor')
+    log('🎭 Simülasyon modunda - Mock paket listesi dönülüyor')
     return {
       success: true,
       data: ['123456789', '987654321', '555555555'], // Mock transfer ID'ler
@@ -232,18 +233,18 @@ async function downloadPackage(transferId, settings = null) {
       }
     )
 
-    console.log('📦 API Response:', JSON.stringify(response.data).substring(0, 200))
+    log('📦 API Response:', JSON.stringify(response.data).substring(0, 200))
     
     const base64Data = response.data?.fileStream
     if (!base64Data) {
-      console.log('❌ fileStream bulunamadı. Response keys:', Object.keys(response.data || {}))
+      log('❌ fileStream bulunamadı. Response keys:', Object.keys(response.data || {}))
       return {
         success: false,
         message: 'Paket verisi alınamadı'
       }
     }
     
-    console.log('✅ Base64 data alındı, uzunluk:', base64Data.length)
+    log('✅ Base64 data alındı, uzunluk:', base64Data.length)
 
     // Base64'ten ZIP'e çevir
     const zipBuffer = Buffer.from(base64Data, 'base64')
@@ -262,18 +263,18 @@ async function downloadPackage(transferId, settings = null) {
     // İlk XML dosyasını al
     const xmlContent = zipEntries[0].getData().toString('utf8')
     
-    console.log('📄 XML İçeriği (ilk 1500 karakter):', xmlContent.substring(0, 1500))
-    console.log('📄 XML Tam Uzunluk:', xmlContent.length)
+    log('📄 XML İçeriği (ilk 1500 karakter):', xmlContent.substring(0, 1500))
+    log('📄 XML Tam Uzunluk:', xmlContent.length)
     
     // XML'i parse et
     const parser = new xml2js.Parser()
     const xmlData = await parser.parseStringPromise(xmlContent)
 
-    console.log('🔍 XML Root Keys:', Object.keys(xmlData))
+    log('🔍 XML Root Keys:', Object.keys(xmlData))
 
     // XML'den bilgileri çıkar - transfer tag'ini destekle
     const root = xmlData.transfer || xmlData.package || xmlData.shipmentNotification || xmlData
-    console.log('📦 Root Keys:', Object.keys(root))
+    log('📦 Root Keys:', Object.keys(root))
     
     const packageInfo = {
       transferId,

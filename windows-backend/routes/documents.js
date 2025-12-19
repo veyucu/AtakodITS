@@ -1,6 +1,7 @@
 import express from 'express'
 import documentService from '../services/documentService.js'
 import { parseITSBarcode, formatMiad } from '../utils/itsParser.js'
+import { log } from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -149,7 +150,7 @@ router.delete('/:documentId/item/:itemId/its-records', async (req, res) => {
     const { documentId, itemId } = req.params
     const { seriNos, turu = 'ITS' } = req.body // Array of seri numbers to delete, turu (ITS/DGR/UTS)
     
-    console.log('🗑️ Kayıt Silme İsteği:', { documentId, itemId, seriNos, turu })
+    log('🗑️ Kayıt Silme İsteği:', { documentId, itemId, seriNos, turu })
     
     if (!seriNos || !Array.isArray(seriNos) || seriNos.length === 0) {
       return res.status(400).json({
@@ -161,7 +162,7 @@ router.delete('/:documentId/item/:itemId/its-records', async (req, res) => {
     // Document ID parse et
     const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
     
-    console.log('📋 Parse edilmiş değerler:', { subeKodu, ftirsip, fatirs_no, straInc: itemId, turu })
+    log('📋 Parse edilmiş değerler:', { subeKodu, ftirsip, fatirs_no, straInc: itemId, turu })
     
     const result = await documentService.deleteITSBarcodeRecords(
       seriNos,
@@ -171,7 +172,7 @@ router.delete('/:documentId/item/:itemId/its-records', async (req, res) => {
       turu
     )
     
-    console.log('✅ Silme sonucu:', result)
+    log('✅ Silme sonucu:', result)
     
     res.json({
       success: true,
@@ -244,7 +245,7 @@ router.post('/its-barcode', async (req, res) => {
       expectedQuantity  // Beklenen miktar (kalem miktarı)
     } = req.body
     
-    console.log('📱 ITS Karekod İsteği:', { barcode, documentId, itemId, expectedQuantity })
+    log('📱 ITS Karekod İsteği:', { barcode, documentId, itemId, expectedQuantity })
     
     // 1. Karekodu parse et
     const parseResult = parseITSBarcode(barcode)
@@ -288,11 +289,11 @@ router.post('/its-barcode', async (req, res) => {
     
     // Duplicate kontrolü
     if (!saveResult.success) {
-      console.log('⚠️ ITS Karekod kaydedilemedi:', saveResult.error, saveResult.message)
+      log('⚠️ ITS Karekod kaydedilemedi:', saveResult.error, saveResult.message)
       return res.status(400).json(saveResult) // error ve message'ı frontend'e gönder
     }
     
-    console.log('✅ ITS Karekod başarıyla kaydedildi!')
+    log('✅ ITS Karekod başarıyla kaydedildi!')
     res.json({
       success: true,
       message: 'ITS karekod başarıyla kaydedildi',
@@ -334,7 +335,7 @@ router.post('/uts-barcode', async (req, res) => {
       miktar            // Miktar
     } = req.body
     
-    console.log('🔴 UTS Barkod İsteği:', { barcode, documentId, itemId, stokKodu, seriNo, lotNo, miktar })
+    log('🔴 UTS Barkod İsteği:', { barcode, documentId, itemId, stokKodu, seriNo, lotNo, miktar })
     
     // Belge ID'sini parse et
     const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
@@ -364,11 +365,11 @@ router.post('/uts-barcode', async (req, res) => {
     })
     
     if (!saveResult.success) {
-      console.log('⚠️ UTS Barkod kaydedilemedi:', saveResult.message)
+      log('⚠️ UTS Barkod kaydedilemedi:', saveResult.message)
       return res.status(400).json(saveResult)
     }
     
-    console.log('✅ UTS Barkod başarıyla kaydedildi!')
+    log('✅ UTS Barkod başarıyla kaydedildi!')
     res.json({
       success: true,
       message: saveResult.data.isUpdate 
@@ -405,7 +406,7 @@ router.post('/uts-records/bulk-save', async (req, res) => {
       barcode
     } = req.body
     
-    console.log('💾 UTS Toplu Kayıt İsteği:', { documentId, itemId, recordCount: records.length })
+    log('💾 UTS Toplu Kayıt İsteği:', { documentId, itemId, recordCount: records.length })
     
     // Belge ID'sini parse et
     const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
@@ -459,7 +460,7 @@ router.post('/carrier-barcode', async (req, res) => {
       kullanici      // Kullanıcı adı
     } = req.body
     
-    console.log('📦 Koli Barkodu İsteği:', { carrierLabel, docId, ftirsip, cariKodu, kullanici })
+    log('📦 Koli Barkodu İsteği:', { carrierLabel, docId, ftirsip, cariKodu, kullanici })
     
     if (!carrierLabel) {
       return res.status(400).json({
@@ -509,7 +510,7 @@ router.delete('/carrier-barcode', async (req, res) => {
       docId          // Belge ID (SUBE_KODU-FTIRSIP-FATIRS_NO)
     } = req.body
     
-    console.log('🗑️ Koli Barkodu Silme İsteği:', { carrierLabel, docId })
+    log('🗑️ Koli Barkodu Silme İsteği:', { carrierLabel, docId })
     
     if (!carrierLabel) {
       return res.status(400).json({
@@ -554,7 +555,7 @@ router.post('/dgr-barcode', async (req, res) => {
       expectedQuantity  // Beklenen miktar (kalem miktarı)
     } = req.body
     
-    console.log('📦 DGR Barkod İsteği:', { barcode, documentId, itemId, stokKodu, expectedQuantity })
+    log('📦 DGR Barkod İsteği:', { barcode, documentId, itemId, stokKodu, expectedQuantity })
     
     // Belge ID'sini parse et
     const [subeKodu, ftirsip, fatirs_no] = documentId.split('-')
@@ -580,11 +581,11 @@ router.post('/dgr-barcode', async (req, res) => {
     })
     
     if (!saveResult.success) {
-      console.log('⚠️ DGR Barkod kaydedilemedi:', saveResult.message)
+      log('⚠️ DGR Barkod kaydedilemedi:', saveResult.message)
       return res.status(400).json(saveResult)
     }
     
-    console.log('✅ DGR Barkod başarıyla kaydedildi!')
+    log('✅ DGR Barkod başarıyla kaydedildi!')
     res.json({
       success: true,
       message: saveResult.data.isUpdate 

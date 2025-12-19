@@ -1,6 +1,7 @@
 import express from 'express'
 import * as ptsService from '../services/ptsService.js'
 import * as ptsDbService from '../services/ptsDbService.js'
+import { log } from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -72,7 +73,7 @@ router.post('/download-bulk-stream', async (req, res) => {
     res.setHeader('Connection', 'keep-alive')
     res.setHeader('X-Accel-Buffering', 'no') // Nginx buffering'i kapat
 
-    console.log('📥 Toplu paket indirme başlıyor (SSE):', { startDate, endDate })
+    log('📥 Toplu paket indirme başlıyor (SSE):', { startDate, endDate })
 
     // Helper function to send SSE message
     const sendProgress = (data) => {
@@ -251,7 +252,7 @@ router.post('/download-bulk-stream', async (req, res) => {
       }
     }
 
-    console.log('📊 Toplu indirme tamamlandı:', results)
+    log('📊 Toplu indirme tamamlandı:', results)
 
     // Son durum
     sendProgress({
@@ -287,7 +288,7 @@ router.post('/download-bulk-old', async (req, res) => {
       })
     }
 
-    console.log('📥 Toplu paket indirme başlıyor (OLD):', { startDate, endDate })
+    log('📥 Toplu paket indirme başlıyor (OLD):', { startDate, endDate })
 
     const searchResult = await ptsService.searchPackages(startDate, endDate, settings)
     
@@ -371,7 +372,7 @@ router.post('/list', async (req, res) => {
       })
     }
 
-    console.log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
+    log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
 
     const result = await ptsDbService.listPackages(startDate, endDate, dateFilterType)
     
