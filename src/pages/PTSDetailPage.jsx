@@ -258,9 +258,9 @@ const PTSDetailPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-dark-950">
-      {/* Header - Dark Theme */}
-      <div className="bg-dark-900/80 backdrop-blur-sm border-b border-dark-700">
+    <div className="flex flex-col h-screen bg-dark-950 overflow-hidden">
+      {/* Header - Sabit */}
+      <div className="flex-shrink-0 bg-dark-900/95 backdrop-blur-sm border-b border-dark-700 z-20">
         <div className="px-6 py-3">
           <div className="flex items-center gap-4">
             <button
@@ -296,36 +296,40 @@ const PTSDetailPage = () => {
                     </span>
                   </div>
                 )}
-                {/* Durum */}
-                {packageData.DURUM && (() => {
-                  const style = getStatusStyle(packageData.DURUM)
+                {/* Durum - Her zaman göster */}
+                {(() => {
+                  const durumValue = packageData.DURUM || '-'
+                  const style = getStatusStyle(durumValue)
                   const StatusIcon = style.icon
                   return (
                     <div className={`${style.bg} ${style.border} border px-3 py-1.5 rounded-lg flex items-center gap-2`}>
                       <StatusIcon className={`w-4 h-4 ${style.text}`} />
-                      <span className={`font-semibold ${style.text}`}>{packageData.DURUM}</span>
+                      <span className="font-semibold text-slate-400">Durum:</span>
+                      <span className={`font-semibold ${style.text}`}>{durumValue}</span>
                     </div>
                   )
                 })()}
-                {/* Bildirim Tarihi */}
-                {packageData.BILDIRIM_TARIHI && (
-                  <div className="bg-primary-500/10 border border-primary-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-primary-400" />
-                    <span className="font-semibold text-primary-400">Bildirim:</span>{' '}
-                    <span className="text-primary-300">{new Date(packageData.BILDIRIM_TARIHI).toLocaleDateString('tr-TR')}</span>
-                  </div>
-                )}
+                {/* Bildirim Tarihi - Her zaman göster */}
+                <div className="bg-primary-500/10 border border-primary-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-primary-400" />
+                  <span className="font-semibold text-slate-400">Bildirim:</span>{' '}
+                  <span className="text-primary-300">
+                    {packageData.BILDIRIM_TARIHI ? new Date(packageData.BILDIRIM_TARIHI).toLocaleDateString('tr-TR') : '-'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* TanStack Table - Dark Theme */}
-      <div className="flex-1 px-6 py-4 overflow-auto">
-        <div className="bg-dark-800/60 rounded-2xl border border-dark-700 overflow-hidden shadow-xl shadow-dark-950/50">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-dark-900 to-dark-800 text-slate-300 sticky top-0 z-10 border-b border-dark-600">
+      {/* TanStack Table - Scrollable Area */}
+      <div className="flex-1 flex flex-col min-h-0 px-6 py-4">
+        <div className="flex-1 flex flex-col min-h-0 bg-dark-800/60 rounded-2xl border border-dark-700 overflow-hidden shadow-xl shadow-dark-950/50">
+          {/* Table with scroll */}
+          <div className="flex-1 overflow-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-dark-900 to-dark-800 text-slate-300 sticky top-0 z-10 border-b border-dark-600">
               {table.getHeaderGroups().map(headerGroup => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map(header => (
@@ -393,9 +397,10 @@ const PTSDetailPage = () => {
                 </tr>
               ))}
             </tbody>
-          </table>
-          {/* Footer */}
-          <div className="bg-gradient-to-r from-dark-900 to-dark-800 border-t border-dark-600 px-5 py-3">
+            </table>
+          </div>
+          {/* Footer - Sabit */}
+          <div className="flex-shrink-0 bg-gradient-to-r from-dark-900 to-dark-800 border-t border-dark-600 px-5 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
