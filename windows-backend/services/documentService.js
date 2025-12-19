@@ -2,7 +2,7 @@ import { getConnection } from '../config/database.js'
 import { getCarrierProductsRecursive } from './ptsDbService.js'
 import sql from 'mssql'
 import settingsService from './settingsService.js'
-import { fixObjectStrings } from '../utils/stringUtils.js'
+import { fixObjectStrings, fixTurkishChars } from '../utils/stringUtils.js'
 
 // Debug mode - production'da false yapılmalı
 const DEBUG = process.env.NODE_ENV !== 'production'
