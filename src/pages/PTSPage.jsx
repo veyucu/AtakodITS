@@ -106,6 +106,24 @@ const PTSPage = () => {
     setTimeout(() => setMessage(null), 5000)
   }
 
+  // İndirme modalını kapat ve listeyi yenile
+  const closeDownloadModal = useCallback(() => {
+    setShowDownloadModal(false)
+    // Liste yenile
+    handleListPackages()
+  }, [handleListPackages])
+
+  // ESC tuşu ile modal kapatma
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && showDownloadModal) {
+        closeDownloadModal()
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [showDownloadModal, closeDownloadModal])
+
   // Tarih validasyonu - geçersiz tarihleri kontrol et
   const isValidDate = (dateString) => {
     if (!dateString) return false
@@ -674,6 +692,27 @@ const PTSPage = () => {
                     </p>
                   )}
                 </div>
+                {/* Kapat Butonu (X) */}
+                <button
+                  onClick={closeDownloadModal}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  title="Kapat (ESC)"
+                >
+                  <X className="w-5 h-5 text-slate-400 hover:text-slate-200" />
+                </button>
+              </div>
+              {/* Tarih Bilgisi */}
+              <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+                <span className="px-2 py-1 bg-dark-700/50 rounded text-slate-300 border border-dark-600">
+                  {new Date(startDate).toLocaleDateString('tr-TR')}
+                </span>
+                <span className="text-slate-500">→</span>
+                <span className="px-2 py-1 bg-dark-700/50 rounded text-slate-300 border border-dark-600">
+                  {new Date(endDate).toLocaleDateString('tr-TR')}
+                </span>
+                <span className="text-xs text-slate-500 ml-2">
+                  ({dateFilterType === 'document' ? 'Belge Tarihi' : 'Kayıt Tarihi'})
+                </span>
               </div>
             </div>
 
@@ -759,10 +798,10 @@ const PTSPage = () => {
             {(downloadProgress.status === 'completed' || downloadProgress.status === 'error') && (
               <div className="px-6 pb-6">
                 <button
-                  onClick={() => setShowDownloadModal(false)}
+                  onClick={closeDownloadModal}
                   className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/30"
                 >
-                  Kapat
+                  Kapat ve Listeyi Yenile
                 </button>
               </div>
             )}
