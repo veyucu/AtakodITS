@@ -84,7 +84,7 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={() => navigate('/pts')}
+            onClick={() => navigate('/pts', { state: { fromDashboard: true } })}
             className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-primary-500/50 hover:shadow-primary-500/10"
           >
             <div className="flex flex-col">

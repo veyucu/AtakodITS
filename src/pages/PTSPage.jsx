@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Package, Home, Truck, Search, Download, RefreshCw, X, AlertCircle, CheckCircle, AlertTriangle, Info } from 'lucide-react'
 import { AgGridReact } from 'ag-grid-react'
 import 'ag-grid-community/styles/ag-grid.css'
@@ -25,10 +25,20 @@ const BadgeRenderer = ({ value, type = 'default' }) => {
 
 const PTSPage = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const gridRef = useRef(null)
   
-  // LocalStorage'dan tarih ayarlarını oku
+  // Dashboard'dan mı gelindi kontrolü
+  const fromDashboard = location.state?.fromDashboard === true
+  
+  // Bugünün tarihi
+  const today = new Date().toISOString().split('T')[0]
+  
+  // LocalStorage'dan tarih ayarlarını oku (Dashboard'dan gelindiyse bugünü kullan)
   const getStoredValue = (key, defaultValue) => {
+    if (fromDashboard) {
+      return defaultValue
+    }
     try {
       const stored = localStorage.getItem(key)
       return stored !== null ? stored : defaultValue
@@ -40,17 +50,17 @@ const PTSPage = () => {
   const [message, setMessage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [startDate, setStartDate] = useState(() => 
-    getStoredValue('pts_startDate', new Date().toISOString().split('T')[0])
+    getStoredValue('pts_startDate', today)
   )
   const [endDate, setEndDate] = useState(() => 
-    getStoredValue('pts_endDate', new Date().toISOString().split('T')[0])
+    getStoredValue('pts_endDate', today)
   )
   const [dateFilterType, setDateFilterType] = useState(() => 
     getStoredValue('pts_dateFilterType', 'document') // Varsayılan: Belge Tarihi
   )
   const [listData, setListData] = useState([]) // Grid için liste verisi
   const [searchText, setSearchText] = useState(() => 
-    getStoredValue('pts_searchText', '')
+    fromDashboard ? '' : getStoredValue('pts_searchText', '')
   ) // Arama metni
   const [initialLoadDone, setInitialLoadDone] = useState(false) // İlk yükleme kontrolü
   
@@ -64,6 +74,14 @@ const PTSPage = () => {
     failed: 0,
     status: 'idle' // idle, searching, downloading, completed, error
   })
+
+  // Dashboard'dan gelindiyse location state'ini temizle (sayfa yenilemelerinde etkilenmemesi için)
+  useEffect(() => {
+    if (fromDashboard) {
+      // State'i temizle - bu sayede refresh yapıldığında veya PTSDetails'den geri dönüldüğünde localStorage kullanılır
+      window.history.replaceState({}, document.title)
+    }
+  }, [fromDashboard])
 
   // Tarih ayarlarını localStorage'a kaydet
   useEffect(() => {
