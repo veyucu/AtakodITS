@@ -471,10 +471,10 @@ const PTSPage = () => {
       )}
 
       {/* Paket Listesi - AG Grid Dark Theme */}
-      <div className="flex-1 px-6 py-4 flex flex-col gap-4">
+      <div className="flex-1 px-6 py-4 flex flex-col min-h-0">
         {listData.length > 0 ? (
           /* Liste Görünümü */
-          <div className="ag-theme-alpine rounded-xl overflow-hidden border border-dark-700" style={{ height: 'calc(100vh - 200px)' }}>
+          <div className="ag-theme-alpine rounded-xl overflow-hidden border border-dark-700 flex-1">
             <AgGridReact
               ref={gridRef}
               rowData={filteredData}
