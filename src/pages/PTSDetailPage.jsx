@@ -260,63 +260,62 @@ const PTSDetailPage = () => {
   return (
     <div className="flex flex-col h-screen bg-dark-950 overflow-hidden">
       {/* Header - Sabit */}
-      <div className="flex-shrink-0 bg-dark-900/95 backdrop-blur-sm border-b border-dark-700 z-20">
+      <div className="flex-shrink-0 bg-dark-900/80 backdrop-blur-sm border-b border-dark-700 z-20">
         <div className="px-6 py-3">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/pts')}
-              className="w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center hover:bg-dark-600 transition-colors border border-dark-600"
+              className="w-8 h-8 bg-dark-700 rounded flex items-center justify-center hover:bg-dark-600 transition-colors border border-dark-600 flex-shrink-0"
             >
-              <ArrowLeft className="w-6 h-6 text-slate-300" />
+              <ArrowLeft className="w-5 h-5 text-slate-300" />
             </button>
-            <div className="flex-1 flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-bold text-slate-100">PTS Paket Detayı</h1>
-                <p className="text-slate-500 text-sm">Transfer ID: {transferId}</p>
+            <div className="w-8 h-8 bg-primary-600 rounded flex items-center justify-center shadow-lg shadow-primary-600/30 flex-shrink-0">
+              <Package className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-shrink-0">
+              <h1 className="text-lg font-bold text-slate-100">PTS Detay</h1>
+              <p className="text-slate-500 text-xs">ID: {transferId}</p>
+            </div>
+            
+            {/* Bilgi Etiketleri */}
+            <div className="flex items-center gap-2 text-sm ml-4 overflow-x-auto flex-1">
+              <div className="bg-dark-800/80 border border-dark-700 px-2 py-1 rounded flex-shrink-0">
+                <span className="text-slate-400 text-xs">Belge:</span> <span className="text-slate-200 text-xs">{packageData.DOCUMENT_NUMBER || '-'}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm flex-wrap">
-                <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded-lg">
-                  <span className="font-semibold text-slate-400">Belge No:</span> <span className="text-slate-200">{packageData.DOCUMENT_NUMBER || '-'}</span>
-                </div>
-                <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded-lg">
-                  <span className="font-semibold text-slate-400">Belge Tarihi:</span>{' '}
-                  <span className="text-slate-200">{packageData.DOCUMENT_DATE ? new Date(packageData.DOCUMENT_DATE).toLocaleDateString('tr-TR') : '-'}</span>
-                </div>
-                <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded-lg">
-                  <span className="font-semibold text-slate-400">Kaynak GLN:</span>{' '}
-                  <span className="font-mono text-slate-200">{packageData.SOURCE_GLN || '-'}</span>
-                </div>
-                {packageData.SOURCE_GLN_NAME && (
-                  <div className="bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg">
-                    <span className="font-semibold text-amber-400">Cari:</span>{' '}
-                    <span className="text-amber-300">
-                      {packageData.SOURCE_GLN_NAME}
-                      {packageData.SOURCE_GLN_ILCE && ` - ${packageData.SOURCE_GLN_ILCE}`}
-                      {packageData.SOURCE_GLN_IL && ` / ${packageData.SOURCE_GLN_IL}`}
-                    </span>
-                  </div>
-                )}
-                {/* Durum - Her zaman göster */}
-                {(() => {
-                  const durumValue = packageData.DURUM || '-'
-                  const style = getStatusStyle(durumValue)
-                  const StatusIcon = style.icon
-                  return (
-                    <div className={`${style.bg} ${style.border} border px-3 py-1.5 rounded-lg flex items-center gap-2`}>
-                      <StatusIcon className={`w-4 h-4 ${style.text}`} />
-                      <span className="font-semibold text-slate-400">Durum:</span>
-                      <span className={`font-semibold ${style.text}`}>{durumValue}</span>
-                    </div>
-                  )
-                })()}
-                {/* Bildirim Tarihi - Her zaman göster */}
-                <div className="bg-primary-500/10 border border-primary-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-primary-400" />
-                  <span className="font-semibold text-slate-400">Bildirim:</span>{' '}
-                  <span className="text-primary-300">
-                    {packageData.BILDIRIM_TARIHI ? new Date(packageData.BILDIRIM_TARIHI).toLocaleDateString('tr-TR') : '-'}
+              <div className="bg-dark-800/80 border border-dark-700 px-2 py-1 rounded flex-shrink-0">
+                <span className="text-slate-400 text-xs">Tarih:</span>{' '}
+                <span className="text-slate-200 text-xs">{packageData.DOCUMENT_DATE ? new Date(packageData.DOCUMENT_DATE).toLocaleDateString('tr-TR') : '-'}</span>
+              </div>
+              <div className="bg-dark-800/80 border border-dark-700 px-2 py-1 rounded flex-shrink-0">
+                <span className="text-slate-400 text-xs">GLN:</span>{' '}
+                <span className="font-mono text-slate-200 text-xs">{packageData.SOURCE_GLN || '-'}</span>
+              </div>
+              {packageData.SOURCE_GLN_NAME && (
+                <div className="bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded flex-shrink-0">
+                  <span className="text-amber-300 text-xs">
+                    {packageData.SOURCE_GLN_NAME}
+                    {packageData.SOURCE_GLN_IL && ` / ${packageData.SOURCE_GLN_IL}`}
                   </span>
                 </div>
+              )}
+              {/* Durum */}
+              {(() => {
+                const durumValue = packageData.DURUM || '-'
+                const style = getStatusStyle(durumValue)
+                const StatusIcon = style.icon
+                return (
+                  <div className={`${style.bg} ${style.border} border px-2 py-1 rounded flex items-center gap-1 flex-shrink-0`}>
+                    <StatusIcon className={`w-3 h-3 ${style.text}`} />
+                    <span className={`text-xs font-medium ${style.text}`}>{durumValue}</span>
+                  </div>
+                )
+              })()}
+              {/* Bildirim Tarihi */}
+              <div className="bg-primary-500/10 border border-primary-500/30 px-2 py-1 rounded flex items-center gap-1 flex-shrink-0">
+                <Clock className="w-3 h-3 text-primary-400" />
+                <span className="text-primary-300 text-xs">
+                  {packageData.BILDIRIM_TARIHI ? new Date(packageData.BILDIRIM_TARIHI).toLocaleDateString('tr-TR') : '-'}
+                </span>
               </div>
             </div>
           </div>
