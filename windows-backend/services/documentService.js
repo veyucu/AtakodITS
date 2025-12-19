@@ -1723,17 +1723,21 @@ const documentService = {
       
       log('📊 Kolide bulunan GTIN sayıları:', gtinCountMap)
       
-      // Her GTIN için miktar kontrolü yap
-      for (const item of itemsResult.recordset) {
-        // GTIN'i temizle
-        const cleanItemGtin = item.GTIN.toString().replace(/^0+/, '')
+      // Sadece KOLİDE BULUNAN GTIN'ler için miktar kontrolü yap
+      for (const cleanGtin of Object.keys(gtinCountMap)) {
+        // Bu GTIN belgede var mı?
+        const item = itemsResult.recordset.find(i => i.GTIN.toString().replace(/^0+/, '') === cleanGtin)
+        
+        if (!item) {
+          throw new Error(`Kolide bulunan GTIN (${cleanGtin}) bu belgede yok!`)
+        }
         
         const expectedQty = item.MIKTAR
         const preparedQty = item.PREPARED_QTY
         const remainingQty = expectedQty - preparedQty
-        const carrierQty = gtinCountMap[cleanItemGtin] || 0
+        const carrierQty = gtinCountMap[cleanGtin] || 0
         
-        console.log(`🔍 GTIN ${cleanItemGtin} kontrolü:`, {
+        console.log(`🔍 GTIN ${cleanGtin} kontrolü:`, {
           stokKodu: item.STOK_KODU,
           expectedQty,
           preparedQty,
@@ -1746,7 +1750,7 @@ const documentService = {
           throw new Error(
             `Bu ürün için kalan miktar yok!\n\n` +
             `Ürün: ${item.STOK_KODU}\n` +
-            `GTIN: ${cleanItemGtin}\n` +
+            `GTIN: ${cleanGtin}\n` +
             `Belgedeki toplam: ${expectedQty}\n` +
             `Daha önce okutulan: ${preparedQty}\n` +
             `Kalan: ${remainingQty}\n` +

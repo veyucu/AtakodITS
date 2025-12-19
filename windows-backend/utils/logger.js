@@ -62,3 +62,4 @@ export const log = (...args) => {
 
 export default { debug, info, warn, error, log }
 
+

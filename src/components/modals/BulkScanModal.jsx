@@ -225,3 +225,4 @@ const BulkScanModal = ({
 
 export default BulkScanModal
 
+
