@@ -288,19 +288,20 @@ const PTSDetailPage = () => {
                 <span className="text-slate-400 text-sm">Tarih:</span>{' '}
                 <span className="text-slate-200 text-sm font-medium">{packageData.DOCUMENT_DATE ? new Date(packageData.DOCUMENT_DATE).toLocaleDateString('tr-TR') : '-'}</span>
               </div>
-              {/* GLN ve Cari birlikte */}
-              <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded flex items-center gap-2">
+              {/* GLN */}
+              <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded">
+                <span className="text-slate-400 text-sm">GLN:</span>{' '}
                 <span className="font-mono text-slate-200 text-sm">{packageData.SOURCE_GLN || '-'}</span>
-                {packageData.SOURCE_GLN_NAME && (
-                  <>
-                    <span className="text-slate-600">|</span>
-                    <span className="text-amber-400 text-sm font-medium">
-                      {packageData.SOURCE_GLN_NAME}
-                      {packageData.SOURCE_GLN_IL && ` / ${packageData.SOURCE_GLN_IL}`}
-                    </span>
-                  </>
-                )}
               </div>
+              {/* Cari */}
+              {packageData.SOURCE_GLN_NAME && (
+                <div className="bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded">
+                  <span className="text-amber-400 text-sm font-medium">
+                    {packageData.SOURCE_GLN_NAME}
+                    {packageData.SOURCE_GLN_IL && ` / ${packageData.SOURCE_GLN_IL}`}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Sağ - Durum, Bildirim */}
