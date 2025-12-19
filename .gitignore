@@ -23,6 +23,17 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment files - ASLA commit etmeyin!
+.env
+.env.local
+.env.*.local
+windows-backend/.env
+windows-backend/.env.local
+
+# Secrets
+*.pem
+*.key
+
 
 
 

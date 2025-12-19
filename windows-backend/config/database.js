@@ -1,11 +1,15 @@
 import sql from 'mssql'
+import dotenv from 'dotenv'
+
+// .env dosyasını yükle
+dotenv.config()
 
 // Ana veritabanı config (MUHASEBE2025) - ITS, UTS, Belgeler için
 const mainConfig = {
-  server: 'NB2',
-  database: 'MUHASEBE2025',
-  user: 'sa',
-  password: 'sapass1*',
+  server: process.env.DB_SERVER || 'NB2',
+  database: process.env.DB_NAME || 'MUHASEBE2025',
+  user: process.env.DB_USER || 'sa',
+  password: process.env.DB_PASSWORD || 'sapass1*',
   options: {
     encrypt: false,
     trustServerCertificate: true,
@@ -13,12 +17,12 @@ const mainConfig = {
     useUTC: false
   },
   pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
+    max: parseInt(process.env.DB_POOL_MAX) || 10,
+    min: parseInt(process.env.DB_POOL_MIN) || 0,
+    idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000
   },
-  connectionTimeout: 30000,
-  requestTimeout: 60000,
+  connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 30000,
+  requestTimeout: parseInt(process.env.DB_REQUEST_TIMEOUT) || 60000,
   beforeConnect: (conn) => {
     conn.on('connect', (err) => {
       if (!err) {
@@ -30,10 +34,10 @@ const mainConfig = {
 
 // PTS veritabanı config (NETSIS) - Sadece PTS işlemleri için
 const ptsConfig = {
-  server: 'NB2',
-  database: 'NETSIS',
-  user: 'sa',
-  password: 'sapass1*',
+  server: process.env.PTS_DB_SERVER || process.env.DB_SERVER || 'NB2',
+  database: process.env.PTS_DB_NAME || 'NETSIS',
+  user: process.env.PTS_DB_USER || process.env.DB_USER || 'sa',
+  password: process.env.PTS_DB_PASSWORD || process.env.DB_PASSWORD || 'sapass1*',
   options: {
     encrypt: false,
     trustServerCertificate: true,
@@ -41,12 +45,12 @@ const ptsConfig = {
     useUTC: false
   },
   pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
+    max: parseInt(process.env.DB_POOL_MAX) || 10,
+    min: parseInt(process.env.DB_POOL_MIN) || 0,
+    idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000
   },
-  connectionTimeout: 30000,
-  requestTimeout: 60000,
+  connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 30000,
+  requestTimeout: parseInt(process.env.DB_REQUEST_TIMEOUT) || 60000,
   beforeConnect: (conn) => {
     conn.on('connect', (err) => {
       if (!err) {

@@ -399,21 +399,6 @@ const apiService = {
     })
   },
 
-  downloadBulkPackages: async (startDate, endDate, settings = null) => {
-    try {
-      console.log('📥 Toplu paket indirme başlıyor:', startDate, endDate)
-      const response = await apiClient.post('/pts/download-bulk-old', { startDate, endDate, settings })
-      console.log('✅ Toplu indirme tamamlandı:', response.data)
-      return response.data
-    } catch (error) {
-      console.error('❌ Toplu indirme hatası:', error)
-      return {
-        success: false,
-        message: error.response?.data?.message || error.message || 'Paketler indirilemedi'
-      }
-    }
-  },
-
   // Transfer ID ile paket sorgula
   queryPackage: async (transferId, settings = null) => {
     try {

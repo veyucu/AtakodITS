@@ -585,9 +585,13 @@ async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', st
     if (uniqueGtins.length > 0) {
       try {
         // stockBarcodeColumn parametresini parse et (örn: "TBLSTSABIT.STOK_KODU" -> "STOK_KODU")
-        const stockColumn = stockBarcodeColumn.includes('.') 
+        const rawStockColumn = stockBarcodeColumn.includes('.') 
           ? stockBarcodeColumn.split('.')[1] 
           : stockBarcodeColumn
+        
+        // SQL Injection koruması - sadece izin verilen kolon adları
+        const ALLOWED_STOCK_COLUMNS = ['STOK_KODU', 'GTIN', 'BARKOD', 'STOK_ADI', 'KOD_1', 'KOD_2', 'KOD_3', 'KOD_4', 'KOD_5']
+        const stockColumn = ALLOWED_STOCK_COLUMNS.includes(rawStockColumn) ? rawStockColumn : 'STOK_KODU'
         
         console.log(`📦 Stok bilgisi aranacak kolon: ${stockColumn}`)
         console.log(`📦 Temizlenmiş GTIN örnekleri:`, uniqueGtins.slice(0, 3))
