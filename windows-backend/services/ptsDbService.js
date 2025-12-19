@@ -979,16 +979,21 @@ async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
   try {
     const pool = await getPTSConnection()
     
-    // Önce bu koli barkoduna ait en büyük TRANSFER_ID'yi bul
+    // Önce bu koli barkoduna ait en büyük TRANSFER_ID'yi bul (TOP 1 ile - daha hızlı)
+    const startTime = Date.now()
+    
     const maxTransferIdQuery = `
-      SELECT MAX(TRANSFER_ID) AS MAX_TRANSFER_ID
-      FROM AKTBLPTSTRA
+      SELECT TOP 1 TRANSFER_ID AS MAX_TRANSFER_ID
+      FROM AKTBLPTSTRA WITH (NOLOCK)
       WHERE CARRIER_LABEL = @carrierLabel
+      ORDER BY TRANSFER_ID DESC
     `
     
     const maxTransferIdRequest = pool.request()
     maxTransferIdRequest.input('carrierLabel', sql.VarChar(25), carrierLabel)
     const maxTransferIdResult = await maxTransferIdRequest.query(maxTransferIdQuery)
+    
+    console.log(`⏱️ MAX TRANSFER_ID sorgusu: ${Date.now() - startTime}ms`)
     
     if (maxTransferIdResult.recordset.length === 0 || !maxTransferIdResult.recordset[0].MAX_TRANSFER_ID) {
       return {
@@ -1001,6 +1006,8 @@ async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
     console.log(`📦 Koli ${carrierLabel} için en büyük TRANSFER_ID: ${maxTransferId}`)
     
     // Recursive CTE ile tüm alt kolileri ve ürünleri bul (sadece en büyük TRANSFER_ID için)
+    const cteStartTime = Date.now()
+    
     const query = `
       WITH CarrierHierarchy AS (
         -- Ana koli (en büyük TRANSFER_ID ile)
@@ -1008,7 +1015,7 @@ async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
           TRANSFER_ID, CARRIER_LABEL, PARENT_CARRIER_LABEL, 
           CONTAINER_TYPE, CARRIER_LEVEL, GTIN, SERIAL_NUMBER, 
           LOT_NUMBER, EXPIRATION_DATE, PRODUCTION_DATE, PO_NUMBER
-        FROM AKTBLPTSTRA
+        FROM AKTBLPTSTRA WITH (NOLOCK)
         WHERE CARRIER_LABEL = @carrierLabel
           AND TRANSFER_ID = @maxTransferId
         
@@ -1019,7 +1026,7 @@ async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
           c.TRANSFER_ID, c.CARRIER_LABEL, c.PARENT_CARRIER_LABEL,
           c.CONTAINER_TYPE, c.CARRIER_LEVEL, c.GTIN, c.SERIAL_NUMBER,
           c.LOT_NUMBER, c.EXPIRATION_DATE, c.PRODUCTION_DATE, c.PO_NUMBER
-        FROM AKTBLPTSTRA c
+        FROM AKTBLPTSTRA c WITH (NOLOCK)
         INNER JOIN CarrierHierarchy ch ON c.PARENT_CARRIER_LABEL = ch.CARRIER_LABEL
           AND c.TRANSFER_ID = @maxTransferId
       )
@@ -1033,6 +1040,7 @@ async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
     
     const result = await request.query(query)
     
+    console.log(`⏱️ CTE sorgusu: ${Date.now() - cteStartTime}ms`)
     console.log(`📦 Koli ${carrierLabel} için toplam ${result.recordset.length} kayıt bulundu`)
     
     // GTIN'leri temizle (leading zeros'ları kırp) ve stockCodes ile karşılaştır
