@@ -134,6 +134,15 @@ const PTSPage = () => {
       return
     }
 
+    // En fazla 1 ay (31 gün) kontrolü
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+    if (diffDays > 31) {
+      showMessage('⚠️ Tarih aralığı en fazla 1 ay olabilir', 'error')
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -183,6 +192,15 @@ const PTSPage = () => {
 
     if (new Date(startDate) > new Date(endDate)) {
       showMessage('⚠️ Başlangıç tarihi bitiş tarihinden büyük olamaz', 'error')
+      return
+    }
+
+    // En fazla 1 ay (31 gün) kontrolü
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+    if (diffDays > 31) {
+      showMessage('⚠️ Tarih aralığı en fazla 1 ay olabilir', 'error')
       return
     }
 
