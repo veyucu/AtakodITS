@@ -262,7 +262,8 @@ const PTSDetailPage = () => {
       {/* Header - Sabit */}
       <div className="flex-shrink-0 bg-dark-900/80 backdrop-blur-sm border-b border-dark-700 z-20">
         <div className="px-6 py-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {/* Sol - Geri ve Başlık */}
             <button
               onClick={() => navigate('/pts')}
               className="w-8 h-8 bg-dark-700 rounded flex items-center justify-center hover:bg-dark-600 transition-colors border border-dark-600 flex-shrink-0"
@@ -272,27 +273,30 @@ const PTSDetailPage = () => {
             <div className="w-8 h-8 bg-primary-600 rounded flex items-center justify-center shadow-lg shadow-primary-600/30 flex-shrink-0">
               <Package className="w-5 h-5 text-white" />
             </div>
-            <div className="flex-shrink-0">
-              <h1 className="text-lg font-bold text-slate-100">PTS Detay</h1>
-              <p className="text-slate-500 text-xs">ID: {transferId}</p>
-            </div>
+            <h1 className="text-lg font-bold text-slate-100 flex-shrink-0">PTS Detay</h1>
+            <span className="text-slate-500 text-sm flex-shrink-0">#{transferId}</span>
             
-            {/* Bilgi Etiketleri */}
-            <div className="flex items-center gap-2 text-sm ml-4 overflow-x-auto flex-1">
-              <div className="bg-dark-800/80 border border-dark-700 px-2 py-1 rounded flex-shrink-0">
-                <span className="text-slate-400 text-xs">Belge:</span> <span className="text-slate-200 text-xs">{packageData.DOCUMENT_NUMBER || '-'}</span>
+            {/* Orta - Belge Bilgileri */}
+            <div className="flex items-center gap-3 ml-6">
+              <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded">
+                <span className="text-slate-400 text-sm">Belge No:</span>{' '}
+                <span className="text-slate-200 text-sm font-medium">{packageData.DOCUMENT_NUMBER || '-'}</span>
               </div>
-              <div className="bg-dark-800/80 border border-dark-700 px-2 py-1 rounded flex-shrink-0">
-                <span className="text-slate-400 text-xs">Tarih:</span>{' '}
-                <span className="text-slate-200 text-xs">{packageData.DOCUMENT_DATE ? new Date(packageData.DOCUMENT_DATE).toLocaleDateString('tr-TR') : '-'}</span>
+              <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded">
+                <span className="text-slate-400 text-sm">Tarih:</span>{' '}
+                <span className="text-slate-200 text-sm font-medium">{packageData.DOCUMENT_DATE ? new Date(packageData.DOCUMENT_DATE).toLocaleDateString('tr-TR') : '-'}</span>
               </div>
-              <div className="bg-dark-800/80 border border-dark-700 px-2 py-1 rounded flex-shrink-0">
-                <span className="text-slate-400 text-xs">GLN:</span>{' '}
-                <span className="font-mono text-slate-200 text-xs">{packageData.SOURCE_GLN || '-'}</span>
+              <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded">
+                <span className="text-slate-400 text-sm">GLN:</span>{' '}
+                <span className="font-mono text-slate-200 text-sm">{packageData.SOURCE_GLN || '-'}</span>
               </div>
+            </div>
+
+            {/* Sağ - Cari, Durum, Bildirim */}
+            <div className="flex items-center gap-3 ml-auto">
               {packageData.SOURCE_GLN_NAME && (
-                <div className="bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded flex-shrink-0">
-                  <span className="text-amber-300 text-xs">
+                <div className="bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded">
+                  <span className="text-amber-400 text-sm font-medium">
                     {packageData.SOURCE_GLN_NAME}
                     {packageData.SOURCE_GLN_IL && ` / ${packageData.SOURCE_GLN_IL}`}
                   </span>
@@ -304,16 +308,16 @@ const PTSDetailPage = () => {
                 const style = getStatusStyle(durumValue)
                 const StatusIcon = style.icon
                 return (
-                  <div className={`${style.bg} ${style.border} border px-2 py-1 rounded flex items-center gap-1 flex-shrink-0`}>
-                    <StatusIcon className={`w-3 h-3 ${style.text}`} />
-                    <span className={`text-xs font-medium ${style.text}`}>{durumValue}</span>
+                  <div className={`${style.bg} ${style.border} border px-3 py-1.5 rounded flex items-center gap-2`}>
+                    <StatusIcon className={`w-4 h-4 ${style.text}`} />
+                    <span className={`text-sm font-medium ${style.text}`}>{durumValue}</span>
                   </div>
                 )
               })()}
               {/* Bildirim Tarihi */}
-              <div className="bg-primary-500/10 border border-primary-500/30 px-2 py-1 rounded flex items-center gap-1 flex-shrink-0">
-                <Clock className="w-3 h-3 text-primary-400" />
-                <span className="text-primary-300 text-xs">
+              <div className="bg-primary-500/10 border border-primary-500/30 px-3 py-1.5 rounded flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary-400" />
+                <span className="text-primary-300 text-sm font-medium">
                   {packageData.BILDIRIM_TARIHI ? new Date(packageData.BILDIRIM_TARIHI).toLocaleDateString('tr-TR') : '-'}
                 </span>
               </div>
