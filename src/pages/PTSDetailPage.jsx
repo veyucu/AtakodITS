@@ -234,6 +234,8 @@ const PTSDetailPage = () => {
     },
   ], [])
 
+  const [columnSizing, setColumnSizing] = useState({})
+
   const table = useReactTable({
     data: products,
     columns,
@@ -241,16 +243,20 @@ const PTSDetailPage = () => {
       grouping,
       expanded,
       sorting,
+      columnSizing,
     },
     onGroupingChange: setGrouping,
     onExpandedChange: setExpanded,
     onSortingChange: setSorting,
+    onColumnSizingChange: setColumnSizing,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
     getSortedRowModel: getSortedRowModel(),
     autoResetExpanded: false,
     enableSortingRemoval: false,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
   })
 
   if (loading) {
@@ -366,8 +372,8 @@ const PTSDetailPage = () => {
                   {headerGroup.headers.map(header => (
                     <th
                       key={header.id}
-                      className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider"
-                      style={{ width: header.column.columnDef.size }}
+                      className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider relative group"
+                      style={{ width: header.getSize() }}
                     >
                       {header.isPlaceholder ? null : (
                         <div
@@ -390,43 +396,69 @@ const PTSDetailPage = () => {
                           )}
                         </div>
                       )}
+                      {/* Resize Handle */}
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none opacity-0 group-hover:opacity-100 transition-opacity ${
+                          header.column.getIsResizing() ? 'bg-primary-500 opacity-100' : 'bg-slate-500 hover:bg-primary-400'
+                        }`}
+                      />
                     </th>
                   ))}
                 </tr>
               ))}
             </thead>
             <tbody className="divide-y divide-dark-700/50">
-              {table.getRowModel().rows.map(row => (
-                <tr
-                  key={row.id}
-                  className={`
-                    ${row.getIsGrouped() 
-                      ? 'bg-gradient-to-r from-dark-700/80 to-dark-700/40 hover:from-dark-700 hover:to-dark-700/60 border-l-4 border-primary-500' 
-                      : 'hover:bg-dark-700/20 border-l-4 border-transparent hover:border-primary-500/30'
-                    }
-                    transition-all duration-150 text-slate-200
-                  `}
-                >
-                  {row.getVisibleCells().map((cell, index) => (
-                    <td
-                      key={cell.id}
-                      className={`
-                        px-4 text-sm
-                        ${row.getIsGrouped() ? 'font-semibold py-1.5' : 'py-2'}
-                        ${index === 0 && !row.getIsGrouped() ? 'pl-14' : ''}
-                      `}
+              {table.getRowModel().rows.map(row => {
+                const visibleCells = row.getVisibleCells()
+                const isGrouped = row.getIsGrouped()
+                
+                // Gruplandırma satırı için özel render
+                if (isGrouped) {
+                  // İlk iki hücreyi al (GTIN ve Stok Adı)
+                  const gtinCell = visibleCells[0]
+                  const stockNameCell = visibleCells[1]
+                  const remainingColSpan = visibleCells.length - 2
+                  
+                  return (
+                    <tr
+                      key={row.id}
+                      className="bg-gradient-to-r from-dark-700/80 to-dark-700/40 hover:from-dark-700 hover:to-dark-700/60 border-l-4 border-primary-500 transition-all duration-150 text-slate-200"
                     >
-                      {cell.getIsGrouped() ? (
-                        flexRender(cell.column.columnDef.aggregatedCell ?? cell.column.columnDef.cell, cell.getContext())
-                      ) : cell.getIsAggregated() ? (
-                        flexRender(cell.column.columnDef.aggregatedCell ?? cell.column.columnDef.cell, cell.getContext())
-                      ) : cell.getIsPlaceholder() ? null : (
-                        flexRender(cell.column.columnDef.cell, cell.getContext())
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+                      {/* GTIN */}
+                      <td className="px-4 py-1.5 text-sm font-semibold" style={{ width: gtinCell.column.getSize() }}>
+                        {flexRender(gtinCell.column.columnDef.aggregatedCell ?? gtinCell.column.columnDef.cell, gtinCell.getContext())}
+                      </td>
+                      {/* Stok Adı + Adet + MIAD'lar (colspan ile birleşik) */}
+                      <td 
+                        colSpan={remainingColSpan + 1} 
+                        className="px-4 py-1.5 text-sm font-semibold"
+                      >
+                        {flexRender(stockNameCell.column.columnDef.aggregatedCell ?? stockNameCell.column.columnDef.cell, stockNameCell.getContext())}
+                      </td>
+                    </tr>
+                  )
+                }
+                
+                // Normal satırlar
+                return (
+                  <tr
+                    key={row.id}
+                    className="hover:bg-dark-700/20 border-l-4 border-transparent hover:border-primary-500/30 transition-all duration-150 text-slate-200"
+                  >
+                    {visibleCells.map((cell, index) => (
+                      <td
+                        key={cell.id}
+                        className={`px-4 text-sm py-2 ${index === 0 ? 'pl-14' : ''}`}
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {cell.getIsPlaceholder() ? null : flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
             </tbody>
             </table>
           </div>
