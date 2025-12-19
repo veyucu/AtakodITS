@@ -978,14 +978,41 @@ export async function getAllTransfers() {
 async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
   try {
     const pool = await getPTSConnection()
+    const totalStartTime = Date.now()
     
-    // Önce bu koli barkoduna ait en büyük TRANSFER_ID'yi bul (TOP 1 ile - daha hızlı)
+    // GTIN'leri temizle (leading zeros kaldır) ve SQL için hazırla
+    const cleanStockCodes = stockCodes.map(code => code.replace(/^0+/, ''))
+    console.log(`📋 Belgede ${cleanStockCodes.length} GTIN:`, cleanStockCodes.slice(0, 5), cleanStockCodes.length > 5 ? '...' : '')
+    
+    // GTIN'lerin hem temizlenmiş hem orijinal (başında 0 ile) hallerini oluştur
+    const allGtinVariants = []
+    cleanStockCodes.forEach(gtin => {
+      allGtinVariants.push(gtin)
+      allGtinVariants.push('0' + gtin) // 13 haneli -> 14 haneli
+    })
+    
+    // GTIN listesini SQL için string olarak oluştur (SQL injection korumalı - sadece sayı)
+    const gtinList = allGtinVariants
+      .filter(g => /^\d+$/.test(g)) // Sadece sayısal değerler
+      .map(g => `'${g}'`)
+      .join(',')
+    
+    if (!gtinList) {
+      return {
+        success: false,
+        error: 'Geçerli GTIN bulunamadı'
+      }
+    }
+    
+    // Önce bu koli barkoduna + belgedeki GTIN'lere ait en büyük TRANSFER_ID'yi bul
     const startTime = Date.now()
     
+    // GTIN filtresi ile MAX TRANSFER_ID - çok daha hızlı!
     const maxTransferIdQuery = `
       SELECT TOP 1 TRANSFER_ID AS MAX_TRANSFER_ID
       FROM AKTBLPTSTRA WITH (NOLOCK)
       WHERE CARRIER_LABEL = @carrierLabel
+        AND GTIN IN (${gtinList})
       ORDER BY TRANSFER_ID DESC
     `
     
@@ -993,44 +1020,30 @@ async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
     maxTransferIdRequest.input('carrierLabel', sql.VarChar(25), carrierLabel)
     const maxTransferIdResult = await maxTransferIdRequest.query(maxTransferIdQuery)
     
-    console.log(`⏱️ MAX TRANSFER_ID sorgusu: ${Date.now() - startTime}ms`)
+    console.log(`⏱️ MAX TRANSFER_ID sorgusu (GTIN filtreli): ${Date.now() - startTime}ms`)
     
     if (maxTransferIdResult.recordset.length === 0 || !maxTransferIdResult.recordset[0].MAX_TRANSFER_ID) {
       return {
         success: false,
-        error: `Koli barkodu bulunamadı: ${carrierLabel}`
+        error: `Koli barkodu bulunamadı veya belgede olmayan ürünler: ${carrierLabel}`
       }
     }
     
     const maxTransferId = maxTransferIdResult.recordset[0].MAX_TRANSFER_ID
-    console.log(`📦 Koli ${carrierLabel} için en büyük TRANSFER_ID: ${maxTransferId}`)
+    console.log(`📦 Koli ${carrierLabel} için TRANSFER_ID: ${maxTransferId}`)
     
-    // Recursive CTE ile tüm alt kolileri ve ürünleri bul (sadece en büyük TRANSFER_ID için)
+    // Direkt sorgu ile ürünleri getir (CTE yerine basit sorgu - GTIN filtreli)
     const cteStartTime = Date.now()
     
     const query = `
-      WITH CarrierHierarchy AS (
-        -- Ana koli (en büyük TRANSFER_ID ile)
-        SELECT 
-          TRANSFER_ID, CARRIER_LABEL, PARENT_CARRIER_LABEL, 
-          CONTAINER_TYPE, CARRIER_LEVEL, GTIN, SERIAL_NUMBER, 
-          LOT_NUMBER, EXPIRATION_DATE, PRODUCTION_DATE, PO_NUMBER
-        FROM AKTBLPTSTRA WITH (NOLOCK)
-        WHERE CARRIER_LABEL = @carrierLabel
-          AND TRANSFER_ID = @maxTransferId
-        
-        UNION ALL
-        
-        -- Alt koliler (recursive) - aynı TRANSFER_ID ile
-        SELECT 
-          c.TRANSFER_ID, c.CARRIER_LABEL, c.PARENT_CARRIER_LABEL,
-          c.CONTAINER_TYPE, c.CARRIER_LEVEL, c.GTIN, c.SERIAL_NUMBER,
-          c.LOT_NUMBER, c.EXPIRATION_DATE, c.PRODUCTION_DATE, c.PO_NUMBER
-        FROM AKTBLPTSTRA c WITH (NOLOCK)
-        INNER JOIN CarrierHierarchy ch ON c.PARENT_CARRIER_LABEL = ch.CARRIER_LABEL
-          AND c.TRANSFER_ID = @maxTransferId
-      )
-      SELECT * FROM CarrierHierarchy
+      SELECT 
+        TRANSFER_ID, CARRIER_LABEL, PARENT_CARRIER_LABEL, 
+        CONTAINER_TYPE, CARRIER_LEVEL, GTIN, SERIAL_NUMBER, 
+        LOT_NUMBER, EXPIRATION_DATE, PRODUCTION_DATE, PO_NUMBER
+      FROM AKTBLPTSTRA WITH (NOLOCK)
+      WHERE TRANSFER_ID = @maxTransferId
+        AND GTIN IN (${gtinList})
+        AND (CARRIER_LABEL = @carrierLabel OR PARENT_CARRIER_LABEL = @carrierLabel)
       ORDER BY CARRIER_LEVEL, GTIN, SERIAL_NUMBER
     `
     
@@ -1040,31 +1053,19 @@ async function getCarrierProductsRecursive(carrierLabel, stockCodes = []) {
     
     const result = await request.query(query)
     
-    console.log(`⏱️ CTE sorgusu: ${Date.now() - cteStartTime}ms`)
-    console.log(`📦 Koli ${carrierLabel} için toplam ${result.recordset.length} kayıt bulundu`)
-    
-    // GTIN'leri temizle (leading zeros'ları kırp) ve stockCodes ile karşılaştır
-    const cleanStockCodes = stockCodes.map(code => code.replace(/^0+/, ''))
-    console.log(`📋 Temizlenmiş stok kodları:`, cleanStockCodes)
-    
-    // GTIN kontrolü ile filtrele
-    const filteredRecords = result.recordset.filter(r => {
-      if (!r.GTIN) return false
-      const cleanGtin = r.GTIN.replace(/^0+/, '')
-      return cleanStockCodes.includes(cleanGtin)
-    })
-    
-    console.log(`📦 GTIN eşleşmesi sonrası ${filteredRecords.length} kayıt kaldı`)
+    console.log(`⏱️ Ürün sorgusu (GTIN filtreli): ${Date.now() - cteStartTime}ms`)
+    console.log(`📦 Koli ${carrierLabel} için ${result.recordset.length} kayıt bulundu`)
+    console.log(`⏱️ TOPLAM SÜRE: ${Date.now() - totalStartTime}ms`)
     
     // Sadece ürünleri filtrele (SERIAL_NUMBER olan kayıtlar)
-    const products = filteredRecords.filter(r => r.SERIAL_NUMBER)
+    const products = result.recordset.filter(r => r.SERIAL_NUMBER)
     
     return {
       success: true,
       data: {
-        allRecords: filteredRecords,
+        allRecords: result.recordset,
         products: products,
-        totalCount: filteredRecords.length,
+        totalCount: result.recordset.length,
         productCount: products.length
       }
     }
