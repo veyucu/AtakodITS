@@ -106,24 +106,6 @@ const PTSPage = () => {
     setTimeout(() => setMessage(null), 5000)
   }
 
-  // İndirme modalını kapat ve listeyi yenile
-  const closeDownloadModal = useCallback(() => {
-    setShowDownloadModal(false)
-    // Liste yenile
-    handleListPackages()
-  }, [handleListPackages])
-
-  // ESC tuşu ile modal kapatma
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape' && showDownloadModal) {
-        closeDownloadModal()
-      }
-    }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [showDownloadModal, closeDownloadModal])
-
   // Tarih validasyonu - geçersiz tarihleri kontrol et
   const isValidDate = (dateString) => {
     if (!dateString) return false
@@ -200,6 +182,24 @@ const PTSPage = () => {
       setLoading(false)
     }
   }, [startDate, endDate, dateFilterType])
+
+  // İndirme modalını kapat ve listeyi yenile
+  const closeDownloadModal = useCallback(() => {
+    setShowDownloadModal(false)
+    // Liste yenile
+    handleListPackages()
+  }, [handleListPackages])
+
+  // ESC tuşu ile modal kapatma
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && showDownloadModal) {
+        closeDownloadModal()
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [showDownloadModal, closeDownloadModal])
 
   // Sayfa yüklendiğinde otomatik listeleme
   useEffect(() => {
