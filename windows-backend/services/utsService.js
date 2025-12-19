@@ -1,0 +1,225 @@
+import { getConnection } from '../config/database.js'
+import { fixObjectStrings } from '../utils/stringUtils.js'
+
+/**
+ * UTS (Ürün Takip Sistemi) işlemleri servisi
+ */
+const utsService = {
+  /**
+   * UTS Kayıtlarını Getir
+   */
+  async getRecords(subeKodu, belgeNo, straInc) {
+    try {
+      const pool = await getConnection()
+      
+      const query = `
+        SELECT
+          RECNO,
+          SERI_NO,
+          LOT_NO,
+          MIKTAR,
+          STOK_KODU,
+          GTIN AS BARKOD,
+          URETIM_TARIHI,
+          HAR_RECNO,
+          FATIRS_NO,
+          FTIRSIP,
+          CARI_KODU,
+          KAYIT_TARIHI,
+          DURUM,
+          KULLANICI
+        FROM AKTBLITSUTS WITH (NOLOCK)
+        WHERE FATIRS_NO = @belgeNo
+          AND HAR_RECNO = @straInc
+          AND TURU = 'UTS'
+        ORDER BY RECNO
+      `
+      
+      const request = pool.request()
+      request.input('belgeNo', belgeNo)
+      request.input('straInc', straInc)
+      
+      const result = await request.query(query)
+      
+      const records = result.recordset.map(row => fixObjectStrings({
+        siraNo: row.RECNO,
+        recno: row.RECNO,
+        seriNo: row.SERI_NO || '',
+        lot: row.LOT_NO || '',
+        miktar: row.MIKTAR || 1,
+        stokKodu: row.STOK_KODU,
+        barkod: row.BARKOD,
+        uretimTarihi: row.URETIM_TARIHI,
+        harRecno: row.HAR_RECNO,
+        fatirs_no: row.FATIRS_NO,
+        ftirsip: row.FTIRSIP,
+        cariKodu: row.CARI_KODU,
+        kayitTarihi: row.KAYIT_TARIHI,
+        durum: row.DURUM,
+        kullanici: row.KULLANICI
+      }))
+      
+      return records
+    } catch (error) {
+      console.error('❌ UTS Kayıtları Getirme Hatası:', error)
+      throw error
+    }
+  },
+
+  /**
+   * UTS Kayıt Ekle/Güncelle (Toplu)
+   */
+  async saveRecords(params) {
+    const {
+      records,
+      originalRecords,
+      documentId,
+      itemId,
+      stokKodu,
+      belgeTip,
+      gckod,
+      belgeNo,
+      belgeTarihi,
+      docType,
+      expectedQuantity,
+      barcode,
+      cariKodu,
+      kullanici
+    } = params
+
+    try {
+      const pool = await getConnection()
+      
+      // Silinecek kayıtları tespit et
+      const newIds = new Set(records.map(r => r.id))
+      const deletedRecords = originalRecords.filter(r => !newIds.has(r.id))
+      
+      // Önce silinen kayıtları sil
+      for (const record of deletedRecords) {
+        const deleteQuery = `
+          DELETE FROM AKTBLITSUTS
+          WHERE FATIRS_NO = @belgeNo
+            AND HAR_RECNO = @harRecno
+            AND RECNO = @recno
+            AND TURU = 'UTS'
+        `
+        
+        const deleteRequest = pool.request()
+        deleteRequest.input('belgeNo', belgeNo)
+        deleteRequest.input('harRecno', itemId)
+        deleteRequest.input('recno', record.siraNo || record.recno)
+        
+        await deleteRequest.query(deleteQuery)
+      }
+
+      // Yeni ve güncellenmiş kayıtları işle
+      for (const record of records) {
+        // Üretim tarihini YYMMDD formatına çevir
+        let uretimTarihiYYMMDD = ''
+        if (record.uretimTarihiDisplay && record.uretimTarihiDisplay.includes('-')) {
+          const [yyyy, mm, dd] = record.uretimTarihiDisplay.split('-')
+          uretimTarihiYYMMDD = `${yyyy.substring(2, 4)}${mm}${dd}`
+        }
+
+        if (record.isNew || String(record.id).startsWith('new_')) {
+          // Yeni kayıt ekle
+          const insertQuery = `
+            INSERT INTO AKTBLITSUTS (
+              SERI_NO, LOT_NO, MIKTAR, STOK_KODU, GTIN,
+              URETIM_TARIHI, HAR_RECNO, FATIRS_NO, FTIRSIP,
+              CARI_KODU, TURU, KAYIT_TARIHI, DURUM, KULLANICI
+            ) VALUES (
+              @seriNo, @lot, @miktar, @stokKodu, @gtin,
+              @uretimTarihi, @harRecno, @belgeNo, @ftirsip,
+              @cariKodu, 'UTS', GETDATE(), 'A', @kullanici
+            )
+          `
+          
+          const insertRequest = pool.request()
+          insertRequest.input('seriNo', record.seriNo || '')
+          insertRequest.input('lot', record.lot || '')
+          insertRequest.input('miktar', record.miktar || 1)
+          insertRequest.input('stokKodu', stokKodu)
+          insertRequest.input('gtin', barcode || stokKodu)
+          insertRequest.input('uretimTarihi', uretimTarihiYYMMDD)
+          insertRequest.input('harRecno', itemId)
+          insertRequest.input('belgeNo', belgeNo)
+          insertRequest.input('ftirsip', docType)
+          insertRequest.input('cariKodu', cariKodu || '')
+          insertRequest.input('kullanici', kullanici || 'SYSTEM')
+          
+          await insertRequest.query(insertQuery)
+        } else {
+          // Mevcut kaydı güncelle
+          const updateQuery = `
+            UPDATE AKTBLITSUTS
+            SET SERI_NO = @seriNo,
+                LOT_NO = @lot,
+                MIKTAR = @miktar,
+                URETIM_TARIHI = @uretimTarihi,
+                KULLANICI = @kullanici
+            WHERE FATIRS_NO = @belgeNo
+              AND HAR_RECNO = @harRecno
+              AND RECNO = @recno
+              AND TURU = 'UTS'
+          `
+          
+          const updateRequest = pool.request()
+          updateRequest.input('seriNo', record.seriNo || '')
+          updateRequest.input('lot', record.lot || '')
+          updateRequest.input('miktar', record.miktar || 1)
+          updateRequest.input('uretimTarihi', uretimTarihiYYMMDD)
+          updateRequest.input('belgeNo', belgeNo)
+          updateRequest.input('harRecno', itemId)
+          updateRequest.input('recno', record.siraNo || record.recno)
+          updateRequest.input('kullanici', kullanici || 'SYSTEM')
+          
+          await updateRequest.query(updateQuery)
+        }
+      }
+
+      return { 
+        success: true, 
+        message: `${records.length} UTS kaydı başarıyla işlendi` 
+      }
+    } catch (error) {
+      console.error('❌ UTS Kayıt Hatası:', error)
+      throw error
+    }
+  },
+
+  /**
+   * UTS Kayıtlarını Sil
+   */
+  async deleteRecords(records, belgeNo, straInc) {
+    try {
+      const pool = await getConnection()
+      
+      for (const record of records) {
+        const query = `
+          DELETE FROM AKTBLITSUTS
+          WHERE FATIRS_NO = @belgeNo
+            AND HAR_RECNO = @straInc
+            AND RECNO = @recno
+            AND TURU = 'UTS'
+        `
+        
+        const request = pool.request()
+        request.input('recno', record.siraNo || record.recno)
+        request.input('belgeNo', belgeNo)
+        request.input('straInc', straInc)
+        
+        await request.query(query)
+      }
+      
+      return { success: true, deletedCount: records.length }
+      
+    } catch (error) {
+      console.error('❌ UTS Kayıt Silme Hatası:', error)
+      throw error
+    }
+  }
+}
+
+export default utsService
+
