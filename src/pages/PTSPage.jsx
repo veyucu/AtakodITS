@@ -5,6 +5,7 @@ import { AgGridReact } from 'ag-grid-react'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import apiService from '../services/apiService'
+import usePageTitle from '../hooks/usePageTitle'
 
 // Badge Renderer - Dark Theme
 const BadgeRenderer = ({ value, type = 'default' }) => {
@@ -13,9 +14,9 @@ const BadgeRenderer = ({ value, type = 'default' }) => {
     adet: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     default: 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
   }
-  
+
   if (!value && value !== 0) return null
-  
+
   return (
     <span className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold ${styles[type]}`}>
       {value}
@@ -24,16 +25,17 @@ const BadgeRenderer = ({ value, type = 'default' }) => {
 }
 
 const PTSPage = () => {
+  usePageTitle('PTS')
   const navigate = useNavigate()
   const location = useLocation()
   const gridRef = useRef(null)
-  
+
   // Dashboard'dan mı gelindi kontrolü
   const fromDashboard = location.state?.fromDashboard === true
-  
+
   // Bugünün tarihi
   const today = new Date().toISOString().split('T')[0]
-  
+
   // LocalStorage'dan tarih ayarlarını oku (Dashboard'dan gelindiyse bugünü kullan)
   const getStoredValue = (key, defaultValue) => {
     if (fromDashboard) {
@@ -46,24 +48,24 @@ const PTSPage = () => {
       return defaultValue
     }
   }
-  
+
   const [message, setMessage] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [startDate, setStartDate] = useState(() => 
+  const [startDate, setStartDate] = useState(() =>
     getStoredValue('pts_startDate', today)
   )
-  const [endDate, setEndDate] = useState(() => 
+  const [endDate, setEndDate] = useState(() =>
     getStoredValue('pts_endDate', today)
   )
-  const [dateFilterType, setDateFilterType] = useState(() => 
+  const [dateFilterType, setDateFilterType] = useState(() =>
     getStoredValue('pts_dateFilterType', 'document') // Varsayılan: Belge Tarihi
   )
   const [listData, setListData] = useState([]) // Grid için liste verisi
-  const [searchText, setSearchText] = useState(() => 
+  const [searchText, setSearchText] = useState(() =>
     fromDashboard ? '' : getStoredValue('pts_searchText', '')
   ) // Arama metni
   const [initialLoadDone, setInitialLoadDone] = useState(false) // İlk yükleme kontrolü
-  
+
   // İndirme modal state
   const [showDownloadModal, setShowDownloadModal] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState({
@@ -114,9 +116,9 @@ const PTSPage = () => {
     if (isNaN(date.getTime())) return false
     // Girilen tarih ile parse edilen tarih aynı mı kontrol et
     const [year, month, day] = dateString.split('-').map(Number)
-    return date.getFullYear() === year && 
-           date.getMonth() === month - 1 && 
-           date.getDate() === day
+    return date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day
   }
 
   // Tarih değiştirme handler'ları
@@ -251,10 +253,10 @@ const PTSPage = () => {
         failed: 0,
         status: 'searching'
       })
-      
+
       // Önce kaç paket var öğren
       const searchResponse = await apiService.searchPackages(startDate, endDate)
-      
+
       if (!searchResponse.success) {
         setDownloadProgress(prev => ({
           ...prev,
@@ -264,7 +266,7 @@ const PTSPage = () => {
       }
 
       const transferIds = searchResponse.data || []
-      
+
       if (transferIds.length === 0) {
         setDownloadProgress(prev => ({
           ...prev,
@@ -283,8 +285,8 @@ const PTSPage = () => {
 
       // SSE ile real-time progress
       await apiService.downloadBulkPackagesStream(
-        startDate, 
-        endDate, 
+        startDate,
+        endDate,
         (progressData) => {
           // Her progress güncellemesinde state'i güncelle
           setDownloadProgress({
@@ -297,9 +299,9 @@ const PTSPage = () => {
           })
         }
       )
-      
+
       // Mesaj kaldırıldı - modal'da zaten gösteriliyor
-      
+
     } catch (error) {
       console.error('Toplu paket indirme hatası:', error)
       setDownloadProgress(prev => ({
@@ -326,18 +328,18 @@ const PTSPage = () => {
     if (!searchText.trim()) return listData
 
     const searchLower = searchText.toLowerCase().trim()
-    
+
     return listData.filter(item => {
       // Transfer ID, Belge No, Source GLN ve Cari İsim'de ara
       const transferId = (item.TRANSFER_ID || '').toString().toLowerCase()
       const documentNumber = (item.DOCUMENT_NUMBER || '').toString().toLowerCase()
       const sourceGln = (item.SOURCE_GLN || '').toString().toLowerCase()
       const cariIsim = (item.SOURCE_GLN_NAME || '').toString().toLowerCase()
-      
+
       return transferId.includes(searchLower) ||
-             documentNumber.includes(searchLower) ||
-             sourceGln.includes(searchLower) ||
-             cariIsim.includes(searchLower)
+        documentNumber.includes(searchLower) ||
+        sourceGln.includes(searchLower) ||
+        cariIsim.includes(searchLower)
     })
   }, [listData, searchText])
 
@@ -491,7 +493,7 @@ const PTSPage = () => {
                 <Truck className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-lg font-bold text-slate-100 flex-shrink-0">PTS</h1>
-              
+
               {/* Arama Input */}
               <div className="relative flex-1 ml-4 mr-6">
                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -568,12 +570,11 @@ const PTSPage = () => {
       {/* Toast Notification - Sağ Üst Köşe */}
       {message && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right duration-300">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl border backdrop-blur-sm min-w-[300px] max-w-[450px] ${
-            message.type === 'success' ? 'bg-emerald-900/90 text-emerald-100 border-emerald-500/50' :
-            message.type === 'error' ? 'bg-rose-900/90 text-rose-100 border-rose-500/50' :
-            message.type === 'warning' ? 'bg-amber-900/90 text-amber-100 border-amber-500/50' :
-            'bg-primary-900/90 text-primary-100 border-primary-500/50'
-          }`}>
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl border backdrop-blur-sm min-w-[300px] max-w-[450px] ${message.type === 'success' ? 'bg-emerald-900/90 text-emerald-100 border-emerald-500/50' :
+              message.type === 'error' ? 'bg-rose-900/90 text-rose-100 border-rose-500/50' :
+                message.type === 'warning' ? 'bg-amber-900/90 text-amber-100 border-amber-500/50' :
+                  'bg-primary-900/90 text-primary-100 border-primary-500/50'
+            }`}>
             {/* İkon */}
             <div className="flex-shrink-0">
               {message.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400" />}
@@ -585,7 +586,7 @@ const PTSPage = () => {
             {/* Mesaj */}
             <span className="flex-1 text-sm font-medium">{message.text.replace(/^[⚠️❌✅ℹ️]+\s*/, '')}</span>
             {/* Kapat Butonu */}
-            <button 
+            <button
               onClick={() => setMessage(null)}
               className="flex-shrink-0 p-1 rounded hover:bg-white/10 transition-colors"
             >
@@ -770,19 +771,16 @@ const PTSPage = () => {
                   </div>
 
                   {/* Başarısız */}
-                  <div className={`rounded-lg p-3 text-center border ${
-                    downloadProgress.failed > 0 
-                      ? 'bg-rose-500/20 border-rose-500/30' 
+                  <div className={`rounded-lg p-3 text-center border ${downloadProgress.failed > 0
+                      ? 'bg-rose-500/20 border-rose-500/30'
                       : 'bg-dark-700/50 border-dark-600'
-                  }`}>
-                    <div className={`text-2xl font-bold ${
-                      downloadProgress.failed > 0 ? 'text-rose-400' : 'text-slate-600'
                     }`}>
+                    <div className={`text-2xl font-bold ${downloadProgress.failed > 0 ? 'text-rose-400' : 'text-slate-600'
+                      }`}>
                       {downloadProgress.failed}
                     </div>
-                    <div className={`text-xs mt-1 ${
-                      downloadProgress.failed > 0 ? 'text-rose-500' : 'text-slate-600'
-                    }`}>
+                    <div className={`text-xs mt-1 ${downloadProgress.failed > 0 ? 'text-rose-500' : 'text-slate-600'
+                      }`}>
                       Hatalı
                     </div>
                   </div>

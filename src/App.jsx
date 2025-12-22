@@ -9,6 +9,7 @@ import PTSPage from './pages/PTSPage'
 import PTSDetailPage from './pages/PTSDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import MesajKodlariPage from './pages/MesajKodlariPage'
+import UsersPage from './pages/UsersPage'
 
 function App() {
   return (
@@ -78,6 +79,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute>
+                <UsersPage />
               </ProtectedRoute>
             }
           />

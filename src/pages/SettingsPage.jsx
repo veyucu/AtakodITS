@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings, Save, Eye, EyeOff, Home, RefreshCw } from 'lucide-react'
 import apiService from '../services/apiService'
+import usePageTitle from '../hooks/usePageTitle'
 
 const DEFAULT_SETTINGS = {
   // ITS Ayarları
@@ -25,38 +26,69 @@ const DEFAULT_SETTINGS = {
   itsPaketIndirUrl: '/pts/app/GetPackage',
   itsPaketGonderUrl: '/pts/app/SendPackage',
   itsDogrulamaUrl: '/reference/app/verification',
-  
+
+  // UTS Ayarları
+  utsId: '',
+  utsWebServiceUrl: 'https://utsuygulama.saglik.gov.tr',
+  utsVermeBildirimiUrl: '/UTS/uh/rest/bildirim/verme/ekle',
+  utsVermeIptalBildirimiUrl: '/UTS/uh/rest/bildirim/verme/iptal',
+  utsAlmaBildirimiUrl: '/UTS/uh/rest/bildirim/alma/ekle',
+  utsFirmaSorgulaUrl: '/UTS/rest/kurum/firmaSorgula',
+  utsUrunSorgulaUrl: '/UTS/rest/tibbiCihaz/urunSorgula',
+  utsBekleyenleriSorgulaUrl: '/UTS/uh/rest/bildirim/alma/bekleyenler/sorgula',
+  utsBildirimSorgulaUrl: '/UTS/uh/rest/bildirim/sorgula/offset',
+  utsStokYapilabilirTekilUrunSorgulaUrl: '/UTS/uh/rest/stokYapilabilirTekilUrun/sorgula',
+
   // ERP Ayarları
   erpWebServiceUrl: 'http://localhost:5000',
-  
+
   // Ürün Ayarları
   urunBarkodBilgisi: 'STOK_KODU',
   urunItsBilgisi: "TBLSTSABIT.KOD_5='BESERI'",
   urunUtsBilgisi: "TBLSTSABIT.KOD_5='UTS'",
-  
+
   // Cari Ayarları
   cariGlnBilgisi: 'TBLCASABIT.EMAIL',
   cariUtsBilgisi: 'TBLCASABITEK.KULL3S'
 }
 
 const SettingsPage = () => {
+  usePageTitle('Ayarlar')
   const navigate = useNavigate()
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState(null)
   const [activeTab, setActiveTab] = useState('its')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // localStorage'dan ayarları yükle
-    const savedSettings = localStorage.getItem('appSettings')
-    if (savedSettings) {
+    // Veritabanından ayarları yükle
+    const loadSettings = async () => {
       try {
-        const parsed = JSON.parse(savedSettings)
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed })
+        const result = await apiService.getSettings()
+        if (result.success) {
+          setSettings({ ...DEFAULT_SETTINGS, ...result.data })
+        } else {
+          // Fallback: localStorage'dan yükle
+          const savedSettings = localStorage.getItem('appSettings')
+          if (savedSettings) {
+            setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) })
+          }
+        }
       } catch (error) {
         console.error('Ayarlar yüklenirken hata:', error)
+        // Fallback: localStorage
+        const savedSettings = localStorage.getItem('appSettings')
+        if (savedSettings) {
+          try {
+            setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) })
+          } catch (e) { }
+        }
+      } finally {
+        setLoading(false)
       }
     }
+    loadSettings()
   }, [])
 
   const handleChange = (field, value) => {
@@ -70,10 +102,10 @@ const SettingsPage = () => {
     try {
       // LocalStorage'a kaydet
       localStorage.setItem('appSettings', JSON.stringify(settings))
-      
+
       // Backend'e de kaydet
       await apiService.saveSettings(settings)
-      
+
       setMessage({ type: 'success', text: '✅ Ayarlar başarıyla kaydedildi!' })
       setTimeout(() => setMessage(null), 3000)
     } catch (error) {
@@ -151,11 +183,10 @@ const SettingsPage = () => {
       {/* Message */}
       {message && (
         <div className="container mx-auto px-6 mt-4">
-          <div className={`p-4 rounded-lg border ${
-            message.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+          <div className={`p-4 rounded-lg border ${message.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
             message.type === 'error' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
-            'bg-primary-500/20 text-primary-400 border-primary-500/30'
-          }`}>
+              'bg-primary-500/20 text-primary-400 border-primary-500/30'
+            }`}>
             {message.text}
           </div>
         </div>
@@ -168,31 +199,37 @@ const SettingsPage = () => {
           <div className="flex border-b border-dark-700">
             <button
               onClick={() => setActiveTab('its')}
-              className={`flex-1 px-6 py-4 font-semibold transition-colors ${
-                activeTab === 'its'
-                  ? 'text-primary-400 border-b-2 border-primary-500 bg-dark-700/50'
-                  : 'text-slate-400 hover:bg-dark-700/30'
-              }`}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors ${activeTab === 'its'
+                ? 'text-primary-400 border-b-2 border-primary-500 bg-dark-700/50'
+                : 'text-slate-400 hover:bg-dark-700/30'
+                }`}
             >
               🔐 ITS Ayarları
             </button>
             <button
+              onClick={() => setActiveTab('uts')}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors ${activeTab === 'uts'
+                ? 'text-rose-400 border-b-2 border-rose-500 bg-dark-700/50'
+                : 'text-slate-400 hover:bg-dark-700/30'
+                }`}
+            >
+              🔴 UTS Ayarları
+            </button>
+            <button
               onClick={() => setActiveTab('erp')}
-              className={`flex-1 px-6 py-4 font-semibold transition-colors ${
-                activeTab === 'erp'
-                  ? 'text-primary-400 border-b-2 border-primary-500 bg-dark-700/50'
-                  : 'text-slate-400 hover:bg-dark-700/30'
-              }`}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors ${activeTab === 'erp'
+                ? 'text-primary-400 border-b-2 border-primary-500 bg-dark-700/50'
+                : 'text-slate-400 hover:bg-dark-700/30'
+                }`}
             >
               🖥️ ERP Ayarları
             </button>
             <button
               onClick={() => setActiveTab('mapping')}
-              className={`flex-1 px-6 py-4 font-semibold transition-colors ${
-                activeTab === 'mapping'
-                  ? 'text-primary-400 border-b-2 border-primary-500 bg-dark-700/50'
-                  : 'text-slate-400 hover:bg-dark-700/30'
-              }`}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors ${activeTab === 'mapping'
+                ? 'text-primary-400 border-b-2 border-primary-500 bg-dark-700/50'
+                : 'text-slate-400 hover:bg-dark-700/30'
+                }`}
             >
               🔗 Alan Eşleştirmeleri
             </button>
@@ -205,7 +242,7 @@ const SettingsPage = () => {
           {activeTab === 'its' && (
             <div>
               <h2 className="text-xl font-bold text-slate-100 mb-6">ITS Web Servis Ayarları</h2>
-              
+
               {/* Temel Bilgiler */}
               <div className="grid grid-cols-2 gap-6 mb-8">
                 <InputField
@@ -278,6 +315,49 @@ const SettingsPage = () => {
             </div>
           )}
 
+          {/* UTS Ayarları */}
+          {activeTab === 'uts' && (
+            <div>
+              <h2 className="text-xl font-bold text-slate-100 mb-6">UTS Web Servis Ayarları</h2>
+
+              {/* UTS ID */}
+              <div className="mb-8">
+                <InputField
+                  label="UTS ID"
+                  field="utsId"
+                  placeholder="Systemfed20222-7305-4225-bb27-89a7d28b68aa"
+                  required
+                />
+                <p className="text-sm text-slate-500 mt-1">
+                  Sağlık Bakanlığı tarafından verilen UTS kimlik numarası (System ile başlar)
+                </p>
+              </div>
+
+              {/* Web Servis Adresi */}
+              <div className="mb-8">
+                <InputField
+                  label="UTS Web Servis Adresi"
+                  field="utsWebServiceUrl"
+                  placeholder="https://utsuygulama.saglik.gov.tr"
+                  required
+                />
+              </div>
+
+              {/* Endpoint URL'leri */}
+              <h3 className="text-lg font-bold text-slate-200 mb-4 mt-8">Endpoint URL'leri</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <InputField label="Verme Bildirimi URL" field="utsVermeBildirimiUrl" placeholder="/UTS/uh/rest/bildirim/verme/ekle" />
+                <InputField label="Verme İptal Bildirimi URL" field="utsVermeIptalBildirimiUrl" placeholder="/UTS/uh/rest/bildirim/verme/iptal" />
+                <InputField label="Alma Bildirimi URL" field="utsAlmaBildirimiUrl" placeholder="/UTS/uh/rest/bildirim/alma/ekle" />
+                <InputField label="Firma Sorgula URL" field="utsFirmaSorgulaUrl" placeholder="/UTS/rest/kurum/firmaSorgula" />
+                <InputField label="Ürün Sorgula URL" field="utsUrunSorgulaUrl" placeholder="/UTS/rest/tibbiCihaz/urunSorgula" />
+                <InputField label="Bekleyenler Sorgula URL" field="utsBekleyenleriSorgulaUrl" placeholder="/UTS/uh/rest/bildirim/alma/bekleyenler/sorgula" />
+                <InputField label="Bildirim Sorgula URL" field="utsBildirimSorgulaUrl" placeholder="/UTS/uh/rest/bildirim/sorgula/offset" />
+                <InputField label="Stok Yapılabilir Tekil Ürün URL" field="utsStokYapilabilirTekilUrunSorgulaUrl" placeholder="/UTS/uh/rest/stokYapilabilirTekilUrun/sorgula" />
+              </div>
+            </div>
+          )}
+
           {/* ERP Ayarları */}
           {activeTab === 'erp' && (
             <div>
@@ -298,7 +378,7 @@ const SettingsPage = () => {
           {activeTab === 'mapping' && (
             <div>
               <h2 className="text-xl font-bold text-slate-100 mb-6">Veritabanı Alan Eşleştirmeleri</h2>
-              
+
               {/* Ürün Ayarları */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
@@ -329,7 +409,7 @@ const SettingsPage = () => {
                       ITS takibi gereken ürünleri belirleyen SQL koşulu (TBLSTSABIT veya TBLSTSABITEK)
                     </p>
                   </div>
-                  
+
                   <div>
                     <InputField
                       label="Ürün UTS Bilgisi (SQL Koşulu)"
@@ -359,7 +439,7 @@ const SettingsPage = () => {
                       Cari GLN numarasının bulunduğu alan (TBLCASABIT veya TBLCASABITEK)
                     </p>
                   </div>
-                  
+
                   <div>
                     <InputField
                       label="Cari UTS Bilgisi (Tablo.Kolon)"

@@ -58,6 +58,75 @@ const apiService = {
     }
   },
 
+  // Login - Kullanıcı girişi
+  login: async (username, password) => {
+    try {
+      const response = await apiClient.post('/auth/login', { username, password })
+      return response.data
+    } catch (error) {
+      console.error('Login error:', error)
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Giriş başarısız'
+      }
+    }
+  },
+
+  // Kullanıcı Listesi
+  getUsers: async () => {
+    try {
+      const response = await apiClient.get('/auth/users')
+      return response.data
+    } catch (error) {
+      console.error('Get users error:', error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  // Kullanıcı Ekle
+  createUser: async (userData) => {
+    try {
+      const response = await apiClient.post('/auth/users', userData)
+      return response.data
+    } catch (error) {
+      console.error('Create user error:', error)
+      return { success: false, error: error.response?.data?.error || error.message }
+    }
+  },
+
+  // Kullanıcı Güncelle
+  updateUser: async (id, userData) => {
+    try {
+      const response = await apiClient.put(`/auth/users/${id}`, userData)
+      return response.data
+    } catch (error) {
+      console.error('Update user error:', error)
+      return { success: false, error: error.response?.data?.error || error.message }
+    }
+  },
+
+  // Kullanıcı Sil
+  deleteUser: async (id) => {
+    try {
+      const response = await apiClient.delete(`/auth/users/${id}`)
+      return response.data
+    } catch (error) {
+      console.error('Delete user error:', error)
+      return { success: false, error: error.response?.data?.error || error.message }
+    }
+  },
+
+  // Şifre Değiştir
+  changeUserPassword: async (id, password) => {
+    try {
+      const response = await apiClient.put(`/auth/users/${id}/password`, { password })
+      return response.data
+    } catch (error) {
+      console.error('Change password error:', error)
+      return { success: false, error: error.response?.data?.error || error.message }
+    }
+  },
+
   // Get all documents (tarih zorunlu)
   getDocuments: async (date) => {
     try {

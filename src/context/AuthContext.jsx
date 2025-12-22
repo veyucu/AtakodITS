@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import usersData from '../data/users.json'
+import apiService from '../services/apiService'
 
 const AuthContext = createContext(null)
 
@@ -29,22 +29,26 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const login = async (username, password) => {
-    // JSON'dan kullanıcıları kontrol et
-    const foundUser = usersData.users.find(
-      u => u.username === username && u.password === password
-    )
+    try {
+      // API üzerinden login
+      const result = await apiService.login(username, password)
 
-    if (foundUser) {
-      // Şifreyi kaldır (güvenlik için)
-      const { password: _, ...userWithoutPassword } = foundUser
-      setUser(userWithoutPassword)
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword))
-      return { success: true, user: userWithoutPassword }
-    }
+      if (result.success) {
+        setUser(result.user)
+        localStorage.setItem('user', JSON.stringify(result.user))
+        return { success: true, user: result.user }
+      }
 
-    return { 
-      success: false, 
-      error: 'Kullanıcı adı veya şifre hatalı!' 
+      return {
+        success: false,
+        error: result.error || 'Kullanıcı adı veya şifre hatalı!'
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      return {
+        success: false,
+        error: 'Giriş işlemi sırasında bir hata oluştu'
+      }
     }
   }
 
@@ -67,25 +71,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

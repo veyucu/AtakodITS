@@ -7,16 +7,25 @@ import {
   ArrowRight,
   Truck,
   Settings,
-  MessageSquare
+  MessageSquare,
+  Users
 } from 'lucide-react'
+import usePageTitle from '../hooks/usePageTitle'
 
 const Dashboard = () => {
+  usePageTitle('Ana Menü')
   const navigate = useNavigate()
   const { user, logout } = useAuth()
 
   const handleLogout = () => {
     logout()
     navigate('/login')
+  }
+
+  // Yetki kontrolü
+  const hasPermission = (permKey) => {
+    if (!user?.permissions) return true // Eski kullanıcılar için varsayılan
+    return user.permissions[permKey] === true
   }
 
   return (
@@ -65,78 +74,111 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <button
-            onClick={() => navigate('/documents')}
-            className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-violet-500/50 hover:shadow-violet-500/10"
-          >
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-16 h-16 bg-violet-500/20 rounded-xl flex items-center justify-center group-hover:bg-violet-600 transition-colors border border-violet-500/30">
-                  <Package className="w-8 h-8 text-violet-400 group-hover:text-white transition-colors" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Ürün Hazırlama */}
+          {hasPermission('urunHazirlama') && (
+            <button
+              onClick={() => navigate('/documents')}
+              className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-violet-500/50 hover:shadow-violet-500/10"
+            >
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-16 h-16 bg-violet-500/20 rounded-xl flex items-center justify-center group-hover:bg-violet-600 transition-colors border border-violet-500/30">
+                    <Package className="w-8 h-8 text-violet-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-violet-400 transition-colors" />
                 </div>
-                <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-violet-400 transition-colors" />
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100 mb-1">Ürün Hazırlama</h3>
+                  <p className="text-sm text-slate-500">Ürün hazırlama işlemlerini başlat</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-100 mb-1">Ürün Hazırlama</h3>
-                <p className="text-sm text-slate-500">Ürün hazırlama işlemlerini başlat</p>
-              </div>
-            </div>
-          </button>
+            </button>
+          )}
 
-          <button
-            onClick={() => navigate('/pts', { state: { fromDashboard: true } })}
-            className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-primary-500/50 hover:shadow-primary-500/10"
-          >
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-16 h-16 bg-primary-500/20 rounded-xl flex items-center justify-center group-hover:bg-primary-600 transition-colors border border-primary-500/30">
-                  <Truck className="w-8 h-8 text-primary-400 group-hover:text-white transition-colors" />
+          {/* PTS */}
+          {hasPermission('pts') && (
+            <button
+              onClick={() => navigate('/pts', { state: { fromDashboard: true } })}
+              className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-primary-500/50 hover:shadow-primary-500/10"
+            >
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-16 h-16 bg-primary-500/20 rounded-xl flex items-center justify-center group-hover:bg-primary-600 transition-colors border border-primary-500/30">
+                    <Truck className="w-8 h-8 text-primary-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-primary-400 transition-colors" />
                 </div>
-                <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-primary-400 transition-colors" />
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100 mb-1">PTS</h3>
+                  <p className="text-sm text-slate-500">Paket Transfer Sistemi</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-100 mb-1">PTS</h3>
-                <p className="text-sm text-slate-500">Paket Transfer Sistemi</p>
-              </div>
-            </div>
-          </button>
+            </button>
+          )}
 
-          <button
-            onClick={() => navigate('/mesaj-kodlari')}
-            className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-indigo-500/50 hover:shadow-indigo-500/10"
-          >
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-16 h-16 bg-indigo-500/20 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 transition-colors border border-indigo-500/30">
-                  <MessageSquare className="w-8 h-8 text-indigo-400 group-hover:text-white transition-colors" />
+          {/* Mesaj Kodları */}
+          {hasPermission('mesajKodlari') && (
+            <button
+              onClick={() => navigate('/mesaj-kodlari')}
+              className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-indigo-500/50 hover:shadow-indigo-500/10"
+            >
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-16 h-16 bg-indigo-500/20 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 transition-colors border border-indigo-500/30">
+                    <MessageSquare className="w-8 h-8 text-indigo-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-indigo-400 transition-colors" />
                 </div>
-                <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-indigo-400 transition-colors" />
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100 mb-1">Mesaj Kodları</h3>
+                  <p className="text-sm text-slate-500">ITS cevap kodları yönetimi</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-100 mb-1">Mesaj Kodları</h3>
-                <p className="text-sm text-slate-500">ITS cevap kodları yönetimi</p>
-              </div>
-            </div>
-          </button>
+            </button>
+          )}
 
-          <button
-            onClick={() => navigate('/settings')}
-            className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-amber-500/50 hover:shadow-amber-500/10"
-          >
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-16 h-16 bg-amber-500/20 rounded-xl flex items-center justify-center group-hover:bg-amber-600 transition-colors border border-amber-500/30">
-                  <Settings className="w-8 h-8 text-amber-400 group-hover:text-white transition-colors" />
+          {/* Ayarlar */}
+          {hasPermission('ayarlar') && (
+            <button
+              onClick={() => navigate('/settings')}
+              className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-amber-500/50 hover:shadow-amber-500/10"
+            >
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-16 h-16 bg-amber-500/20 rounded-xl flex items-center justify-center group-hover:bg-amber-600 transition-colors border border-amber-500/30">
+                    <Settings className="w-8 h-8 text-amber-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-amber-400 transition-colors" />
                 </div>
-                <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-amber-400 transition-colors" />
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100 mb-1">Ayarlar</h3>
+                  <p className="text-sm text-slate-500">ITS ve ERP entegrasyon ayarları</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-100 mb-1">Ayarlar</h3>
-                <p className="text-sm text-slate-500">ITS ve ERP entegrasyon ayarları</p>
+            </button>
+          )}
+
+          {/* Kullanıcılar */}
+          {hasPermission('kullanicilar') && (
+            <button
+              onClick={() => navigate('/users')}
+              className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-rose-500/50 hover:shadow-rose-500/10"
+            >
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-16 h-16 bg-rose-500/20 rounded-xl flex items-center justify-center group-hover:bg-rose-600 transition-colors border border-rose-500/30">
+                    <Users className="w-8 h-8 text-rose-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-rose-400 transition-colors" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100 mb-1">Kullanıcılar</h3>
+                  <p className="text-sm text-slate-500">Kullanıcı ve yetki yönetimi</p>
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+          )}
         </div>
       </main>
     </div>

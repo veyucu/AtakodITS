@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { LogIn, User, Lock, AlertCircle, Eye, EyeOff, Package } from 'lucide-react'
+import usePageTitle from '../hooks/usePageTitle'
 
 const LoginPage = () => {
+  usePageTitle('Giriş')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  
+
   const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
@@ -23,7 +25,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    
+
     // Validasyon
     if (!username.trim() || !password.trim()) {
       setError('Lütfen tüm alanları doldurun')
@@ -35,13 +37,13 @@ const LoginPage = () => {
     // Login işlemi
     setTimeout(async () => {
       const result = await login(username, password)
-      
+
       if (result.success) {
         navigate('/dashboard', { replace: true })
       } else {
         setError(result.error)
       }
-      
+
       setLoading(false)
     }, 800)
   }

@@ -5,12 +5,14 @@ import {
     ArrowLeft, RefreshCw, Download, MessageSquare, AlertTriangle
 } from 'lucide-react'
 import apiService from '../services/apiService'
+import usePageTitle from '../hooks/usePageTitle'
 
 /**
  * Mesaj Kodları Sayfası
  * ITS cevap kodlarını listeler ve günceller
  */
 const MesajKodlariPage = () => {
+    usePageTitle('Mesaj Kodları')
     const navigate = useNavigate()
     const gridRef = useRef(null)
     const [loading, setLoading] = useState(false)
@@ -138,8 +140,8 @@ const MesajKodlariPage = () => {
                 {/* Mesaj */}
                 {message && (
                     <div className={`mb-4 px-4 py-3 rounded-lg border ${message.type === 'error'
-                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                        : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                         }`}>
                         <p className="font-medium">{message.text}</p>
                     </div>

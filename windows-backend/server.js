@@ -5,8 +5,10 @@ import documentsRouter from './routes/documents.js';
 import ptsRouter from './routes/pts.js';
 import itsRouter from './routes/its.js';
 import settingsRouter from './routes/settings.js';
+import authRouter from './routes/authRoutes.js';
 import * as ptsDbService from './services/ptsDbService.js';
 import * as itsDbService from './services/itsDbService.js';
+import * as authDbService from './services/authDbService.js';
 
 dotenv.config();
 
@@ -43,6 +45,7 @@ app.use('/api/documents', documentsRouter);
 app.use('/api/pts', ptsRouter);
 app.use('/api/its', itsRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/auth', authRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -82,6 +85,16 @@ async function startServer() {
       console.log('✅ ITS tabloları hazır');
     } else {
       console.error('⚠️ ITS tabloları oluşturulamadı:', itsTablesResult.error);
+    }
+
+    // Auth tablolarını oluştur (AKTBLKULLANICI, AKTBLAYAR)
+    console.log('📋 Auth tabloları kontrol ediliyor...');
+    const authTablesResult = await authDbService.createTablesIfNotExists();
+
+    if (authTablesResult.success) {
+      console.log('✅ Auth tabloları hazır');
+    } else {
+      console.error('⚠️ Auth tabloları oluşturulamadı:', authTablesResult.error);
     }
 
     // Server'ı başlat

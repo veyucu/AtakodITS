@@ -5,8 +5,10 @@ import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import { Package, Search, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle, AlertCircle, Home } from 'lucide-react'
 import apiService from '../services/apiService'
+import usePageTitle from '../hooks/usePageTitle'
 
 const DocumentsPage = () => {
+  usePageTitle('Ürün Hazırlama')
   const navigate = useNavigate()
   const gridRef = useRef(null)
 
