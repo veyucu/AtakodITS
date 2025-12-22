@@ -21,14 +21,14 @@ const carrierService = {
 
     try {
       const pool = await getConnection()
-      
+
       // Koli içerisindeki ürünleri TBLPTSTRA'dan al
       const carrierProducts = await getCarrierProductsRecursive(carrierLabel)
-      
+
       if (!carrierProducts || carrierProducts.length === 0) {
-        return { 
-          success: false, 
-          message: 'Bu koli barkodu ile ürün bulunamadı' 
+        return {
+          success: false,
+          message: 'Bu koli barkodu ile ürün bulunamadı'
         }
       }
 
@@ -39,23 +39,23 @@ const carrierService = {
           SELECT COUNT(*) as count
           FROM AKTBLITSUTS WITH (NOLOCK)
           WHERE SERI_NO = @seriNo
-            AND TURU = 'ITS'
+            AND TURU = 'I'
         `
-        
+
         const checkRequest = pool.request()
         checkRequest.input('seriNo', product.seriNo)
-        
+
         const checkResult = await checkRequest.query(checkQuery)
-        
+
         if (checkResult.recordset[0].count > 0) {
           duplicates.push(product.seriNo)
         }
       }
 
       if (duplicates.length > 0) {
-        return { 
-          success: false, 
-          message: `Bu kolide daha önce kayıtlı seri numaraları var: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}` 
+        return {
+          success: false,
+          message: `Bu kolide daha önce kayıtlı seri numaraları var: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}`
         }
       }
 
@@ -81,19 +81,19 @@ const carrierService = {
         })
 
         if (!matchingItem) {
-          return { 
-            success: false, 
-            message: `Bu koli içindeki ürün (${gtin}) belgede bulunamadı` 
+          return {
+            success: false,
+            message: `Bu koli içindeki ürün (${gtin}) belgede bulunamadı`
           }
         }
 
         const remainingQty = matchingItem.quantity - (matchingItem.okutulan || 0)
-        
+
         // Kalan miktar 0 veya altındaysa eklemeye izin verme
         if (remainingQty <= 0) {
-          return { 
-            success: false, 
-            message: `${matchingItem.productName} için okutulacak ürün kalmadı (Tamamlandı)` 
+          return {
+            success: false,
+            message: `${matchingItem.productName} için okutulacak ürün kalmadı (Tamamlandı)`
           }
         }
 
@@ -110,7 +110,7 @@ const carrierService = {
 
         for (const product of carrierProducts) {
           const gtin = product.gtin?.replace(/^0+/, '') || ''
-          
+
           // Matching item'ı bul
           const matchingItem = items.find(item => {
             const itemGtin = (item.barcode || item.stokKodu || '').replace(/^0+/, '')
@@ -128,8 +128,8 @@ const carrierService = {
             ) VALUES (
               @seriNo, @stokKodu, @gtin, @miad, @lot,
               @harRecno, @fatirs_no, @ftirsip, @cariKodu,
-              @carrierLabel, 'CARRIER',
-              'ITS', GETDATE(), 'A', @kullanici
+              @carrierLabel, 'C',
+              'I', GETDATE(), 'A', @kullanici
             )
           `
 
@@ -137,7 +137,18 @@ const carrierService = {
           insertRequest.input('seriNo', product.seriNo)
           insertRequest.input('stokKodu', matchingItem.stokKodu)
           insertRequest.input('gtin', gtin)
-          insertRequest.input('miad', product.miad || '')
+
+          // MIAD'ı YYMMDD string'den Date tipine dönüştür
+          let miadDate = null
+          if (product.miad && product.miad.length === 6) {
+            const yy = product.miad.substring(0, 2)
+            const mm = product.miad.substring(2, 4)
+            const dd = product.miad.substring(4, 6)
+            const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+            miadDate = new Date(`${yyyy}-${mm}-${dd}`)
+          }
+          insertRequest.input('miad', sql.Date, miadDate)
+
           insertRequest.input('lot', product.lot || '')
           insertRequest.input('harRecno', matchingItem.straInc)
           insertRequest.input('fatirs_no', belgeNo)
@@ -152,8 +163,8 @@ const carrierService = {
 
         await transaction.commit()
 
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: `${savedCount} ürün koliden başarıyla kaydedildi`,
           savedCount,
           affectedGtins,
@@ -175,12 +186,12 @@ const carrierService = {
   async deleteCarrierRecords(carrierLabel, docId) {
     try {
       const pool = await getConnection()
-      
+
       // docId'yi parse et (format: SUBE_KODU-FTIRSIP-FATIRS_NO)
       const parts = docId.split('-')
       const ftirsip = parts[1]
       const belgeNo = parts[2]
-      
+
       // Önce bu koli barkoduna sahip kayıtları ve GTIN bilgilerini al
       const selectQuery = `
         SELECT GTIN, COUNT(*) as COUNT
@@ -188,25 +199,25 @@ const carrierService = {
         WHERE CARRIER_LABEL = @carrierLabel
           AND FATIRS_NO = @belgeNo
           AND FTIRSIP = @ftirsip
-          AND TURU = 'ITS'
+          AND TURU = 'I'
         GROUP BY GTIN
       `
-      
+
       const selectRequest = pool.request()
       selectRequest.input('carrierLabel', carrierLabel)
       selectRequest.input('belgeNo', belgeNo)
       selectRequest.input('ftirsip', ftirsip)
-      
+
       const selectResult = await selectRequest.query(selectQuery)
-      
+
       if (selectResult.recordset.length === 0) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           message: 'Bu koli barkodu ile kayıt bulunamadı',
-          deletedCount: 0 
+          deletedCount: 0
         }
       }
-      
+
       // GTIN bazında silinen miktarları topla
       const gtinCounts = {}
       let totalRecords = 0
@@ -214,34 +225,34 @@ const carrierService = {
         gtinCounts[row.GTIN] = row.COUNT
         totalRecords += row.COUNT
       })
-      
+
       // Kayıtları sil
       const deleteQuery = `
         DELETE FROM AKTBLITSUTS
         WHERE CARRIER_LABEL = @carrierLabel
           AND FATIRS_NO = @belgeNo
           AND FTIRSIP = @ftirsip
-          AND TURU = 'ITS'
+          AND TURU = 'I'
       `
-      
+
       const deleteRequest = pool.request()
       deleteRequest.input('carrierLabel', carrierLabel)
       deleteRequest.input('belgeNo', belgeNo)
       deleteRequest.input('ftirsip', ftirsip)
-      
+
       await deleteRequest.query(deleteQuery)
-      
+
       // Etkilenen GTIN'leri döndür (temizlenmiş haliyle)
       const affectedGtins = Object.keys(gtinCounts)
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         deletedCount: totalRecords,
         affectedGtins,
         gtinCounts,
         message: `${totalRecords} ürün koliden silindi`
       }
-      
+
     } catch (error) {
       console.error('❌ Koli Silme Hatası:', error)
       throw error

@@ -101,10 +101,10 @@ const UTSModal = ({
 
   // Yeni satır ekle
   const handleAddNewRow = () => {
-    const maxSiraNo = records.length > 0 
-      ? Math.max(...records.map(r => r.siraNo || 0)) 
+    const maxSiraNo = records.length > 0
+      ? Math.max(...records.map(r => r.siraNo || 0))
       : 0
-    
+
     const newRow = {
       id: `new_${Date.now()}`,
       siraNo: maxSiraNo + 1,
@@ -115,7 +115,7 @@ const UTSModal = ({
       miktar: 1,
       isNew: true
     }
-    
+
     setRecords([...records, newRow])
     setHasChanges(true)
   }
@@ -133,13 +133,13 @@ const UTSModal = ({
 
     const selectedIds = new Set(selectedRecords.map(r => r.id))
     const remainingRecords = records.filter(r => !selectedIds.has(r.id))
-    
+
     // Sıra numaralarını yeniden düzenle
     const reindexedRecords = remainingRecords.map((r, index) => ({
       ...r,
       siraNo: index + 1
     }))
-    
+
     setRecords(reindexedRecords)
     setSelectedRecords([])
     setHasChanges(true)
@@ -150,7 +150,7 @@ const UTSModal = ({
   const handleSaveAll = async () => {
     try {
       // Validasyonlar
-      const validRows = records.filter(row => 
+      const validRows = records.filter(row =>
         row.lot?.trim() || row.seriNo?.trim() || row.miktar > 0
       )
 
@@ -265,12 +265,12 @@ const UTSModal = ({
         if (response.success) {
           const enrichedRecords = (response.data || []).map(record => {
             let uretimTarihiDisplay = ''
-            if (record.uretimTarihi && record.uretimTarihi.length === 6) {
-              const yy = record.uretimTarihi.substring(0, 2)
-              const mm = record.uretimTarihi.substring(2, 4)
-              const dd = record.uretimTarihi.substring(4, 6)
-              const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
-              uretimTarihiDisplay = `${yyyy}-${mm}-${dd}`
+            if (record.uretimTarihi) {
+              // DATE tipinden gelen tarih (ISO string)
+              const date = new Date(record.uretimTarihi)
+              if (!isNaN(date.getTime())) {
+                uretimTarihiDisplay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+              }
             }
             return { ...record, uretimTarihiDisplay }
           })
@@ -308,13 +308,13 @@ const UTSModal = ({
   const totalMiktar = records.reduce((sum, r) => sum + (r.miktar || 0), 0)
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       onClick={handleClose}
       onKeyDown={(e) => e.key === 'Escape' && handleClose()}
     >
-      <div 
-        className="bg-white rounded-xl shadow-2xl w-[90%] max-w-5xl max-h-[80vh] overflow-hidden" 
+      <div
+        className="bg-white rounded-xl shadow-2xl w-[90%] max-w-5xl max-h-[80vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -351,13 +351,12 @@ const UTSModal = ({
         <div className="p-6 flex flex-col" style={{ height: 'calc(80vh - 100px)' }}>
           {/* Toast Message */}
           {modalMessage && (
-            <div className={`mb-4 px-4 py-3 rounded-lg shadow-lg border-l-4 animate-pulse ${
-              modalMessage.type === 'success'
-                ? 'bg-green-50 border-green-500 text-green-800'
-                : modalMessage.type === 'error'
+            <div className={`mb-4 px-4 py-3 rounded-lg shadow-lg border-l-4 animate-pulse ${modalMessage.type === 'success'
+              ? 'bg-green-50 border-green-500 text-green-800'
+              : modalMessage.type === 'error'
                 ? 'bg-red-50 border-red-500 text-red-800'
                 : 'bg-yellow-50 border-yellow-500 text-yellow-800'
-            }`}>
+              }`}>
               <p className="font-semibold">{modalMessage.text}</p>
             </div>
           )}

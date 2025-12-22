@@ -15,13 +15,13 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'AtakodITS Backend is running',
     timestamp: new Date().toISOString()
   });
@@ -29,7 +29,7 @@ app.get('/api/health', (req, res) => {
 
 // Test endpoint
 app.get('/api/test', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Test endpoint working!',
     data: {
       version: '1.0.0',
@@ -46,18 +46,18 @@ app.use('/api/settings', settingsRouter);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: 'Not Found',
-    message: `Cannot ${req.method} ${req.path}` 
+    message: `Cannot ${req.method} ${req.path}`
   });
 });
 
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal Server Error',
-    message: err.message 
+    message: err.message
   });
 });
 
@@ -67,28 +67,28 @@ async function startServer() {
     // PTS tablolarını oluştur (varsa kontrol et)
     console.log('📋 PTS tabloları kontrol ediliyor...');
     const ptsTablesResult = await ptsDbService.createTablesIfNotExists();
-    
+
     if (ptsTablesResult.success) {
       console.log('✅ PTS tabloları hazır');
     } else {
       console.error('⚠️ PTS tabloları oluşturulamadı:', ptsTablesResult.error);
     }
-    
+
     // ITS tablolarını oluştur (varsa kontrol et)
     console.log('📋 ITS tabloları kontrol ediliyor...');
     const itsTablesResult = await itsDbService.createTablesIfNotExists();
-    
+
     if (itsTablesResult.success) {
       console.log('✅ ITS tabloları hazır');
     } else {
       console.error('⚠️ ITS tabloları oluşturulamadı:', itsTablesResult.error);
     }
-    
+
     // Server'ı başlat
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-});
+    app.listen(PORT, () => {
+      console.log(`🚀 Server is running on http://localhost:${PORT}`);
+      console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
+    });
   } catch (error) {
     console.error('❌ Server başlatma hatası:', error);
     process.exit(1);

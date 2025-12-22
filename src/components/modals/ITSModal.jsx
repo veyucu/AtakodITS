@@ -55,6 +55,17 @@ const ITSModal = ({
       headerName: 'MIAD',
       field: 'miad',
       width: 100,
+      valueFormatter: (params) => {
+        if (!params.value) return ''
+        // DATE tipinden gelen tarih (ISO string)
+        const date = new Date(params.value)
+        if (!isNaN(date.getTime())) {
+          const mm = String(date.getMonth() + 1).padStart(2, '0')
+          const yy = String(date.getFullYear()).slice(-2)
+          return `${mm}/${yy}` // MM/YY formatında göster
+        }
+        return ''
+      },
       cellClass: 'text-center font-mono'
     },
     {
@@ -104,13 +115,38 @@ const ITSModal = ({
   // ITS Karekodları Text Formatında Oluştur
   const generateBarcodeTexts = () => {
     return records.map(record => {
+      // MIAD'ı YYMMDD formatına çevir
+      let miadFormatted = ''
+      if (record.miad) {
+        try {
+          // ISO string'den tarihi parse et: "2028-09-29T21:00:00.000Z"
+          const miadStr = String(record.miad)
+          if (miadStr.includes('T') || miadStr.includes('-')) {
+            // ISO format: YYYY-MM-DDTHH:mm:ss.sssZ veya YYYY-MM-DD
+            const datePart = miadStr.split('T')[0] // "2028-09-29"
+            const parts = datePart.split('-') // ["2028", "09", "29"]
+            if (parts.length === 3) {
+              const yy = parts[0].slice(-2) // "28"
+              const mm = parts[1] // "09"
+              const dd = parts[2] // "29"
+              miadFormatted = `${yy}${mm}${dd}` // "280929"
+            }
+          } else if (miadStr.length === 6) {
+            // Zaten YYMMDD formatında
+            miadFormatted = miadStr
+          }
+        } catch (e) {
+          console.error('MIAD parse error:', e)
+        }
+      }
+
       const parts = [
-        '010',
+        '01',
         record.barkod || '',
         '21',
         record.seriNo || '',
         '17',
-        record.miad || '',
+        miadFormatted,
         '10',
         record.lot || ''
       ]
@@ -212,13 +248,13 @@ const ITSModal = ({
   if (!isOpen || !selectedItem) return null
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       onClick={onClose}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
-      <div 
-        className="bg-white rounded-xl shadow-2xl w-[90%] max-w-5xl max-h-[80vh] overflow-hidden" 
+      <div
+        className="bg-white rounded-xl shadow-2xl w-[90%] max-w-5xl max-h-[80vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -253,21 +289,19 @@ const ITSModal = ({
           <div className="flex items-center gap-2 mb-4">
             <button
               onClick={() => setModalView('grid')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                modalView === 'grid'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${modalView === 'grid'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               📊 Grid Görünümü
             </button>
             <button
               onClick={() => setModalView('text')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                modalView === 'text'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${modalView === 'text'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               📝 Metin Görünümü
             </button>

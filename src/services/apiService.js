@@ -64,17 +64,17 @@ const apiService = {
       if (!date) {
         throw new Error('Tarih parametresi zorunludur')
       }
-      
+
       const response = await apiClient.get(`/documents?date=${date}`)
       // Backend { success: true, documents: [...] } formatında dönüyor
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: response.data.documents || []
       }
     } catch (error) {
       console.error('Get documents error:', error)
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: error.message || 'Dökümanlar alınamadı',
         data: []
       }
@@ -94,9 +94,9 @@ const apiService = {
     } catch (error) {
       console.error('❌ Get document error:', error)
       console.error('❌ Error response:', error.response?.data)
-      return { 
-        success: false, 
-        message: error.message || 'Döküman alınamadı' 
+      return {
+        success: false,
+        message: error.message || 'Döküman alınamadı'
       }
     }
   },
@@ -105,15 +105,15 @@ const apiService = {
   updateDocumentStatus: async (id, status) => {
     try {
       const response = await apiClient.patch(`/documents/${id}/status`, { status })
-      return { 
-        success: true, 
-        data: response.data 
+      return {
+        success: true,
+        data: response.data
       }
     } catch (error) {
       console.error('Update status error:', error)
-      return { 
-        success: false, 
-        message: error.message || 'Durum güncellenemedi' 
+      return {
+        success: false,
+        message: error.message || 'Durum güncellenemedi'
       }
     }
   },
@@ -122,18 +122,18 @@ const apiService = {
   updateItemPreparedStatus: async (documentId, itemId, isPrepared) => {
     try {
       const response = await apiClient.patch(
-        `/documents/${documentId}/items/${itemId}`, 
+        `/documents/${documentId}/items/${itemId}`,
         { isPrepared }
       )
-      return { 
-        success: true, 
-        data: response.data 
+      return {
+        success: true,
+        data: response.data
       }
     } catch (error) {
       console.error('Update item error:', error)
-      return { 
-        success: false, 
-        message: error.message || 'Ürün durumu güncellenemedi' 
+      return {
+        success: false,
+        message: error.message || 'Ürün durumu güncellenemedi'
       }
     }
   },
@@ -142,15 +142,15 @@ const apiService = {
   searchProductByBarcode: async (barcode) => {
     try {
       const response = await apiClient.get(`/products/search?barcode=${barcode}`)
-      return { 
-        success: true, 
-        data: response.data 
+      return {
+        success: true,
+        data: response.data
       }
     } catch (error) {
       console.error('Search product error:', error)
-      return { 
-        success: false, 
-        message: error.message || 'Ürün bulunamadı' 
+      return {
+        success: false,
+        message: error.message || 'Ürün bulunamadı'
       }
     }
   },
@@ -332,7 +332,7 @@ const apiService = {
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
         const url = `${API_URL}/pts/download-bulk-stream`
-        
+
         log('📥 SSE Toplu paket indirme başlıyor:', startDate, endDate)
 
         fetch(url, {
@@ -364,7 +364,7 @@ const apiService = {
                     const data = JSON.parse(line.slice(6))
                     log('📊 SSE Progress:', data)
                     onProgress(data)
-                    
+
                     if (data.status === 'completed') {
                       log('✅ İndirme tamamlandı:', data)
                       resolve({ success: true, data })
@@ -482,7 +482,7 @@ const apiService = {
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
       if (dateFilterType) params.append('dateFilterType', dateFilterType)
-      
+
       // Ayarlardan kolon adlarını ekle
       if (settings?.itsSettings?.cariGlnColumn) {
         params.append('cariGlnColumn', settings.itsSettings.cariGlnColumn)
@@ -490,9 +490,9 @@ const apiService = {
       if (settings?.itsSettings?.stockBarcodeColumn) {
         params.append('stockBarcodeColumn', settings.itsSettings.stockBarcodeColumn)
       }
-      
+
       log('📋 API isteği:', { startDate, endDate, dateFilterType, cariGlnColumn: settings?.itsSettings?.cariGlnColumn })
-      
+
       const response = await apiClient.get(`/pts/database/list?${params.toString()}`)
       return response.data
     } catch (error) {
@@ -549,10 +549,10 @@ const apiService = {
   listPTSPackages: async (startDate, endDate, dateFilterType = 'created') => {
     try {
       log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
-      const response = await apiClient.post('/pts/list', { 
-        startDate, 
-        endDate, 
-        dateFilterType 
+      const response = await apiClient.post('/pts/list', {
+        startDate,
+        endDate,
+        dateFilterType
       })
       log('✅ PTS listesi alındı:', response.data)
       return response.data
@@ -587,10 +587,171 @@ const apiService = {
       console.error('Save settings error:', error)
       throw error
     }
+  },
+
+  // PTS Bildirimi Gönder
+  sendPTSNotification: async (documentId, kullanici, settings = null) => {
+    try {
+      log('📤 PTS Bildirimi gönderiliyor:', { documentId, kullanici })
+      const response = await apiClient.post(`/documents/${documentId}/pts-notification`, {
+        kullanici,
+        settings
+      })
+      log('✅ PTS Bildirimi yanıtı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS Bildirimi hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'PTS bildirimi gönderilemedi'
+      }
+    }
+  },
+
+  // PTS XML Önizleme (web servise göndermeden)
+  previewPTSNotification: async (documentId, kullanici, note = '', settings = null) => {
+    try {
+      log('📝 PTS XML Önizleme isteniyor:', { documentId, kullanici, note })
+      const response = await apiClient.post(`/documents/${documentId}/pts-preview`, {
+        kullanici,
+        note,
+        settings
+      })
+      log('✅ PTS XML Önizleme yanıtı:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS XML Önizleme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'XML oluşturulamadı'
+      }
+    }
+  },
+
+  // Belgedeki Tüm ITS Kayıtlarını Getir
+  getAllITSRecordsForDocument: async (documentId, cariKodu) => {
+    try {
+      log('📋 Belgedeki tüm ITS kayıtları getiriliyor:', documentId, cariKodu)
+      const response = await apiClient.get(`/documents/${documentId}/its-all-records?cariKodu=${encodeURIComponent(cariKodu)}`)
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS kayıtları getirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'ITS kayıtları alınamadı',
+        data: []
+      }
+    }
+  },
+
+  // ==================== ITS BİLDİRİM İŞLEMLERİ ====================
+
+  // ITS Satış Bildirimi
+  itsSatisBildirimi: async (documentId, karsiGlnNo, products, settings = null) => {
+    try {
+      log('📤 ITS Satış Bildirimi gönderiliyor:', { documentId, productCount: products?.length })
+      const response = await apiClient.post(`/documents/${documentId}/its-satis-bildirimi`, {
+        karsiGlnNo,
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Satış Bildirimi hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Satış bildirimi gönderilemedi'
+      }
+    }
+  },
+
+  // ITS Satış İptal Bildirimi
+  itsSatisIptalBildirimi: async (documentId, karsiGlnNo, products, settings = null) => {
+    try {
+      log('🔴 ITS Satış İptal gönderiliyor:', { documentId, productCount: products?.length })
+      const response = await apiClient.post(`/documents/${documentId}/its-satis-iptal`, {
+        karsiGlnNo,
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Satış İptal hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Satış iptal bildirimi gönderilemedi'
+      }
+    }
+  },
+
+  // ITS Doğrulama
+  itsDogrulama: async (documentId, products, settings = null) => {
+    try {
+      log('🔍 ITS Doğrulama gönderiliyor:', { documentId, productCount: products?.length })
+      const response = await apiClient.post(`/documents/${documentId}/its-dogrulama`, {
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Doğrulama hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Doğrulama başarısız'
+      }
+    }
+  },
+
+  // ITS Başarısız Ürünleri Sorgula
+  itsBasarisizSorgula: async (documentId, products, settings = null) => {
+    try {
+      log('❓ ITS Başarısız Sorgulama gönderiliyor:', { documentId, productCount: products?.length })
+      const response = await apiClient.post(`/documents/${documentId}/its-basarisiz-sorgula`, {
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Başarısız Sorgulama hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Sorgulama başarısız'
+      }
+    }
+  },
+
+  // ==================== MESAJ KODLARI ====================
+
+  // Tüm mesaj kodlarını getir
+  getMesajKodlari: async () => {
+    try {
+      log('📋 Mesaj kodları getiriliyor...')
+      const response = await apiClient.get('/its/mesaj-kodlari')
+      return response.data
+    } catch (error) {
+      console.error('❌ Mesaj kodları getirme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Mesaj kodları alınamadı',
+        data: []
+      }
+    }
+  },
+
+  // ITS'den mesaj kodlarını güncelle
+  guncellemMesajKodlari: async (settings = null) => {
+    try {
+      log('🔄 Mesaj kodları güncelleniyor...')
+      const response = await apiClient.post('/its/mesaj-kodlari/guncelle', { settings })
+      return response.data
+    } catch (error) {
+      console.error('❌ Mesaj kodları güncelleme hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Mesaj kodları güncellenemedi'
+      }
+    }
   }
 }
 
 export default apiService
-
-
-

@@ -11,7 +11,7 @@ const utsService = {
   async getRecords(subeKodu, belgeNo, straInc) {
     try {
       const pool = await getConnection()
-      
+
       const query = `
         SELECT
           RECNO,
@@ -31,16 +31,16 @@ const utsService = {
         FROM AKTBLITSUTS WITH (NOLOCK)
         WHERE FATIRS_NO = @belgeNo
           AND HAR_RECNO = @straInc
-          AND TURU = 'UTS'
+          AND TURU = 'U'
         ORDER BY RECNO
       `
-      
+
       const request = pool.request()
       request.input('belgeNo', belgeNo)
       request.input('straInc', straInc)
-      
+
       const result = await request.query(query)
-      
+
       const records = result.recordset.map(row => fixObjectStrings({
         siraNo: row.RECNO,
         recno: row.RECNO,
@@ -58,7 +58,7 @@ const utsService = {
         durum: row.DURUM,
         kullanici: row.KULLANICI
       }))
-      
+
       return records
     } catch (error) {
       console.error('❌ UTS Kayıtları Getirme Hatası:', error)
@@ -89,11 +89,11 @@ const utsService = {
 
     try {
       const pool = await getConnection()
-      
+
       // Silinecek kayıtları tespit et
       const newIds = new Set(records.map(r => r.id))
       const deletedRecords = originalRecords.filter(r => !newIds.has(r.id))
-      
+
       // Önce silinen kayıtları sil
       for (const record of deletedRecords) {
         const deleteQuery = `
@@ -101,14 +101,14 @@ const utsService = {
           WHERE FATIRS_NO = @belgeNo
             AND HAR_RECNO = @harRecno
             AND RECNO = @recno
-            AND TURU = 'UTS'
+            AND TURU = 'U'
         `
-        
+
         const deleteRequest = pool.request()
         deleteRequest.input('belgeNo', belgeNo)
         deleteRequest.input('harRecno', itemId)
         deleteRequest.input('recno', record.siraNo || record.recno)
-        
+
         await deleteRequest.query(deleteQuery)
       }
 
@@ -131,10 +131,10 @@ const utsService = {
             ) VALUES (
               @seriNo, @lot, @miktar, @stokKodu, @gtin,
               @uretimTarihi, @harRecno, @belgeNo, @ftirsip,
-              @cariKodu, 'UTS', GETDATE(), 'A', @kullanici
+              @cariKodu, 'U', GETDATE(), 'A', @kullanici
             )
           `
-          
+
           const insertRequest = pool.request()
           insertRequest.input('seriNo', record.seriNo || '')
           insertRequest.input('lot', record.lot || '')
@@ -147,7 +147,7 @@ const utsService = {
           insertRequest.input('ftirsip', docType)
           insertRequest.input('cariKodu', cariKodu || '')
           insertRequest.input('kullanici', kullanici || 'SYSTEM')
-          
+
           await insertRequest.query(insertQuery)
         } else {
           // Mevcut kaydı güncelle
@@ -161,9 +161,9 @@ const utsService = {
             WHERE FATIRS_NO = @belgeNo
               AND HAR_RECNO = @harRecno
               AND RECNO = @recno
-              AND TURU = 'UTS'
+              AND TURU = 'U'
           `
-          
+
           const updateRequest = pool.request()
           updateRequest.input('seriNo', record.seriNo || '')
           updateRequest.input('lot', record.lot || '')
@@ -173,14 +173,14 @@ const utsService = {
           updateRequest.input('harRecno', itemId)
           updateRequest.input('recno', record.siraNo || record.recno)
           updateRequest.input('kullanici', kullanici || 'SYSTEM')
-          
+
           await updateRequest.query(updateQuery)
         }
       }
 
-      return { 
-        success: true, 
-        message: `${records.length} UTS kaydı başarıyla işlendi` 
+      return {
+        success: true,
+        message: `${records.length} UTS kaydı başarıyla işlendi`
       }
     } catch (error) {
       console.error('❌ UTS Kayıt Hatası:', error)
@@ -194,26 +194,26 @@ const utsService = {
   async deleteRecords(records, belgeNo, straInc) {
     try {
       const pool = await getConnection()
-      
+
       for (const record of records) {
         const query = `
           DELETE FROM AKTBLITSUTS
           WHERE FATIRS_NO = @belgeNo
             AND HAR_RECNO = @straInc
             AND RECNO = @recno
-            AND TURU = 'UTS'
+            AND TURU = 'U'
         `
-        
+
         const request = pool.request()
         request.input('recno', record.siraNo || record.recno)
         request.input('belgeNo', belgeNo)
         request.input('straInc', straInc)
-        
+
         await request.query(query)
       }
-      
+
       return { success: true, deletedCount: records.length }
-      
+
     } catch (error) {
       console.error('❌ UTS Kayıt Silme Hatası:', error)
       throw error

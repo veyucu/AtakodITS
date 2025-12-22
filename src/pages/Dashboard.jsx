@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { 
-  Package, 
-  LogOut, 
-  User, 
+import {
+  Package,
+  LogOut,
+  User,
   ArrowRight,
   Truck,
-  Settings
+  Settings,
+  MessageSquare
 } from 'lucide-react'
 
 const Dashboard = () => {
@@ -48,7 +49,7 @@ const Dashboard = () => {
                   <p className="text-xs text-slate-500">{user?.role}</p>
                 </div>
               </div>
-              
+
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-rose-500/30"
@@ -64,7 +65,7 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <button
             onClick={() => navigate('/documents')}
             className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-violet-500/50 hover:shadow-violet-500/10"
@@ -97,6 +98,24 @@ const Dashboard = () => {
               <div>
                 <h3 className="text-xl font-bold text-slate-100 mb-1">PTS</h3>
                 <p className="text-sm text-slate-500">Paket Transfer Sistemi</p>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/mesaj-kodlari')}
+            className="bg-dark-800/60 backdrop-blur-sm rounded-xl shadow-dark-lg transition-all p-8 text-left group border border-dark-700 hover:border-indigo-500/50 hover:shadow-indigo-500/10"
+          >
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-16 h-16 bg-indigo-500/20 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 transition-colors border border-indigo-500/30">
+                  <MessageSquare className="w-8 h-8 text-indigo-400 group-hover:text-white transition-colors" />
+                </div>
+                <ArrowRight className="w-6 h-6 text-slate-600 group-hover:text-indigo-400 transition-colors" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-100 mb-1">Mesaj Kodları</h3>
+                <p className="text-sm text-slate-500">ITS cevap kodları yönetimi</p>
               </div>
             </div>
           </button>

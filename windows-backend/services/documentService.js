@@ -13,16 +13,16 @@ const documentService = {
   async getAllDocuments(date) {
     try {
       const pool = await getConnection()
-      
+
       // Tarih zorunlu
       if (!date) {
         throw new Error('Tarih filtresi zorunludur')
       }
-      
+
       // Filtre WHERE koşulları
       const additionalWhere = ` AND CAST(V.TARIH AS DATE) = @filterDate`
       const params = { filterDate: date }
-      
+
       const query = `
         SELECT
           V.SUBE_KODU,
@@ -99,13 +99,13 @@ const documentService = {
           ON (V.CARI_KODU=CE.CARI_KOD)
         ORDER BY V.TARIH DESC, V.FATIRS_NO DESC
       `
-      
+
       // Parametreleri ekle
       const request = pool.request()
       request.input('filterDate', params.filterDate)
-      
+
       const result = await request.query(query)
-      
+
       // Veriyi frontend için uygun formata çevir
       const documents = result.recordset.map((row, index) => {
         // Türkçe karakterleri önce düzelt (SQL'den gelen raw data)
@@ -132,8 +132,8 @@ const documentService = {
           UTS_COUNT: row.UTS_COUNT || 0,
           DGR_COUNT: row.DGR_COUNT || 0
         }
-        
-        
+
+
         const doc = {
           id: `${fixedRow.SUBE_KODU}-${fixedRow.FTIRSIP}-${fixedRow.FATIRS_NO}`,
           subeKodu: fixedRow.SUBE_KODU,
@@ -158,13 +158,13 @@ const documentService = {
           okutulan: fixedRow.OKUTULAN || 0,
           kalan: fixedRow.KALAN || 0,
           preparedItems: fixedRow.OKUTULAN || 0,
-          status: fixedRow.OKUTULAN === 0 ? 'pending' : 
-                  fixedRow.OKUTULAN < fixedRow.MIKTAR ? 'preparing' : 'completed'
+          status: fixedRow.OKUTULAN === 0 ? 'pending' :
+            fixedRow.OKUTULAN < fixedRow.MIKTAR ? 'preparing' : 'completed'
         }
-        
+
         return doc
       })
-      
+
       return documents
     } catch (error) {
       console.error('Belgeler getirme hatası:', error)
@@ -177,23 +177,23 @@ const documentService = {
     try {
       log('📄 getDocumentById çağrıldı:', { subeKodu, ftirsip, fatirs_no })
       const pool = await getConnection()
-      
+
       // Ayarlardan GLN ve UTS kolon bilgilerini al
       const settings = await settingsService.getSettings()
       const glnInfo = settingsService.parseColumnInfo(settings.cariGlnBilgisi || 'TBLCASABIT.EMAIL')
       const utsInfo = settingsService.parseColumnInfo(settings.cariUtsBilgisi || 'TBLCASABITEK.KULL3S')
-      
-      log('🔧 Ayarlar:', { 
-        glnTable: glnInfo.table, 
+
+      log('🔧 Ayarlar:', {
+        glnTable: glnInfo.table,
         glnColumn: glnInfo.column,
         utsTable: utsInfo.table,
-        utsColumn: utsInfo.column 
+        utsColumn: utsInfo.column
       })
-      
+
       // Dinamik kolon isimleri
       const glnColumn = glnInfo.table === 'TBLCASABIT' ? `C.${glnInfo.column}` : `CE.${glnInfo.column}`
       const utsColumn = utsInfo.table === 'TBLCASABIT' ? `C.${utsInfo.column}` : `CE.${utsInfo.column}`
-      
+
       // Belge detayı için sorgu
       const detailQuery = `
         SELECT
@@ -214,7 +214,10 @@ const documentService = {
           CAST(V.KAYITTARIHI AS DATETIME) AS KAYIT_TARIHI,
           V.MIKTAR,
           ISNULL(V.OKUTULAN,0) AS OKUTULAN,
-          V.MIKTAR - ISNULL(V.OKUTULAN,0) AS KALAN
+          V.MIKTAR - ISNULL(V.OKUTULAN,0) AS KALAN,
+          V.PTS_ID,
+          V.PTS_TARIH,
+          V.PTS_KULLANICI
         FROM
         (
           SELECT 
@@ -226,6 +229,9 @@ const documentService = {
             A.FATKALEM_ADEDI AS KALEM,
             A.CARI_KODU,
             A.KAYITTARIHI,
+            NULL AS PTS_ID,
+            NULL AS PTS_TARIH,
+            NULL AS PTS_KULLANICI,
             (SELECT SUM(STHAR_GCMIK) FROM TBLSIPATRA X WITH (NOLOCK) WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS MIKTAR,
             (SELECT SUM(Y.MIKTAR) FROM TBLSIPATRA X WITH (NOLOCK) INNER JOIN AKTBLITSUTS Y WITH (NOLOCK) ON (X.FISNO = Y.FATIRS_NO AND X.INCKEYNO = Y.HAR_RECNO AND X.STOK_KODU=Y.STOK_KODU AND X.STHAR_FTIRSIP = Y.FTIRSIP)
             WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN
@@ -244,6 +250,9 @@ const documentService = {
             A.FATKALEM_ADEDI AS KALEM,
             A.CARI_KODU,
             A.KAYITTARIHI,
+            A.PTS_ID,
+            A.PTS_TARIH,
+            A.PTS_KULLANICI,
             (SELECT SUM(STHAR_GCMIK) FROM TBLSTHAR X WITH (NOLOCK) WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS MIKTAR,
             (SELECT SUM(Y.MIKTAR) FROM TBLSTHAR X WITH (NOLOCK) INNER JOIN AKTBLITSUTS Y WITH (NOLOCK) ON (X.FISNO = Y.FATIRS_NO AND X.INCKEYNO = Y.HAR_RECNO AND X.STOK_KODU=Y.STOK_KODU AND X.STHAR_FTIRSIP = Y.FTIRSIP)
             WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN
@@ -261,27 +270,27 @@ const documentService = {
           TBLCASABITEK CE WITH (NOLOCK)
           ON (V.CARI_KODU=CE.CARI_KOD)
       `
-      
+
       const request = pool.request()
       request.input('subeKodu', subeKodu)
       request.input('ftirsip', ftirsip)
       request.input('fatirs_no', fatirs_no)
-      
+
       const result = await request.query(detailQuery)
       log('📊 SQL Sonuç sayısı:', result.recordset.length)
-      
+
       if (result.recordset.length === 0) {
         log('❌ Belge bulunamadı')
         return null
       }
-      
+
       const row = result.recordset[0]
       log('✅ Belge bulundu:', { FATIRS_NO: row.FATIRS_NO, CARI_ISIM: row.CARI_ISIM })
-      
+
       // Belge kalemlerini getir
       const items = await this.getDocumentItems(subeKodu, ftirsip, fatirs_no, row.CARI_KODU)
       log('📦 Kalem sayısı:', items.length)
-      
+
       // Türkçe karakterleri düzelt
       const fixedRow = {
         SUBE_KODU: row.SUBE_KODU,
@@ -301,9 +310,12 @@ const documentService = {
         KAYIT_TARIHI: row.KAYIT_TARIHI,
         MIKTAR: row.MIKTAR,
         OKUTULAN: row.OKUTULAN,
-        KALAN: row.KALAN
+        KALAN: row.KALAN,
+        PTS_ID: row.PTS_ID,
+        PTS_TARIH: row.PTS_TARIH,
+        PTS_KULLANICI: row.PTS_KULLANICI
       }
-      
+
       const document = {
         id: `${fixedRow.SUBE_KODU}-${fixedRow.FTIRSIP}-${fixedRow.FATIRS_NO}`,
         subeKodu: fixedRow.SUBE_KODU,
@@ -325,11 +337,14 @@ const documentService = {
         okutulan: fixedRow.OKUTULAN || 0,
         kalan: fixedRow.KALAN || 0,
         preparedItems: fixedRow.OKUTULAN || 0,
-        status: fixedRow.OKUTULAN === 0 ? 'pending' : 
-                fixedRow.OKUTULAN < fixedRow.MIKTAR ? 'preparing' : 'completed',
-        items: items
+        status: fixedRow.OKUTULAN === 0 ? 'pending' :
+          fixedRow.OKUTULAN < fixedRow.MIKTAR ? 'preparing' : 'completed',
+        items: items,
+        ptsId: fixedRow.PTS_ID || null,
+        ptsTarih: fixedRow.PTS_TARIH ? fixedRow.PTS_TARIH.toISOString() : null,
+        ptsKullanici: fixedRow.PTS_KULLANICI || null
       }
-      
+
       return document
     } catch (error) {
       console.error('Belge detay getirme hatası:', error)
@@ -341,16 +356,16 @@ const documentService = {
   async getDocumentItems(subeKodu, ftirsip, fatirs_no, cariKodu) {
     try {
       const pool = await getConnection()
-      
+
       let itemsQuery = ''
-      
+
       if (ftirsip === '6') {
         // Sipariş kalemleri
         itemsQuery = `
           SELECT
             H.STOK_KODU,
             S.STOK_ADI,
-            (CASE WHEN S.KOD_5='BESERI' THEN 'ITS' WHEN S.KOD_5='UTS' THEN 'UTS' ELSE 'DGR' END) AS TURU,
+            (CASE WHEN S.KOD_5='BESERI' THEN 'I' WHEN S.KOD_5='UTS' THEN 'U' ELSE 'D' END) AS TURU,
             H.STHAR_GCMIK AS MIKTAR,
             H.INCKEYNO,
             H.STHAR_HTUR,
@@ -375,7 +390,7 @@ const documentService = {
           SELECT
             H.STOK_KODU,
             S.STOK_ADI,
-            (CASE WHEN S.KOD_5='BESERI' THEN 'ITS' WHEN S.KOD_5='UTS' THEN 'UTS' ELSE 'DGR' END) AS TURU,
+            (CASE WHEN S.KOD_5='BESERI' THEN 'I' WHEN S.KOD_5='UTS' THEN 'U' ELSE 'D' END) AS TURU,
             H.STHAR_GCMIK AS MIKTAR,
             H.INCKEYNO,
             H.STHAR_HTUR,
@@ -395,15 +410,15 @@ const documentService = {
           ORDER BY H.INCKEYNO
         `
       }
-      
+
       const request = pool.request()
       request.input('subeKodu', subeKodu)
       request.input('ftirsip', ftirsip)
       request.input('fatirs_no', fatirs_no)
       request.input('cariKodu', cariKodu)
-      
+
       const result = await request.query(itemsQuery)
-      
+
       const items = result.recordset.map(row => ({
         itemId: row.INCKEYNO,
         stokKodu: row.STOK_KODU,
@@ -411,13 +426,13 @@ const documentService = {
         barcode: row.STOK_KODU, // Barkod olarak stok kodu kullanılıyor
         quantity: row.MIKTAR,
         unit: 'ADET', // Sabit birim
-        turu: row.TURU, // ITS, UTS veya DGR
+        turu: row.TURU === 'I' ? 'ITS' : row.TURU === 'U' ? 'UTS' : 'DGR', // I->ITS, U->UTS, D->DGR
         okutulan: row.OKUTULAN || 0,
         isPrepared: row.OKUTULAN >= row.MIKTAR,
         stharHtur: row.STHAR_HTUR, // ITS için gerekli
         stharGckod: row.STHAR_GCKOD // ITS için gerekli
       }))
-      
+
       return items
     } catch (error) {
       console.error('Belge kalemleri getirme hatası:', error)
@@ -429,7 +444,7 @@ const documentService = {
   async getITSBarcodeRecords(subeKodu, belgeNo, straInc, kayitTipi) {
     try {
       const pool = await getConnection()
-      
+
       const query = `
         SELECT
           RECNO,
@@ -449,16 +464,16 @@ const documentService = {
         FROM AKTBLITSUTS WITH (NOLOCK)
         WHERE FATIRS_NO = @belgeNo
           AND HAR_RECNO = @straInc
-          AND TURU = 'ITS'
-        ORDER BY SERI_NO
+          AND TURU = 'I'
+        ORDER BY KAYIT_TARIHI ASC
       `
-      
+
       const request = pool.request()
       request.input('belgeNo', belgeNo)
       request.input('straInc', straInc)
-      
+
       const result = await request.query(query)
-      
+
       const records = result.recordset.map(row => fixObjectStrings({
         recno: row.RECNO,
         seriNo: row.SERI_NO,
@@ -475,7 +490,10 @@ const documentService = {
         durum: row.DURUM,
         kullanici: row.KULLANICI
       }))
-      
+
+      // Debug: MIAD değerlerini logla
+      console.log('📅 ITS Kayıtları - MIAD değerleri:', records.map(r => ({ seriNo: r.seriNo, miad: r.miad, miadType: typeof r.miad })))
+
       return records
     } catch (error) {
       console.error('❌ ITS Kayıtları Getirme Hatası:', error)
@@ -487,7 +505,7 @@ const documentService = {
   async getUTSBarcodeRecords(subeKodu, belgeNo, straInc, kayitTipi) {
     try {
       const pool = await getConnection()
-      
+
       const query = `
         SELECT
           RECNO,
@@ -507,16 +525,16 @@ const documentService = {
         FROM AKTBLITSUTS WITH (NOLOCK)
         WHERE FATIRS_NO = @belgeNo
           AND HAR_RECNO = @straInc
-          AND TURU = 'UTS'
+          AND TURU = 'U'
         ORDER BY RECNO
       `
-      
+
       const request = pool.request()
       request.input('belgeNo', belgeNo)
       request.input('straInc', straInc)
-      
+
       const result = await request.query(query)
-      
+
       const records = result.recordset.map(row => fixObjectStrings({
         siraNo: row.RECNO,
         recno: row.RECNO,
@@ -534,7 +552,7 @@ const documentService = {
         durum: row.DURUM,
         kullanici: row.KULLANICI
       }))
-      
+
       return records
     } catch (error) {
       console.error('❌ UTS Kayıtları Getirme Hatası:', error)
@@ -543,14 +561,14 @@ const documentService = {
   },
 
   // TBLSERITRA Kayıtlarını Sil - ITS/DGR/UTS
-  async deleteITSBarcodeRecords(seriNos, subeKodu, belgeNo, straInc, turu = 'ITS') {
+  async deleteITSBarcodeRecords(seriNos, subeKodu, belgeNo, straInc, turu = 'I') {
     try {
       const pool = await getConnection()
-      
+
       // Önce silinecek kayıtların CARRIER_LABEL değerlerini al (sadece ITS için)
       const carrierLabelsToUpdate = new Set()
-      
-      if (turu === 'ITS') {
+
+      if (turu === 'I') {
         for (const seriNo of seriNos) {
           const checkQuery = `
             SELECT CARRIER_LABEL
@@ -561,24 +579,24 @@ const documentService = {
               AND TURU = @turu
               AND CARRIER_LABEL IS NOT NULL
           `
-          
+
           const checkRequest = pool.request()
           checkRequest.input('belgeNo', belgeNo)
           checkRequest.input('straInc', straInc)
           checkRequest.input('seriNo', seriNo)
           checkRequest.input('turu', turu)
-          
+
           const checkResult = await checkRequest.query(checkQuery)
           if (checkResult.recordset.length > 0 && checkResult.recordset[0].CARRIER_LABEL) {
             carrierLabelsToUpdate.add(checkResult.recordset[0].CARRIER_LABEL)
           }
         }
-        
+
         // Silinecek kayıtların CARRIER_LABEL değerleri varsa, 
         // aynı CARRIER_LABEL'a sahip diğer kayıtların da CARRIER_LABEL'ını NULL yap
         if (carrierLabelsToUpdate.size > 0) {
           log('📦 Koli bütünlüğü korunuyor, CARRIER_LABEL değerleri temizleniyor:', Array.from(carrierLabelsToUpdate))
-          
+
           for (const carrierLabel of carrierLabelsToUpdate) {
             const updateQuery = `
               UPDATE AKTBLITSUTS
@@ -588,19 +606,19 @@ const documentService = {
                 AND CARRIER_LABEL = @carrierLabel
                 AND TURU = @turu
             `
-            
+
             const updateRequest = pool.request()
             updateRequest.input('belgeNo', belgeNo)
             updateRequest.input('straInc', straInc)
             updateRequest.input('carrierLabel', carrierLabel)
             updateRequest.input('turu', turu)
-            
+
             await updateRequest.query(updateQuery)
             log('🔄 Koli bilgisi temizlendi:', carrierLabel)
           }
         }
       }
-      
+
       // Seri numaralarını tek tek sil
       for (const seriNo of seriNos) {
         log('🔍 Siliniyor - Parametreler:', {
@@ -610,11 +628,11 @@ const documentService = {
           seriNoLength: seriNo.length,
           turu
         })
-        
+
         // ITS/UTS için SERI_NO, DGR için STOK_KODU kullan
         let checkExistQuery, query
-        
-        if (turu === 'DGR') {
+
+        if (turu === 'D') {
           // DGR için STOK_KODU ile arama
           checkExistQuery = `
             SELECT SERI_NO, CARRIER_LABEL, GTIN, STOK_KODU
@@ -624,7 +642,7 @@ const documentService = {
               AND STOK_KODU = @seriNo
               AND TURU = @turu
           `
-          
+
           query = `
             DELETE FROM AKTBLITSUTS
             WHERE FATIRS_NO = @belgeNo
@@ -642,7 +660,7 @@ const documentService = {
               AND SERI_NO = @seriNo
               AND TURU = @turu
           `
-          
+
           query = `
             DELETE FROM AKTBLITSUTS
             WHERE FATIRS_NO = @belgeNo
@@ -651,19 +669,19 @@ const documentService = {
               AND TURU = @turu
           `
         }
-        
+
         const checkRequest = pool.request()
         checkRequest.input('belgeNo', belgeNo)
         checkRequest.input('straInc', straInc)
         checkRequest.input('seriNo', seriNo)
         checkRequest.input('turu', turu)
-        
+
         const checkResult = await checkRequest.query(checkExistQuery)
         log('📊 Kayıt kontrolü - Bulunan:', checkResult.recordset.length, checkResult.recordset)
-        
+
         if (checkResult.recordset.length === 0) {
           console.log(`⚠️ Kayıt bulunamadı! Alternatif kontrol yapılıyor...`)
-          
+
           // Belgedeki kayıtları listele
           const allRecordsQuery = `
             SELECT TOP 5 SERI_NO, STOK_KODU, HAR_RECNO, CARRIER_LABEL, TURU
@@ -678,26 +696,26 @@ const documentService = {
           const allResult = await allRequest.query(allRecordsQuery)
           console.log(`📋 Bu belgedeki son 5 ${turu} kaydı:`, allResult.recordset)
         }
-        
+
         const request = pool.request()
         request.input('belgeNo', belgeNo)
         request.input('straInc', straInc)
         request.input('seriNo', seriNo)
         request.input('turu', turu)
-        
+
         const result = await request.query(query)
         log('🗑️ DELETE Sonucu - Etkilenen Satır Sayısı:', result.rowsAffected[0])
-        
+
         if (result.rowsAffected[0] === 0) {
           log('❌ SİLME BAŞARISIZ! Kayıt silinemedi')
         } else {
           console.log(`✅ ${turu} Kayıt Başarıyla Silindi:`, seriNo)
         }
       }
-      
+
       console.log(`✅ ${turu} Kayıtlar Başarıyla Silindi:`, seriNos.length)
       return { success: true, deletedCount: seriNos.length }
-      
+
     } catch (error) {
       console.error(`❌ ${turu || 'ITS'} Kayıt Silme Hatası:`, error)
       throw error
@@ -708,12 +726,12 @@ const documentService = {
   async deleteCarrierBarcodeRecords(carrierLabel, docId) {
     try {
       const pool = await getConnection()
-      
+
       log('🗑️ Koli barkoduna göre ITS kayıtları siliniyor:', carrierLabel)
-      
+
       // docId'yi parse et (format: SUBE_KODU-FTIRSIP-FATIRS_NO)
       const [subeKodu, ftirsip, belgeNo] = docId.split('-')
-      
+
       // Önce bu koli barkoduna sahip kayıtları ve GTIN bilgilerini al
       const selectQuery = `
         SELECT GTIN, COUNT(*) as COUNT
@@ -721,26 +739,26 @@ const documentService = {
         WHERE CARRIER_LABEL = @carrierLabel
           AND FATIRS_NO = @belgeNo
           AND FTIRSIP = @ftirsip
-          AND TURU = 'ITS'
+          AND TURU = 'I'
         GROUP BY GTIN
       `
-      
+
       const selectRequest = pool.request()
       selectRequest.input('carrierLabel', carrierLabel)
       selectRequest.input('belgeNo', belgeNo)
       selectRequest.input('ftirsip', ftirsip)
-      
+
       const selectResult = await selectRequest.query(selectQuery)
-      
+
       if (selectResult.recordset.length === 0) {
         log('⚠️ Silinecek kayıt bulunamadı')
-        return { 
-          success: false, 
+        return {
+          success: false,
           message: 'Bu koli barkodu ile kayıt bulunamadı',
-          deletedCount: 0 
+          deletedCount: 0
         }
       }
-      
+
       // GTIN bazında silinen miktarları topla
       const gtinCounts = {}
       let totalRecords = 0
@@ -748,39 +766,39 @@ const documentService = {
         gtinCounts[row.GTIN] = row.COUNT
         totalRecords += row.COUNT
       })
-      
+
       console.log(`📦 Silinecek kayıt sayısı: ${totalRecords}`)
       log('📊 GTIN bazında:', gtinCounts)
-      
+
       // Kayıtları sil
       const deleteQuery = `
         DELETE FROM AKTBLITSUTS
         WHERE CARRIER_LABEL = @carrierLabel
           AND FATIRS_NO = @belgeNo
           AND FTIRSIP = @ftirsip
-          AND TURU = 'ITS'
+          AND TURU = 'I'
       `
-      
+
       const deleteRequest = pool.request()
       deleteRequest.input('carrierLabel', carrierLabel)
       deleteRequest.input('belgeNo', belgeNo)
       deleteRequest.input('ftirsip', ftirsip)
-      
+
       await deleteRequest.query(deleteQuery)
-      
+
       console.log(`✅ ${totalRecords} ITS kayıt başarıyla silindi (Koli: ${carrierLabel})`)
-      
+
       // Etkilenen GTIN'leri döndür (temizlenmiş haliyle)
       const affectedGtins = Object.keys(gtinCounts)
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         deletedCount: totalRecords,
         affectedGtins: affectedGtins,
         gtinCounts: gtinCounts,
         message: `${totalRecords} ürün koliden silindi`
       }
-      
+
     } catch (error) {
       console.error('❌ Koli Barkodu Silme Hatası:', error)
       throw error
@@ -791,7 +809,7 @@ const documentService = {
   async deleteUTSBarcodeRecords(records, subeKodu, belgeNo, straInc) {
     try {
       const pool = await getConnection()
-      
+
       // Kayıtları RECNO ile sil
       for (const record of records) {
         const query = `
@@ -799,21 +817,21 @@ const documentService = {
           WHERE FATIRS_NO = @belgeNo
             AND HAR_RECNO = @straInc
             AND RECNO = @recno
-            AND TURU = 'UTS'
+            AND TURU = 'U'
         `
-        
+
         const request = pool.request()
         request.input('recno', record.siraNo || record.recno)
         request.input('belgeNo', belgeNo)
         request.input('straInc', straInc)
-        
+
         await request.query(query)
         log('🗑️ UTS Kayıt Silindi (AKTBLITSUTS):', record.recno || record.siraNo)
       }
-      
+
       log('✅ UTS Kayıtlar Başarıyla Silindi:', records.length)
       return { success: true, deletedCount: records.length }
-      
+
     } catch (error) {
       console.error('❌ UTS Kayıt Silme Hatası:', error)
       throw error
@@ -824,15 +842,15 @@ const documentService = {
   async saveITSBarcode(data) {
     try {
       const pool = await getConnection()
-      
+
       const {
         kayitTipi,    // 'M' veya 'A' (kullanılmayacak ama geriye dönük uyumluluk için)
         seriNo,
         stokKodu,
         straInc,      // HAR_RECNO olarak kaydedilecek
         tarih,
-        acik1,        // Miad
-        acik2,        // Lot
+        miad,         // MIAD (YYMMDD formatında geliyor)
+        lotNo,        // LOT_NO
         gckod,        // Kullanılmayacak
         miktar = 1,   // Her zaman 1
         belgeNo,      // FATIRS_NO
@@ -845,9 +863,9 @@ const documentService = {
         cariKodu,     // Cari kodu
         kullanici     // Kullanıcı adı
       } = data
-      
+
       log('💾 ITS Karekod Kaydediliyor (AKTBLITSUTS):', data)
-      
+
       // ZORUNLU ALAN KONTROLLERI
       if (!kullanici) {
         console.error('❌ KULLANICI bilgisi eksik! (ITS)')
@@ -857,7 +875,7 @@ const documentService = {
           message: '❌ Kullanıcı bilgisi zorunludur!'
         }
       }
-      
+
       if (!cariKodu) {
         console.error('❌ CARI_KODU bilgisi eksik! (ITS)')
         return {
@@ -866,7 +884,7 @@ const documentService = {
           message: '❌ Cari kodu bilgisi zorunludur!'
         }
       }
-      
+
       // 1. Mevcut okutulmuş miktarı kontrol et (miktar aşımı kontrolü)
       if (expectedQuantity) {
         const quantityCheckQuery = `
@@ -876,21 +894,21 @@ const documentService = {
             AND HAR_RECNO = @straInc
             AND STOK_KODU = @stokKodu
             AND FTIRSIP = @ftirsip
-            AND TURU = 'ITS'
+            AND TURU = 'I'
         `
-        
+
         const quantityCheckRequest = pool.request()
         quantityCheckRequest.input('belgeNo', belgeNo)
         quantityCheckRequest.input('straInc', straInc)
         quantityCheckRequest.input('stokKodu', stokKodu)
         quantityCheckRequest.input('ftirsip', ftirsip)
-        
+
         const quantityCheckResult = await quantityCheckRequest.query(quantityCheckQuery)
         const currentOkutulan = quantityCheckResult.recordset[0].TOTAL_OKUTULAN
-        
+
         // Yeni okutulacak miktar: ITS için her zaman 1
         const newMiktar = 1
-        
+
         if (currentOkutulan + newMiktar > expectedQuantity) {
           log('⚠️⚠️⚠️ MİKTAR AŞIMI! (ITS) ⚠️⚠️⚠️')
           log('Stok Kodu:', stokKodu)
@@ -905,7 +923,7 @@ const documentService = {
         }
         log('✓ Miktar kontrolü geçti (ITS):', currentOkutulan + newMiktar, '/', expectedQuantity)
       }
-      
+
       // 2. Aynı seri numarasının daha önce okutulup okutulmadığını kontrol et
       const checkQuery = `
         SELECT COUNT(*) AS KAYIT_SAYISI
@@ -913,27 +931,27 @@ const documentService = {
         WHERE SERI_NO = @seriNo
           AND FATIRS_NO = @belgeNo
       `
-      
+
       const checkRequest = pool.request()
       checkRequest.input('seriNo', seriNo)
       checkRequest.input('belgeNo', belgeNo)
-      
+
       const checkResult = await checkRequest.query(checkQuery)
-      
+
       if (checkResult.recordset[0].KAYIT_SAYISI > 0) {
         log('⚠️⚠️⚠️ DUPLICATE KAREKOD TESPIT EDİLDİ! ⚠️⚠️⚠️')
         log('Seri No:', seriNo)
         log('Belge No:', belgeNo)
         log('Bu karekod daha önce', checkResult.recordset[0].KAYIT_SAYISI, 'kere okutulmuş!')
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'DUPLICATE',
           message: '⚠️ Bu karekod daha önce okutulmuş! Aynı seri numarası tekrar okutulamaz.'
         }
       }
-      
+
       log('✓ Seri numarası kontrolü geçti, kayıt yapılacak:', seriNo)
-      
+
       const query = `
         INSERT INTO AKTBLITSUTS (
           TURU,
@@ -950,22 +968,22 @@ const documentService = {
           KULLANICI,
           KAYIT_TARIHI
         ) VALUES (
-          'ITS',
+          'I',
           @ftirsip,
           @belgeNo,
           @cariKodu,
           @stokKodu,
           @ilcGtin,
           @seriNo,
-          @acik1,
-          @acik2,
+          @miad,
+          @lotNo,
           @straInc,
           1,
           @kullanici,
           GETDATE()
         )
       `
-      
+
       const request = pool.request()
       request.input('ftirsip', ftirsip || '6')
       request.input('belgeNo', belgeNo)
@@ -973,29 +991,40 @@ const documentService = {
       request.input('stokKodu', stokKodu)
       request.input('ilcGtin', ilcGtin)
       request.input('seriNo', seriNo)
-      request.input('acik1', acik1) // MIAD
-      request.input('acik2', acik2) // LOT_NO
+
+      // MIAD'ı YYMMDD string'den Date tipine dönüştür
+      let miadDate = null
+      if (miad && miad.length === 6) {
+        const yy = miad.substring(0, 2)
+        const mm = miad.substring(2, 4)
+        const dd = miad.substring(4, 6)
+        const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+        miadDate = new Date(`${yyyy}-${mm}-${dd}`)
+      }
+      request.input('miad', sql.Date, miadDate)
+
+      request.input('lotNo', lotNo) // LOT_NO
       request.input('straInc', straInc) // HAR_RECNO
       request.input('kullanici', kullanici)
-      
+
       await request.query(query)
-      
+
       log('✅✅✅ ITS KAREKOD BAŞARIYLA KAYDEDİLDİ! ✅✅✅')
       log('Seri No:', seriNo)
       log('Stok Kodu:', stokKodu)
-      log('Miad:', acik1)
-      log('Lot:', acik2)
+      log('Miad:', miad)
+      log('Lot:', lotNo)
       log('Belge No:', belgeNo)
-      
-      return { 
+
+      return {
         success: true,
         data: {
           seriNo,
-          miad: acik1,
-          lot: acik2
+          miad,
+          lot: lotNo
         }
       }
-      
+
     } catch (error) {
       console.error('❌ ITS Karekod Kaydetme Hatası:', error)
       throw error
@@ -1006,7 +1035,7 @@ const documentService = {
   async saveDGRBarcode(data) {
     try {
       const pool = await getConnection()
-      
+
       const {
         kayitTipi,    // Kullanılmayacak (geriye dönük uyumluluk)
         stokKodu,     // Stok Kodu
@@ -1023,9 +1052,9 @@ const documentService = {
         kullanici,    // Kullanıcı (ZORUNLU)
         miktar = 1    // Kullanıcı "100*BARKOD" gönderirse miktar=100
       } = data
-      
+
       log('💾 DGR Barkod Kaydediliyor (AKTBLITSUTS):', data)
-      
+
       // ZORUNLU ALAN KONTROLLERI
       if (!kullanici) {
         console.error('❌ KULLANICI bilgisi eksik! (DGR)')
@@ -1035,7 +1064,7 @@ const documentService = {
           message: '❌ Kullanıcı bilgisi zorunludur!'
         }
       }
-      
+
       if (!cariKodu) {
         console.error('❌ CARI_KODU bilgisi eksik! (DGR)')
         return {
@@ -1044,7 +1073,7 @@ const documentService = {
           message: '❌ Cari kodu bilgisi zorunludur!'
         }
       }
-      
+
       // Aynı kayıt var mı kontrol et (FATIRS_NO, HAR_RECNO, STOK_KODU, GTIN)
       const checkQuery = `
         SELECT RECNO, MIKTAR
@@ -1054,24 +1083,24 @@ const documentService = {
           AND STOK_KODU = @stokKodu
           AND GTIN = @ilcGtin
           AND FTIRSIP = @ftirsip
-          AND TURU = 'DGR'
+          AND TURU = 'D'
       `
-      
+
       const checkRequest = pool.request()
       checkRequest.input('belgeNo', belgeNo)
       checkRequest.input('straInc', straInc)
       checkRequest.input('stokKodu', stokKodu)
       checkRequest.input('ilcGtin', ilcGtin)
       checkRequest.input('ftirsip', ftirsip || '6')
-      
+
       const checkResult = await checkRequest.query(checkQuery)
-      
+
       if (checkResult.recordset.length > 0) {
         // Kayıt var, MIKTAR'ı arttır (UPDATE)
         const existingRecord = checkResult.recordset[0]
         const currentMiktar = existingRecord.MIKTAR || 0
         const newMiktar = currentMiktar + miktar
-        
+
         // Miktar kontrolü
         if (expectedQuantity && newMiktar > expectedQuantity) {
           log('⚠️ MİKTAR AŞIMI! (DGR UPDATE)')
@@ -1082,7 +1111,7 @@ const documentService = {
             message: `⚠️ Miktar aşımı! Beklenen: ${expectedQuantity}, Mevcut: ${currentMiktar}`
           }
         }
-        
+
         const updateQuery = `
           UPDATE AKTBLITSUTS
           SET MIKTAR = @newMiktar,
@@ -1090,16 +1119,16 @@ const documentService = {
               KAYIT_TARIHI = GETDATE()
           WHERE RECNO = @recno
         `
-        
+
         const updateRequest = pool.request()
         updateRequest.input('newMiktar', newMiktar)
         updateRequest.input('kullanici', kullanici)
         updateRequest.input('recno', existingRecord.RECNO)
-        
+
         await updateRequest.query(updateQuery)
-        
+
         log('✅ DGR Barkod güncellendi:', stokKodu, '- Miktar:', currentMiktar, '→', newMiktar)
-        
+
         return {
           success: true,
           data: {
@@ -1111,7 +1140,7 @@ const documentService = {
         }
       } else {
         // Kayıt yok, yeni kayıt ekle (INSERT)
-        
+
         // Toplam miktar kontrolü (diğer kayıtlarla birlikte)
         if (expectedQuantity) {
           const totalCheckQuery = `
@@ -1121,18 +1150,18 @@ const documentService = {
               AND HAR_RECNO = @straInc
               AND STOK_KODU = @stokKodu
               AND FTIRSIP = @ftirsip
-              AND TURU = 'DGR'
+              AND TURU = 'D'
           `
-          
+
           const totalCheckRequest = pool.request()
           totalCheckRequest.input('belgeNo', belgeNo)
           totalCheckRequest.input('straInc', straInc)
           totalCheckRequest.input('stokKodu', stokKodu)
           totalCheckRequest.input('ftirsip', ftirsip || '6')
-          
+
           const totalCheckResult = await totalCheckRequest.query(totalCheckQuery)
           const currentTotal = totalCheckResult.recordset[0].TOTAL_OKUTULAN
-          
+
           if (currentTotal + miktar > expectedQuantity) {
             log('⚠️ MİKTAR AŞIMI! (DGR INSERT)')
             log('Beklenen:', expectedQuantity, '/ Mevcut Toplam:', currentTotal, '/ Eklenecek:', miktar)
@@ -1143,7 +1172,7 @@ const documentService = {
             }
           }
         }
-        
+
         const insertQuery = `
           INSERT INTO AKTBLITSUTS (
             TURU,
@@ -1157,7 +1186,7 @@ const documentService = {
             KULLANICI,
             KAYIT_TARIHI
           ) VALUES (
-            'DGR',
+            'D',
             @ftirsip,
             @belgeNo,
             @cariKodu,
@@ -1169,7 +1198,7 @@ const documentService = {
             GETDATE()
           )
         `
-        
+
         const insertRequest = pool.request()
         insertRequest.input('ftirsip', ftirsip || '6')
         insertRequest.input('belgeNo', belgeNo)
@@ -1179,11 +1208,11 @@ const documentService = {
         insertRequest.input('straInc', straInc)
         insertRequest.input('miktar', miktar)
         insertRequest.input('kullanici', kullanici)
-        
+
         await insertRequest.query(insertQuery)
-        
+
         log('✅ DGR Barkod kaydedildi:', stokKodu, '- Miktar:', miktar)
-        
+
         return {
           success: true,
           data: {
@@ -1194,7 +1223,7 @@ const documentService = {
           }
         }
       }
-      
+
     } catch (error) {
       console.error('❌ DGR Barkod Kaydetme Hatası:', error)
       throw error
@@ -1205,7 +1234,7 @@ const documentService = {
   async saveUTSBarcode(data) {
     try {
       const pool = await getConnection()
-      
+
       const {
         kayitTipi,    // Kullanılmayacak
         seriNo,       // Seri No (opsiyonel)
@@ -1225,9 +1254,9 @@ const documentService = {
         cariKodu,     // Cari kodu
         kullanici     // Kullanıcı
       } = data
-      
+
       log('💾 UTS Barkod Kaydediliyor (AKTBLITSUTS):', data)
-      
+
       // ZORUNLU ALAN KONTROLLERI
       if (!kullanici) {
         console.error('❌ KULLANICI bilgisi eksik! (UTS)')
@@ -1237,7 +1266,7 @@ const documentService = {
           message: '❌ Kullanıcı bilgisi zorunludur!'
         }
       }
-      
+
       if (!cariKodu) {
         console.error('❌ CARI_KODU bilgisi eksik! (UTS)')
         return {
@@ -1246,7 +1275,7 @@ const documentService = {
           message: '❌ Cari kodu bilgisi zorunludur!'
         }
       }
-      
+
       // Üretim tarihini YYMMDD formatına çevir (YYAAGG - Yıl Ay Gün)
       let formattedUretimTarihi = ''
       if (uretimTarihi) {
@@ -1266,17 +1295,17 @@ const documentService = {
           console.log(`📅 Tarih dönüşümü (fallback): ${uretimTarihi} -> ${formattedUretimTarihi}`)
         }
       }
-      
+
       // Belge Tarih formatı - saat bilgisi olmadan (YYYY-MM-DD)
       const tarihDate = new Date(tarih)
       const year = tarihDate.getFullYear()
       const month = String(tarihDate.getMonth() + 1).padStart(2, '0')
       const day = String(tarihDate.getDate()).padStart(2, '0')
       const formattedTarih = `${year}-${month}-${day}`
-      
+
       // SERI_NO ve LOT_NO alanları bağımsız
       // (Seri no SERI_NO'ya, Lot no LOT_NO'ya yazılır)
-      
+
       // Miktar kontrolü - beklenen miktarı aşmamalı (MIKTAR toplamı)
       if (expectedQuantity) {
         const quantityCheckQuery = `
@@ -1286,18 +1315,18 @@ const documentService = {
             AND HAR_RECNO = @straInc
             AND STOK_KODU = @stokKodu
             AND FTIRSIP = @ftirsip
-            AND TURU = 'UTS'
+            AND TURU = 'U'
         `
-        
+
         const quantityCheckRequest = pool.request()
         quantityCheckRequest.input('belgeNo', belgeNo)
         quantityCheckRequest.input('straInc', straInc)
         quantityCheckRequest.input('stokKodu', stokKodu)
         quantityCheckRequest.input('ftirsip', ftirsip)
-        
+
         const quantityCheckResult = await quantityCheckRequest.query(quantityCheckQuery)
         const currentOkutulan = quantityCheckResult.recordset[0].TOTAL_OKUTULAN
-        
+
         // miktar parametresi kullanıcının girdiği lot miktarı (birden fazla olabilir)
         if (currentOkutulan + miktar > expectedQuantity) {
           log('⚠️⚠️⚠️ MİKTAR AŞIMI! (UTS) ⚠️⚠️⚠️')
@@ -1313,7 +1342,7 @@ const documentService = {
         }
         log('✓ Miktar kontrolü geçti (UTS):', currentOkutulan + miktar, '/', expectedQuantity)
       }
-      
+
       // Unique kontroller - Seri No ve Lot No teklik kontrolü
       // Seri No unique kontrolü
       if (seriNo) {
@@ -1324,19 +1353,19 @@ const documentService = {
             AND HAR_RECNO = @straInc
             AND STOK_KODU = @stokKodu
             AND FTIRSIP = @ftirsip
-            AND TURU = 'UTS'
+            AND TURU = 'U'
             AND SERI_NO = @seriNo
         `
-        
+
         const seriCheckRequest = pool.request()
         seriCheckRequest.input('belgeNo', belgeNo)
         seriCheckRequest.input('straInc', straInc)
         seriCheckRequest.input('stokKodu', stokKodu)
         seriCheckRequest.input('ftirsip', ftirsip)
         seriCheckRequest.input('seriNo', seriNo)
-        
+
         const seriCheckResult = await seriCheckRequest.query(seriCheckQuery)
-        
+
         if (seriCheckResult.recordset.length > 0) {
           log('⚠️ DUPLICATE! Aynı Seri No zaten kayıtlı:', seriNo)
           return {
@@ -1346,7 +1375,7 @@ const documentService = {
           }
         }
       }
-      
+
       // Lot No unique kontrolü
       if (lotNo) {
         const lotCheckQuery = `
@@ -1356,19 +1385,19 @@ const documentService = {
             AND HAR_RECNO = @straInc
             AND STOK_KODU = @stokKodu
             AND FTIRSIP = @ftirsip
-            AND TURU = 'UTS'
+            AND TURU = 'U'
             AND LOT_NO = @lotNo
         `
-        
+
         const lotCheckRequest = pool.request()
         lotCheckRequest.input('belgeNo', belgeNo)
         lotCheckRequest.input('straInc', straInc)
         lotCheckRequest.input('stokKodu', stokKodu)
         lotCheckRequest.input('ftirsip', ftirsip)
         lotCheckRequest.input('lotNo', lotNo)
-        
+
         const lotCheckResult = await lotCheckRequest.query(lotCheckQuery)
-        
+
         if (lotCheckResult.recordset.length > 0) {
           log('⚠️ DUPLICATE! Aynı Lot No zaten kayıtlı:', lotNo)
           return {
@@ -1378,10 +1407,10 @@ const documentService = {
           }
         }
       }
-      
+
       // Yeni kayıt oluştur (INSERT)
       log('✓ Yeni kayıt oluşturuluyor...')
-      
+
       const insertQuery = `
         INSERT INTO AKTBLITSUTS (
           TURU,
@@ -1398,7 +1427,7 @@ const documentService = {
           KULLANICI,
           KAYIT_TARIHI
         ) VALUES (
-          'UTS',
+          'U',
           @ftirsip,
           @belgeNo,
           @cariKodu,
@@ -1413,7 +1442,7 @@ const documentService = {
           GETDATE()
         )
       `
-      
+
       // UTS için tek kayıt ekle, MIKTAR alanına değer yaz
       const insertRequest = pool.request()
       insertRequest.input('ftirsip', ftirsip || '6')
@@ -1427,11 +1456,11 @@ const documentService = {
       insertRequest.input('straInc', straInc)
       insertRequest.input('miktar', miktar)
       insertRequest.input('kullanici', kullanici)
-      
+
       await insertRequest.query(insertQuery)
-      
+
       log('✅ UTS Barkod kaydedildi (AKTBLITSUTS):', stokKodu, '- Miktar:', miktar)
-      
+
       return {
         success: true,
         data: {
@@ -1441,7 +1470,7 @@ const documentService = {
           miktar
         }
       }
-      
+
     } catch (error) {
       console.error('❌ UTS Barkod Kaydetme Hatası:', error)
       throw error
@@ -1452,7 +1481,7 @@ const documentService = {
   async saveUTSRecords(data) {
     try {
       const pool = await getConnection()
-      
+
       const {
         records,          // Grid'den gelen kayıtlar (siraNo, seriNo, lot, miktar, uretimTarihi)
         originalRecords,  // DB'den gelen orijinal kayıtlar (siraNo)
@@ -1470,29 +1499,29 @@ const documentService = {
         cariKodu,         // Belgedeki CARI_KODU
         kullanici         // Sisteme giriş yapan kullanıcı
       } = data
-      
+
       log('💾 UTS Toplu Kayıt İşlemi Başlıyor...')
       log('Toplam Kayıt:', records.length)
-      
+
       // Belge Tarih formatı
       const tarihDate = new Date(tarih)
       const year = tarihDate.getFullYear()
       const month = String(tarihDate.getMonth() + 1).padStart(2, '0')
       const day = String(tarihDate.getDate()).padStart(2, '0')
       const formattedTarih = `${year}-${month}-${day}`
-      
+
       const transaction = pool.transaction()
       await transaction.begin()
-      
+
       try {
         // 1. Silinen kayıtları bul ve DELETE
         const originalSiraNumbers = originalRecords.map(r => r.siraNo)
         const currentSiraNumbers = records.filter(r => r.siraNo).map(r => r.siraNo)
         const deletedSiraNumbers = originalSiraNumbers.filter(sno => !currentSiraNumbers.includes(sno))
-        
+
         if (deletedSiraNumbers.length > 0) {
           console.log(`🗑️ ${deletedSiraNumbers.length} kayıt silinecek:`, deletedSiraNumbers)
-          
+
           for (const siraNo of deletedSiraNumbers) {
             const deleteQuery = `
               DELETE FROM AKTBLITSUTS 
@@ -1502,14 +1531,14 @@ const documentService = {
             deleteRequest.input('siraNo', siraNo)
             await deleteRequest.query(deleteQuery)
           }
-          
+
           log('✅ Silme işlemi tamamlandı')
         }
-        
+
         // 2. Her satır için INSERT veya UPDATE
         let insertCount = 0
         let updateCount = 0
-        
+
         for (const record of records) {
           // Üretim tarihini YYMMDD formatına çevir
           let formattedUretimTarihi = ''
@@ -1520,11 +1549,11 @@ const documentService = {
           } else if (record.uretimTarihi) {
             formattedUretimTarihi = record.uretimTarihi
           }
-          
+
           // SERI_NO ve LOT_NO ayarla
           const finalSeriNo = record.seriNo || ''
           const finalLotNo = record.lot || ''
-          
+
           if (record.siraNo) {
             // UPDATE mevcut kayıt
             const updateQuery = `
@@ -1537,7 +1566,7 @@ const documentService = {
                   KAYIT_TARIHI = GETDATE()
               WHERE RECNO = @siraNo
             `
-            
+
             const updateRequest = transaction.request()
             updateRequest.input('siraNo', record.siraNo)
             updateRequest.input('finalSeriNo', finalSeriNo)
@@ -1545,11 +1574,11 @@ const documentService = {
             updateRequest.input('finalLotNo', finalLotNo)
             updateRequest.input('miktar', record.miktar)
             updateRequest.input('kullanici', kullanici)
-            
+
             await updateRequest.query(updateQuery)
             updateCount++
             console.log(`✏️ Kayıt güncellendi: RECNO=${record.siraNo}`)
-            
+
           } else {
             // INSERT yeni kayıt
             const insertQuery = `
@@ -1567,7 +1596,7 @@ const documentService = {
                 MIKTAR,
                 KULLANICI
               ) VALUES (
-                'UTS',
+                'U',
                 @ftirsip,
                 @belgeNo,
                 @straInc,
@@ -1581,7 +1610,7 @@ const documentService = {
                 @kullanici
               )
             `
-            
+
             const insertRequest = transaction.request()
             insertRequest.input('ftirsip', ftirsip)
             insertRequest.input('belgeNo', belgeNo)
@@ -1594,33 +1623,33 @@ const documentService = {
             insertRequest.input('formattedUretimTarihi', formattedUretimTarihi)
             insertRequest.input('miktar', record.miktar)
             insertRequest.input('kullanici', kullanici)
-            
+
             await insertRequest.query(insertQuery)
             insertCount++
             console.log(`➕ Yeni kayıt eklendi: ${finalSeriNo}`)
           }
         }
-        
+
         // Transaction commit
         await transaction.commit()
-        
+
         log('✅✅✅ UTS TOPLU KAYIT BAŞARILI! ✅✅✅')
         console.log(`➕ ${insertCount} yeni kayıt eklendi`)
         console.log(`✏️ ${updateCount} kayıt güncellendi`)
         console.log(`🗑️ ${deletedSiraNumbers.length} kayıt silindi`)
-        
+
         return {
           success: true,
           insertCount,
           updateCount,
           deleteCount: deletedSiraNumbers.length
         }
-        
+
       } catch (error) {
         await transaction.rollback()
         throw error
       }
-      
+
     } catch (error) {
       console.error('❌ UTS Toplu Kayıt Hatası:', error)
       throw error
@@ -1631,36 +1660,36 @@ const documentService = {
   async saveCarrierBarcode(data) {
     try {
       const pool = await getConnection()
-      
+
       const { carrierLabel, docId, ftirsip, cariKodu, kullanici } = data
-      
+
       if (!carrierLabel) {
         throw new Error('Koli barkodu zorunludur')
       }
-      
+
       if (!docId) {
         throw new Error('Belge ID zorunludur')
       }
-      
+
       if (!kullanici) {
         throw new Error('Kullanıcı bilgisi zorunludur')
       }
-      
+
       log('📦 Koli barkodu işleniyor:', { carrierLabel, docId, ftirsip, cariKodu, kullanici })
-      
+
       // docId'yi parse et (format: SUBE_KODU-FTIRSIP-FATIRS_NO)
       const [subeKodu, parsedFtirsip, belgeNo] = docId.split('-')
-      
+
       // ftirsip parametresi yoksa parse'dan al
       const usedFtirsip = ftirsip || parsedFtirsip
-      
+
       // Belge tipine göre kalem tablosunu seç
       // Sipariş (6) = TBLSIPATRA, Fatura (1/2) = TBLSTHAR
       const isSiparis = usedFtirsip === '6'
       const itemTable = isSiparis ? 'TBLSIPATRA' : 'TBLSTHAR'
-      
+
       console.log(`📋 Kalemler ${itemTable} tablosundan getiriliyor (belgeNo: ${belgeNo}, ftirsip: ${usedFtirsip})`)
-      
+
       // Belgedeki ITS kalemlerini getir (sadece ITS olanlar)
       const itemsRequest = pool.request()
       itemsRequest.input('belgeNo', belgeNo)
@@ -1678,7 +1707,7 @@ const documentService = {
             FROM AKTBLITSUTS WITH (NOLOCK) 
             WHERE FATIRS_NO = @belgeNo 
             AND STOK_KODU = s.STOK_KODU 
-            AND TURU = 'ITS'
+            AND TURU = 'I'
           ), 0) as PREPARED_QTY
         FROM ${itemTable} s WITH (NOLOCK)
         INNER JOIN TBLSTSABIT st WITH (NOLOCK) ON s.STOK_KODU = st.STOK_KODU
@@ -1686,33 +1715,33 @@ const documentService = {
         AND s.STHAR_ACIKLAMA = @cariKodu
         AND st.KOD_5 = 'BESERI'
       `)
-      
+
       if (itemsResult.recordset.length === 0) {
         throw new Error('Belgede ITS ürünü bulunamadı')
       }
-      
+
       // Belgedeki stok kodlarını topla
       const stockCodes = itemsResult.recordset.map(item => item.GTIN).filter(g => g)
-      
+
       log('📋 Belgedeki ITS ürünleri:', itemsResult.recordset.length)
       log('📋 Stok kodları (GTIN):', stockCodes)
-      
+
       // Koliden ürünleri getir (hiyerarşik)
       const carrierResult = await getCarrierProductsRecursive(carrierLabel, stockCodes)
-      
+
       if (!carrierResult.success) {
         throw new Error(carrierResult.error || 'Koli ürünleri getirilemedi')
       }
-      
+
       const { products, allRecords } = carrierResult.data
-      
+
       if (products.length === 0) {
         throw new Error('Kolide ürün bulunamadı veya belgede olmayan ürünler var')
       }
-      
+
       log('📦 Kolide bulunan ürün sayısı:', products.length)
       log('📦 Kolide bulunan toplam kayıt:', allRecords.length)
-      
+
       // Miktar kontrolü - GTIN bazında (temizlenmiş GTIN ile)
       const gtinCountMap = {}
       products.forEach(p => {
@@ -1720,23 +1749,23 @@ const documentService = {
         const cleanGtin = p.GTIN.replace(/^0+/, '')
         gtinCountMap[cleanGtin] = (gtinCountMap[cleanGtin] || 0) + 1
       })
-      
+
       log('📊 Kolide bulunan GTIN sayıları:', gtinCountMap)
-      
+
       // Sadece KOLİDE BULUNAN GTIN'ler için miktar kontrolü yap
       for (const cleanGtin of Object.keys(gtinCountMap)) {
         // Bu GTIN belgede var mı?
         const item = itemsResult.recordset.find(i => i.GTIN.toString().replace(/^0+/, '') === cleanGtin)
-        
+
         if (!item) {
           throw new Error(`Kolide bulunan GTIN (${cleanGtin}) bu belgede yok!`)
         }
-        
+
         const expectedQty = item.MIKTAR
         const preparedQty = item.PREPARED_QTY
         const remainingQty = expectedQty - preparedQty
         const carrierQty = gtinCountMap[cleanGtin] || 0
-        
+
         console.log(`🔍 GTIN ${cleanGtin} kontrolü:`, {
           stokKodu: item.STOK_KODU,
           expectedQty,
@@ -1744,7 +1773,7 @@ const documentService = {
           remainingQty,
           carrierQty
         })
-        
+
         // Sadece kalan miktar 0 veya negatifse hata ver
         if (remainingQty <= 0) {
           throw new Error(
@@ -1758,62 +1787,62 @@ const documentService = {
             `❌ Tüm miktar zaten okutulmuş!`
           )
         }
-        
+
         // Kalan > 0 ise, koli miktarı kalan miktarı geçse bile izin ver
         if (carrierQty > remainingQty) {
           console.log(`⚠️ UYARI: Koli miktarı (${carrierQty}) kalan miktarı (${remainingQty}) aşıyor, ancak izin veriliyor.`)
         }
       }
-      
+
       // Duplicate seri kontrolü - Kolide okutulan serilerden herhangi biri daha önce okutulmuş mu?
       const serialNumbers = products.map(p => p.SERIAL_NUMBER).filter(s => s)
-      
+
       if (serialNumbers.length > 0) {
         const duplicateCheckRequest = pool.request()
-        
+
         // Seri numaralarını parametre olarak ekle
         serialNumbers.forEach((serial, index) => {
           duplicateCheckRequest.input(`serial${index}`, serial)
         })
-        
+
         const serialParams = serialNumbers.map((_, i) => `@serial${i}`).join(',')
-        
+
         const duplicateResult = await duplicateCheckRequest.query(`
           SELECT SERI_NO 
           FROM AKTBLITSUTS WITH (NOLOCK)
           WHERE SERI_NO IN (${serialParams})
           AND FATIRS_NO = '${belgeNo}'
         `)
-        
+
         if (duplicateResult.recordset.length > 0) {
           const duplicateSerials = duplicateResult.recordset.map(r => r.SERI_NO).join(', ')
           throw new Error(`Bu seriler daha önce okutulmuş: ${duplicateSerials}`)
         }
       }
-      
+
       // Tüm kontroller geçti, ürünleri kaydet
       const savedCount = 0
       const transaction = new sql.Transaction(pool)
-      
+
       try {
         await transaction.begin()
-        
+
         for (const product of products) {
           const insertRequest = transaction.request()
-          
-          insertRequest.input('turu', 'ITS')
+
+          insertRequest.input('turu', 'I')
           insertRequest.input('ftirsip', usedFtirsip)
           insertRequest.input('fatirs_no', belgeNo)
           insertRequest.input('cari_kodu', cariKodu)
-          
+
           // GTIN'i temizle (leading zeros kaldır)
           const cleanGtin = product.GTIN.replace(/^0+/, '')
-          
+
           // GTIN'den STOK_KODU ve HAR_RECNO'yu bul (temizlenmiş GTIN ile)
           const stockItem = itemsResult.recordset.find(i => i.GTIN === cleanGtin)
           const stokKodu = stockItem ? stockItem.STOK_KODU : null
           const harRecno = stockItem ? stockItem.INCKEYNO : null
-          
+
           // MIAD formatını YYAAGG'ye çevir (YYMMDD)
           let miadFormatted = null
           if (product.EXPIRATION_DATE) {
@@ -1823,7 +1852,7 @@ const documentService = {
             const dd = String(expDate.getDate()).padStart(2, '0')
             miadFormatted = `${yy}${mm}${dd}`
           }
-          
+
           // URETIM_TARIHI formatını YYAAGG'ye çevir
           let productionFormatted = null
           if (product.PRODUCTION_DATE) {
@@ -1833,7 +1862,7 @@ const documentService = {
             const dd = String(prodDate.getDate()).padStart(2, '0')
             productionFormatted = `${yy}${mm}${dd}`
           }
-          
+
           insertRequest.input('har_recno', harRecno)
           insertRequest.input('stok_kodu', stokKodu)
           insertRequest.input('miktar', 1) // ITS her zaman 1
@@ -1845,7 +1874,7 @@ const documentService = {
           insertRequest.input('carrier_label', product.CARRIER_LABEL)
           insertRequest.input('container_type', product.CONTAINER_TYPE)
           insertRequest.input('kullanici', kullanici)
-          
+
           await insertRequest.query(`
             INSERT INTO AKTBLITSUTS (
               HAR_RECNO, TURU, FTIRSIP, FATIRS_NO, CARI_KODU, STOK_KODU, MIKTAR,
@@ -1858,28 +1887,116 @@ const documentService = {
             )
           `)
         }
-        
+
         await transaction.commit()
-        
+
         console.log(`✅ Koliden ${products.length} ürün başarıyla kaydedildi`)
-        
+
         // Etkilenen unique GTIN'leri topla (temizlenmiş haliyle)
         const affectedGtins = [...new Set(products.map(p => p.GTIN.replace(/^0+/, '')))]
-        
+
         return {
           success: true,
           message: `Koliden ${products.length} ürün başarıyla eklendi`,
           savedCount: products.length,
           affectedGtins: affectedGtins
         }
-        
+
       } catch (error) {
         await transaction.rollback()
         throw error
       }
-      
+
     } catch (error) {
       console.error('❌ Koli Barkodu Kayıt Hatası:', error)
+      throw error
+    }
+  },
+
+  // Belgedeki tüm ITS kayıtlarını PTS bildirimi için getir
+  async getAllITSRecordsForDocument(subeKodu, fatirs_no, ftirsip, cariKodu) {
+    try {
+      const pool = await getConnection()
+
+      const query = `
+      SELECT
+        A.RECNO,
+        A.SERI_NO,
+        A.GTIN,
+        A.MIAD,
+        A.LOT_NO,
+        A.CARRIER_LABEL,
+        A.CONTAINER_TYPE,
+        A.DURUM,
+        A.BILDIRIM_TARIHI,
+        S.STOK_ADI,
+        M.MESAJ AS DURUM_MESAJI
+      FROM AKTBLITSUTS A WITH (NOLOCK)
+      LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON A.STOK_KODU = S.STOK_KODU
+      LEFT JOIN NETSIS.dbo.AKTBLITSMESAJ M WITH (NOLOCK) ON A.DURUM = M.ID
+      WHERE A.FATIRS_NO = @fatirs_no
+        AND A.FTIRSIP = @ftirsip
+        AND A.CARI_KODU = @cariKodu
+        AND A.TURU = 'I'
+      ORDER BY A.KAYIT_TARIHI ASC
+    `
+
+      const request = pool.request()
+      request.input('fatirs_no', fatirs_no)
+      request.input('ftirsip', ftirsip)
+      request.input('cariKodu', cariKodu)
+
+      const result = await request.query(query)
+
+      const records = result.recordset.map(row => ({
+        recNo: row.RECNO,
+        seriNo: row.SERI_NO,
+        gtin: row.GTIN,
+        stokAdi: fixTurkishChars(row.STOK_ADI),
+        miad: row.MIAD,
+        lotNo: row.LOT_NO,
+        carrierLabel: row.CARRIER_LABEL,
+        containerType: row.CONTAINER_TYPE,
+        durum: row.DURUM,
+        durumMesaji: fixTurkishChars(row.DURUM_MESAJI),
+        bildirimTarihi: row.BILDIRIM_TARIHI
+      }))
+
+      log('📋 ITS kayıtları alındı:', records.length)
+      return records
+    } catch (error) {
+      console.error('❌ ITS Kayıtları Getirme Hatası:', error)
+      throw error
+    }
+  },
+
+  // Belgenin PTS durumunu güncelle
+  async updateDocumentPTSStatus(subeKodu, fatirs_no, ftirsip, ptsId, kullanici) {
+    try {
+      const pool = await getConnection()
+
+      // TBLFATUIRS tablosunda PTS alanlarını güncelle
+      const query = `
+        UPDATE TBLFATUIRS
+        SET PTS_ID = @ptsId,
+            PTS_TARIH = GETDATE(),
+            PTS_KULLANICI = @kullanici
+        WHERE FATIRS_NO = @fatirs_no
+          AND FTIRSIP = @ftirsip
+      `
+
+      const request = pool.request()
+      request.input('ptsId', ptsId)
+      request.input('kullanici', kullanici)
+      request.input('fatirs_no', fatirs_no)
+      request.input('ftirsip', ftirsip)
+
+      const result = await request.query(query)
+
+      log('✅ PTS durumu güncellendi:', { fatirs_no, ptsId, rowsAffected: result.rowsAffected })
+      return { success: true, rowsAffected: result.rowsAffected[0] }
+    } catch (error) {
+      console.error('❌ PTS Durumu Güncelleme Hatası:', error)
       throw error
     }
   }

@@ -21,7 +21,7 @@ const dgrService = {
 
     try {
       const pool = await getConnection()
-      
+
       // Mevcut kayıt var mı kontrol et
       const checkQuery = `
         SELECT RECNO, MIKTAR
@@ -29,38 +29,38 @@ const dgrService = {
         WHERE FATIRS_NO = @fatirs_no
           AND HAR_RECNO = @harRecno
           AND STOK_KODU = @stokKodu
-          AND TURU = 'DGR'
+          AND TURU = 'D'
       `
-      
+
       const checkRequest = pool.request()
       checkRequest.input('fatirs_no', fatirs_no)
       checkRequest.input('harRecno', harRecno)
       checkRequest.input('stokKodu', stokKodu)
-      
+
       const checkResult = await checkRequest.query(checkQuery)
-      
+
       if (checkResult.recordset.length > 0) {
         // Mevcut kaydı güncelle (miktarı artır)
         const existingRecord = checkResult.recordset[0]
         const newQuantity = (existingRecord.MIKTAR || 0) + quantity
-        
+
         const updateQuery = `
           UPDATE AKTBLITSUTS
           SET MIKTAR = @miktar,
               KULLANICI = @kullanici
           WHERE RECNO = @recno
-            AND TURU = 'DGR'
+            AND TURU = 'D'
         `
-        
+
         const updateRequest = pool.request()
         updateRequest.input('miktar', newQuantity)
         updateRequest.input('kullanici', kullanici || 'SYSTEM')
         updateRequest.input('recno', existingRecord.RECNO)
-        
+
         await updateRequest.query(updateQuery)
-        
-        return { 
-          success: true, 
+
+        return {
+          success: true,
           message: `DGR miktarı güncellendi: ${newQuantity}`,
           newQuantity
         }
@@ -74,10 +74,10 @@ const dgrService = {
           ) VALUES (
             @stokKodu, @gtin, @miktar,
             @harRecno, @fatirs_no, @ftirsip, @cariKodu,
-            'DGR', GETDATE(), 'A', @kullanici
+            'D', GETDATE(), 'A', @kullanici
           )
         `
-        
+
         const insertRequest = pool.request()
         insertRequest.input('stokKodu', stokKodu)
         insertRequest.input('gtin', gtin)
@@ -87,9 +87,9 @@ const dgrService = {
         insertRequest.input('ftirsip', ftirsip)
         insertRequest.input('cariKodu', cariKodu || '')
         insertRequest.input('kullanici', kullanici || 'SYSTEM')
-        
+
         await insertRequest.query(insertQuery)
-        
+
         return { success: true, message: 'DGR kaydı başarıyla eklendi' }
       }
     } catch (error) {
@@ -105,7 +105,7 @@ const dgrService = {
   async deleteRecord(stokKodu, belgeNo, straInc, quantity = 1) {
     try {
       const pool = await getConnection()
-      
+
       // Önce mevcut miktarı kontrol et
       const checkQuery = `
         SELECT RECNO, MIKTAR
@@ -113,58 +113,58 @@ const dgrService = {
         WHERE FATIRS_NO = @belgeNo
           AND HAR_RECNO = @straInc
           AND STOK_KODU = @stokKodu
-          AND TURU = 'DGR'
+          AND TURU = 'D'
       `
-      
+
       const checkRequest = pool.request()
       checkRequest.input('belgeNo', belgeNo)
       checkRequest.input('straInc', straInc)
       checkRequest.input('stokKodu', stokKodu)
-      
+
       const checkResult = await checkRequest.query(checkQuery)
-      
+
       if (checkResult.recordset.length === 0) {
         return { success: false, message: 'Silinecek DGR kaydı bulunamadı' }
       }
-      
+
       const existingRecord = checkResult.recordset[0]
       const currentQuantity = existingRecord.MIKTAR || 0
-      
+
       if (currentQuantity <= quantity) {
         // Tüm kaydı sil
         const deleteQuery = `
           DELETE FROM AKTBLITSUTS
           WHERE RECNO = @recno
-            AND TURU = 'DGR'
+            AND TURU = 'D'
         `
-        
+
         const deleteRequest = pool.request()
         deleteRequest.input('recno', existingRecord.RECNO)
-        
+
         await deleteRequest.query(deleteQuery)
-        
+
         return { success: true, message: 'DGR kaydı silindi', deletedQuantity: currentQuantity }
       } else {
         // Miktarı düşür
         const newQuantity = currentQuantity - quantity
-        
+
         const updateQuery = `
           UPDATE AKTBLITSUTS
           SET MIKTAR = @miktar
           WHERE RECNO = @recno
-            AND TURU = 'DGR'
+            AND TURU = 'D'
         `
-        
+
         const updateRequest = pool.request()
         updateRequest.input('miktar', newQuantity)
         updateRequest.input('recno', existingRecord.RECNO)
-        
+
         await updateRequest.query(updateQuery)
-        
-        return { 
-          success: true, 
+
+        return {
+          success: true,
           message: `DGR miktarı düşürüldü: ${newQuantity}`,
-          newQuantity 
+          newQuantity
         }
       }
     } catch (error) {
@@ -179,7 +179,7 @@ const dgrService = {
   async getRecords(belgeNo, straInc) {
     try {
       const pool = await getConnection()
-      
+
       const query = `
         SELECT
           RECNO,
@@ -196,16 +196,16 @@ const dgrService = {
         FROM AKTBLITSUTS WITH (NOLOCK)
         WHERE FATIRS_NO = @belgeNo
           AND HAR_RECNO = @straInc
-          AND TURU = 'DGR'
+          AND TURU = 'D'
         ORDER BY RECNO
       `
-      
+
       const request = pool.request()
       request.input('belgeNo', belgeNo)
       request.input('straInc', straInc)
-      
+
       const result = await request.query(query)
-      
+
       return result.recordset.map(row => ({
         recno: row.RECNO,
         stokKodu: row.STOK_KODU,

@@ -8,6 +8,7 @@ import DocumentDetailPage from './pages/DocumentDetailPage'
 import PTSPage from './pages/PTSPage'
 import PTSDetailPage from './pages/PTSDetailPage'
 import SettingsPage from './pages/SettingsPage'
+import MesajKodlariPage from './pages/MesajKodlariPage'
 
 function App() {
   return (
@@ -16,69 +17,78 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
-          
+
           {/* Protected Routes */}
-          <Route 
-            path="/dashboard" 
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          
-          <Route 
-            path="/documents" 
+
+          <Route
+            path="/documents"
             element={
               <ProtectedRoute>
                 <DocumentsPage />
               </ProtectedRoute>
-            } 
+            }
           />
-          
-          <Route 
-            path="/documents/:id" 
+
+          <Route
+            path="/documents/:id"
             element={
               <ProtectedRoute>
                 <DocumentDetailPage />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/pts" 
+          <Route
+            path="/pts"
             element={
               <ProtectedRoute>
                 <PTSPage />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/pts/:transferId" 
+          <Route
+            path="/pts/:transferId"
             element={
               <ProtectedRoute>
                 <PTSDetailPage />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/settings" 
+          <Route
+            path="/mesaj-kodlari"
+            element={
+              <ProtectedRoute>
+                <MesajKodlariPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
             element={
               <ProtectedRoute>
                 <SettingsPage />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Legacy routes - yönlendirme */}
           <Route path="/orders" element={<Navigate to="/documents" replace />} />
           <Route path="/orders/:id" element={<Navigate to="/documents/:id" replace />} />
-          
+
           {/* Default Route - Login'e yönlendir */}
           <Route path="/" element={<Navigate to="/login" replace />} />
-          
+
           {/* 404 - Dashboard'a yönlendir */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

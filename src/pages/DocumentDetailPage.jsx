@@ -12,12 +12,15 @@ import apiService from '../services/apiService'
 import { log } from '../utils/debug'
 import { useSound } from '../hooks/useSound'
 import { parseITSBarcode } from '../utils/barcodeParser'
+import PTSModal from '../components/modals/PTSModal'
+import ITSBildirimModal from '../components/modals/ITSBildirimModal'
 
 const DocumentDetailPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const barcodeInputRef = useRef(null)
   const utsGridRef = useRef(null)
+  const itsGridRef = useRef(null)
 
   // Custom Hooks
   const { playSuccessSound, playErrorSound, playWarningSound } = useSound()
@@ -56,6 +59,12 @@ const DocumentDetailPage = () => {
   const [bulkScanResults, setBulkScanResults] = useState(null)
   const bulkTextareaRef = useRef(null)
   const bulkLineNumbersRef = useRef(null)
+
+  // PTS Bildirimi Modal State'leri
+  const [showPTSModal, setShowPTSModal] = useState(false)
+
+  // ITS Bildirim Modal State'i
+  const [showITSBildirimModal, setShowITSBildirimModal] = useState(false)
 
   // Belge tipini belirle
   const getDocumentTypeName = (docType, tipi) => {
@@ -675,16 +684,16 @@ const DocumentDetailPage = () => {
       width: 120,
       cellClass: 'text-center font-semibold',
       valueFormatter: (params) => {
-        // YYMMDD -> DD.MM.YYYY
         if (!params.value) return ''
-        if (params.value.length === 6) {
-          const yy = params.value.substring(0, 2)
-          const mm = params.value.substring(2, 4)
-          const dd = params.value.substring(4, 6)
-          const yyyy = parseInt(yy) > 50 ? `19${yy}` : `20${yy}`
+        // DATE tipinden gelen tarih (ISO string)
+        const date = new Date(params.value)
+        if (!isNaN(date.getTime())) {
+          const dd = String(date.getDate()).padStart(2, '0')
+          const mm = String(date.getMonth() + 1).padStart(2, '0')
+          const yyyy = date.getFullYear()
           return `${dd}.${mm}.${yyyy}`
         }
-        return params.value
+        return ''
       }
     },
     {
@@ -1817,19 +1826,30 @@ const DocumentDetailPage = () => {
   // ITS Karekodları Text Formatında Oluştur
   const generateITSBarcodeTexts = () => {
     return itsRecords.map(record => {
-      // Format: 010 + ILC_GTIN + 21 + SERI_NO + 17 + ACIK1 + 10 + ACIK2
-      // + işaretleri olmadan, değerler direkt birleştirilir
-      const parts = [
-        '010',
+      // MIAD'ı YYMMDD formatına çevir (yerel saat dilimine göre)
+      let miadFormatted = ''
+      if (record.miad) {
+        const date = new Date(record.miad)
+        if (!isNaN(date.getTime())) {
+          const yy = String(date.getFullYear()).slice(-2)
+          const mm = String(date.getMonth() + 1).padStart(2, '0')
+          const dd = String(date.getDate()).padStart(2, '0')
+          miadFormatted = `${yy}${mm}${dd}`
+        }
+      }
+
+      // Format: 01 + ILC_GTIN + 21 + SERI_NO + 17 + MIAD + 10 + LOT
+      const barcodeText = [
+        '01',
         record.barkod || '',
         '21',
         record.seriNo || '',
         '17',
-        record.miad || '',
+        miadFormatted,
         '10',
         record.lot || ''
       ]
-      return parts.join('')
+      return barcodeText.join('')
     }).join('\n')
   }
 
@@ -2154,6 +2174,22 @@ const DocumentDetailPage = () => {
                   >
                     <RefreshCw className="w-5 h-5" />
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowITSBildirimModal(true)}
+                    className="w-9 h-9 flex items-center justify-center rounded transition-all bg-dark-700 text-slate-200 hover:bg-dark-600 border border-dark-600"
+                    title="ITS Bildirim"
+                  >
+                    ITS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPTSModal(true)}
+                    className="w-9 h-9 flex items-center justify-center rounded transition-all bg-dark-700 text-slate-200 hover:bg-dark-600 border border-dark-600"
+                    title="PTS Gönderimi"
+                  >
+                    PTS
+                  </button>
                 </>
               )}
             </form>
@@ -2383,6 +2419,7 @@ const DocumentDetailPage = () => {
                       </div>
                     ) : (
                       <AgGridReact
+                        ref={itsGridRef}
                         rowData={itsRecords}
                         columnDefs={itsModalColumnDefs}
                         defaultColDef={itsModalDefaultColDef}
@@ -2394,6 +2431,14 @@ const DocumentDetailPage = () => {
                         }}
                         animateRows={true}
                         enableCellTextSelection={true}
+                        onGridReady={(params) => {
+                          // Son satıra scroll yap
+                          if (itsRecords.length > 0) {
+                            setTimeout(() => {
+                              params.api.ensureIndexVisible(itsRecords.length - 1, 'bottom')
+                            }, 100)
+                          }
+                        }}
                       />
                     )}
                   </div>
@@ -2598,6 +2643,26 @@ const DocumentDetailPage = () => {
           </div>
         </div>
       )}
+
+      {/* PTS Modal */}
+      <PTSModal
+        isOpen={showPTSModal}
+        onClose={() => setShowPTSModal(false)}
+        order={order}
+        playSuccessSound={playSuccessSound}
+        playErrorSound={playErrorSound}
+        onSuccess={fetchDocument}
+      />
+
+      {/* ITS Bildirim Modal */}
+      <ITSBildirimModal
+        isOpen={showITSBildirimModal}
+        onClose={() => setShowITSBildirimModal(false)}
+        order={order}
+        playSuccessSound={playSuccessSound}
+        playErrorSound={playErrorSound}
+      />
+
     </div>
   )
 }

@@ -12,7 +12,7 @@ const itsService = {
   async getRecords(subeKodu, belgeNo, straInc) {
     try {
       const pool = await getConnection()
-      
+
       const query = `
         SELECT
           RECNO,
@@ -32,16 +32,16 @@ const itsService = {
         FROM AKTBLITSUTS WITH (NOLOCK)
         WHERE FATIRS_NO = @belgeNo
           AND HAR_RECNO = @straInc
-          AND TURU = 'ITS'
+          AND TURU = 'I'
         ORDER BY SERI_NO
       `
-      
+
       const request = pool.request()
       request.input('belgeNo', belgeNo)
       request.input('straInc', straInc)
-      
+
       const result = await request.query(query)
-      
+
       const records = result.recordset.map(row => fixObjectStrings({
         recno: row.RECNO,
         seriNo: row.SERI_NO,
@@ -58,7 +58,7 @@ const itsService = {
         durum: row.DURUM,
         kullanici: row.KULLANICI
       }))
-      
+
       return records
     } catch (error) {
       console.error('❌ ITS Kayıtları Getirme Hatası:', error)
@@ -85,7 +85,7 @@ const itsService = {
 
     try {
       const pool = await getConnection()
-      
+
       // Mükerrer seri no kontrolü
       const checkQuery = `
         SELECT COUNT(*) as count
@@ -93,20 +93,20 @@ const itsService = {
         WHERE FATIRS_NO = @fatirs_no
           AND HAR_RECNO = @harRecno
           AND SERI_NO = @seriNo
-          AND TURU = 'ITS'
+          AND TURU = 'I'
       `
-      
+
       const checkRequest = pool.request()
       checkRequest.input('fatirs_no', fatirs_no)
       checkRequest.input('harRecno', harRecno)
       checkRequest.input('seriNo', seriNo)
-      
+
       const checkResult = await checkRequest.query(checkQuery)
-      
+
       if (checkResult.recordset[0].count > 0) {
         return { success: false, message: 'Bu seri numarası zaten kayıtlı!' }
       }
-      
+
       // Yeni kayıt ekle
       const insertQuery = `
         INSERT INTO AKTBLITSUTS (
@@ -116,10 +116,10 @@ const itsService = {
         ) VALUES (
           @seriNo, @stokKodu, @gtin, @miad, @lot,
           @harRecno, @fatirs_no, @ftirsip, @cariKodu,
-          'ITS', GETDATE(), 'A', @kullanici
+          'I', GETDATE(), 'A', @kullanici
         )
       `
-      
+
       const insertRequest = pool.request()
       insertRequest.input('seriNo', seriNo)
       insertRequest.input('stokKodu', stokKodu)
@@ -131,9 +131,9 @@ const itsService = {
       insertRequest.input('ftirsip', ftirsip)
       insertRequest.input('cariKodu', cariKodu)
       insertRequest.input('kullanici', kullanici || 'SYSTEM')
-      
+
       await insertRequest.query(insertQuery)
-      
+
       return { success: true, message: 'ITS kaydı başarıyla eklendi' }
     } catch (error) {
       console.error('❌ ITS Kayıt Hatası:', error)
@@ -147,10 +147,10 @@ const itsService = {
   async deleteRecords(seriNos, belgeNo, straInc) {
     try {
       const pool = await getConnection()
-      
+
       // Önce silinecek kayıtların CARRIER_LABEL değerlerini al
       const carrierLabelsToUpdate = new Set()
-      
+
       for (const seriNo of seriNos) {
         const checkQuery = `
           SELECT CARRIER_LABEL
@@ -158,21 +158,21 @@ const itsService = {
           WHERE FATIRS_NO = @belgeNo
             AND HAR_RECNO = @straInc
             AND SERI_NO = @seriNo
-            AND TURU = 'ITS'
+            AND TURU = 'I'
             AND CARRIER_LABEL IS NOT NULL
         `
-        
+
         const checkRequest = pool.request()
         checkRequest.input('belgeNo', belgeNo)
         checkRequest.input('straInc', straInc)
         checkRequest.input('seriNo', seriNo)
-        
+
         const checkResult = await checkRequest.query(checkQuery)
         if (checkResult.recordset.length > 0 && checkResult.recordset[0].CARRIER_LABEL) {
           carrierLabelsToUpdate.add(checkResult.recordset[0].CARRIER_LABEL)
         }
       }
-      
+
       // Koli bütünlüğü korunuyor
       if (carrierLabelsToUpdate.size > 0) {
         for (const carrierLabel of carrierLabelsToUpdate) {
@@ -182,18 +182,18 @@ const itsService = {
             WHERE FATIRS_NO = @belgeNo
               AND HAR_RECNO = @straInc
               AND CARRIER_LABEL = @carrierLabel
-              AND TURU = 'ITS'
+              AND TURU = 'I'
           `
-          
+
           const updateRequest = pool.request()
           updateRequest.input('belgeNo', belgeNo)
           updateRequest.input('straInc', straInc)
           updateRequest.input('carrierLabel', carrierLabel)
-          
+
           await updateRequest.query(updateQuery)
         }
       }
-      
+
       // Seri numaralarını tek tek sil
       let deletedCount = 0
       for (const seriNo of seriNos) {
@@ -202,22 +202,22 @@ const itsService = {
           WHERE FATIRS_NO = @belgeNo
             AND HAR_RECNO = @straInc
             AND SERI_NO = @seriNo
-            AND TURU = 'ITS'
+            AND TURU = 'I'
         `
-        
+
         const request = pool.request()
         request.input('belgeNo', belgeNo)
         request.input('straInc', straInc)
         request.input('seriNo', seriNo)
-        
+
         const result = await request.query(query)
         if (result.rowsAffected[0] > 0) {
           deletedCount++
         }
       }
-      
+
       return { success: true, deletedCount }
-      
+
     } catch (error) {
       console.error('❌ ITS Kayıt Silme Hatası:', error)
       throw error
@@ -237,7 +237,7 @@ const itsService = {
 
     try {
       const pool = await getConnection()
-      
+
       for (let i = 0; i < barcodes.length; i++) {
         const barcode = barcodes[i].trim()
         if (!barcode) continue
@@ -255,14 +255,14 @@ const itsService = {
             SELECT COUNT(*) as count
             FROM AKTBLITSUTS WITH (NOLOCK)
             WHERE SERI_NO = @seriNo
-              AND TURU = 'ITS'
+              AND TURU = 'I'
           `
-          
+
           const checkRequest = pool.request()
           checkRequest.input('seriNo', parsed.serialNumber)
-          
+
           const checkResult = await checkRequest.query(checkQuery)
-          
+
           if (checkResult.recordset[0].count > 0) {
             results.errors.push({ line: i + 1, message: 'Bu seri numarası zaten kayıtlı' })
             results.errorCount++
@@ -278,10 +278,10 @@ const itsService = {
             ) VALUES (
               @seriNo, @stokKodu, @gtin, @miad, @lot,
               @harRecno, @fatirs_no, @ftirsip, @cariKodu,
-              'ITS', GETDATE(), 'A', @kullanici
+              'I', GETDATE(), 'A', @kullanici
             )
           `
-          
+
           const insertRequest = pool.request()
           insertRequest.input('seriNo', parsed.serialNumber)
           insertRequest.input('stokKodu', documentInfo.stokKodu)
@@ -293,10 +293,10 @@ const itsService = {
           insertRequest.input('ftirsip', documentInfo.ftirsip)
           insertRequest.input('cariKodu', documentInfo.cariKodu)
           insertRequest.input('kullanici', kullanici || 'SYSTEM')
-          
+
           await insertRequest.query(insertQuery)
           results.successCount++
-          
+
         } catch (error) {
           results.errors.push({ line: i + 1, message: error.message })
           results.errorCount++
@@ -321,7 +321,7 @@ const itsService = {
     try {
       const ai01Index = barcode.indexOf('01')
       const ai21Index = barcode.indexOf('21')
-      
+
       if (ai01Index === -1 || ai21Index === -1) {
         return null
       }
