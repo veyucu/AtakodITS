@@ -411,8 +411,7 @@ const apiService = {
   downloadBulkPackagesStream: async (startDate, endDate, onProgress, settings = null) => {
     return new Promise((resolve, reject) => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
-        const url = `${API_URL}/pts/download-bulk-stream`
+        const url = `${API_BASE_URL}/pts/download-bulk-stream`
 
         log('📥 SSE Toplu paket indirme başlıyor:', startDate, endDate)
 
