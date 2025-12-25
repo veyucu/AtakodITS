@@ -82,9 +82,9 @@ router.post('/download-bulk-stream', async (req, res) => {
 
     // 1. Transfer ID listesini al
     sendProgress({ status: 'searching', message: 'Paketler aranıyor...' })
-    
+
     const searchResult = await ptsService.searchPackages(startDate, endDate, settings)
-    
+
     if (!searchResult.success) {
       sendProgress({ status: 'error', message: searchResult.message })
       res.end()
@@ -92,28 +92,28 @@ router.post('/download-bulk-stream', async (req, res) => {
     }
 
     const transferIds = searchResult.data || []
-    
+
     if (transferIds.length === 0) {
-      sendProgress({ 
-        status: 'completed', 
-        total: 0, 
-        downloaded: 0, 
-        skipped: 0, 
+      sendProgress({
+        status: 'completed',
+        total: 0,
+        downloaded: 0,
+        skipped: 0,
         failed: 0,
-        message: 'Belirtilen tarih aralığında paket bulunamadı' 
+        message: 'Belirtilen tarih aralığında paket bulunamadı'
       })
       res.end()
       return
     }
 
     console.log(`📦 ${transferIds.length} paket bulundu`)
-    sendProgress({ 
-      status: 'downloading', 
+    sendProgress({
+      status: 'downloading',
       total: transferIds.length,
       downloaded: 0,
       skipped: 0,
       failed: 0,
-      message: `${transferIds.length} paket bulundu, indirme başlıyor...` 
+      message: `${transferIds.length} paket bulundu, indirme başlıyor...`
     })
 
     // 2. Her paketi indir ve kaydet
@@ -133,7 +133,7 @@ router.post('/download-bulk-stream', async (req, res) => {
         // Daha önce indirilmiş mi kontrol et
         console.log(`🔍 Kontrol ediliyor: ${transferIdStr} (${i + 1}/${transferIds.length})`)
         const existingCheck = await ptsDbService.getPackageData(transferIdStr)
-        
+
         if (existingCheck.success && existingCheck.data) {
           results.skipped++
           results.packages.push({
@@ -142,7 +142,7 @@ router.post('/download-bulk-stream', async (req, res) => {
             message: 'Daha önce indirilmiş'
           })
           console.log(`⏭️  ${transferIdStr} zaten veritabanında, atlanıyor`)
-          
+
           // Progress güncelle
           sendProgress({
             status: 'downloading',
@@ -167,12 +167,12 @@ router.post('/download-bulk-stream', async (req, res) => {
           current: i + 1,
           message: `${transferIdStr} indiriliyor... (${i + 1}/${transferIds.length})`
         })
-        
+
         const downloadResult = await ptsService.downloadPackage(transferIdStr, settings)
-        
+
         if (downloadResult.success) {
           const saveResult = await ptsDbService.savePackageData(downloadResult.data)
-          
+
           if (saveResult.success) {
             results.downloaded++
             results.packages.push({
@@ -181,7 +181,7 @@ router.post('/download-bulk-stream', async (req, res) => {
               productCount: downloadResult.data?.products?.length || 0
             })
             console.log(`✅ ${transferIdStr} veritabanına kaydedildi (${downloadResult.data?.products?.length || 0} ürün)`)
-            
+
             // Progress güncelle
             sendProgress({
               status: 'downloading',
@@ -200,7 +200,7 @@ router.post('/download-bulk-stream', async (req, res) => {
               message: `Kayıt hatası: ${saveResult.message}`
             })
             console.error(`❌ ${transferIdStr} veritabanına kaydedilemedi:`, saveResult.message)
-            
+
             sendProgress({
               status: 'downloading',
               total: results.total,
@@ -219,7 +219,7 @@ router.post('/download-bulk-stream', async (req, res) => {
             message: downloadResult.message
           })
           console.error(`❌ Hata: ${transferIdStr} - ${downloadResult.message}`)
-          
+
           sendProgress({
             status: 'downloading',
             total: results.total,
@@ -239,7 +239,7 @@ router.post('/download-bulk-stream', async (req, res) => {
           message: error.message
         })
         console.error(`❌ ${transferId} indirme hatası:`, error.message)
-        
+
         sendProgress({
           status: 'downloading',
           total: results.total,
@@ -291,13 +291,13 @@ router.post('/download-bulk-old', async (req, res) => {
     log('📥 Toplu paket indirme başlıyor (OLD):', { startDate, endDate })
 
     const searchResult = await ptsService.searchPackages(startDate, endDate, settings)
-    
+
     if (!searchResult.success) {
       return res.json(searchResult)
     }
 
     const transferIds = searchResult.data || []
-    
+
     if (transferIds.length === 0) {
       return res.json({
         success: true,
@@ -319,17 +319,17 @@ router.post('/download-bulk-old', async (req, res) => {
 
     for (const transferId of transferIds) {
       const transferIdStr = String(transferId)
-      
+
       try {
         const existingCheck = await ptsDbService.getPackageData(transferIdStr)
-        
+
         if (existingCheck.success && existingCheck.data) {
           results.skipped++
           continue
         }
 
         const downloadResult = await ptsService.downloadPackage(transferIdStr, settings)
-        
+
         if (downloadResult.success) {
           const saveResult = await ptsDbService.savePackageData(downloadResult.data)
           if (saveResult.success) results.downloaded++
@@ -375,7 +375,7 @@ router.post('/list', async (req, res) => {
     log('📋 PTS paketleri listeleniyor:', { startDate, endDate, dateFilterType })
 
     const result = await ptsDbService.listPackages(startDate, endDate, dateFilterType)
-    
+
     res.json(result)
 
   } catch (error) {
@@ -571,6 +571,144 @@ router.get('/carrier-details/:transferId/:carrierLabel', async (req, res) => {
       success: false,
       message: 'Sunucu hatası',
       error: error.message
+    })
+  }
+})
+
+/**
+ * POST /api/pts/:transferId/alim-bildirimi
+ * PTS Alım Bildirimi - /common/app/accept
+ */
+router.post('/:transferId/alim-bildirimi', async (req, res) => {
+  try {
+    const { transferId } = req.params
+    const { products, settings } = req.body
+
+    log('📥 PTS Alım Bildirimi İsteği:', { transferId, productCount: products?.length })
+
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bildirilecek ürün listesi boş'
+      })
+    }
+
+    // ITS API servisini import et
+    const itsApiService = await import('../services/itsApiService.js')
+
+    // Alış bildirimi yap (sadece productList gönderilir)
+    const result = await itsApiService.depoAlisBildirimi(products, settings)
+
+    log('📋 PTS Alım Bildirimi Sonucu:', JSON.stringify({
+      success: result.success,
+      message: result.message,
+      dataCount: result.data?.length,
+      productsCount: products.length,
+      firstProduct: products[0] ? { id: products[0].id, gtin: products[0].gtin } : null,
+      firstResult: result.data?.[0] || null
+    }, null, 2))
+
+    // Sonuç başarılı veya başarısız - her durumda kayıtları güncelle
+    if (result.data && result.data.length > 0) {
+      // Her ürün için sonucu hazırla - GTIN ve seriNo ile
+      const recordsToUpdate = result.data.map(item => ({
+        gtin: item.gtin,
+        sn: item.seriNo,
+        durum: item.durum
+      }))
+
+      log(`📝 Güncellenecek kayıt: ${recordsToUpdate.length}/${result.data.length}`)
+
+      // Tüm satırlar başarılı mı kontrol et
+      const tumBasarili = result.data.every(item => item.durum == 1)
+
+      // PTS tablolarını güncelle (AKTBLPTSMAS her zaman, AKTBLPTSTRA eşleşenler için)
+      try {
+        await itsApiService.updatePTSBildirimDurum(transferId, recordsToUpdate, tumBasarili)
+        log('✅ PTS tabloları güncellendi')
+      } catch (updateError) {
+        log('❌ PTS tablo güncelleme hatası:', updateError.message)
+      }
+    }
+
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ PTS Alım Bildirimi Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Alım bildirimi gönderilemedi'
+    })
+  }
+})
+
+/**
+ * POST /api/pts/:transferId/alim-iade-bildirimi
+ * PTS Alım İade Bildirimi - /common/app/return
+ */
+router.post('/:transferId/alim-iade-bildirimi', async (req, res) => {
+  try {
+    const { transferId } = req.params
+    const { karsiGlnNo, products, settings } = req.body
+
+    log('🔴 PTS Alım İade Bildirimi İsteği:', { transferId, karsiGlnNo, productCount: products?.length })
+
+    if (!karsiGlnNo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Karşı taraf GLN numarası zorunludur'
+      })
+    }
+
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'İade edilecek ürün listesi boş'
+      })
+    }
+
+    // ITS API servisini import et
+    const itsApiService = await import('../services/itsApiService.js')
+
+    // İade alış bildirimi yap
+    const result = await itsApiService.depoIadeAlisBildirimi(karsiGlnNo, products, settings)
+
+    log('📋 PTS Alım İade Bildirimi Sonucu:', {
+      success: result.success,
+      dataCount: result.data?.length,
+      productsCount: products.length
+    })
+
+    // Sonuç başarılı veya başarısız - her durumda kayıtları güncelle
+    if (result.data && result.data.length > 0) {
+      // Her ürün için sonucu hazırla - GTIN ve seriNo ile
+      const recordsToUpdate = result.data.map(item => ({
+        gtin: item.gtin,
+        sn: item.seriNo,
+        durum: item.durum
+      }))
+
+      log(`📝 Güncellenecek kayıt: ${recordsToUpdate.length}/${result.data.length}`)
+
+      // Tüm satırlar başarılı mı kontrol et
+      const tumBasarili = result.data.every(item => item.durum == 1)
+
+      // PTS tablolarını güncelle (AKTBLPTSMAS her zaman, AKTBLPTSTRA eşleşenler için)
+      try {
+        await itsApiService.updatePTSBildirimDurum(transferId, recordsToUpdate, tumBasarili)
+        log('✅ PTS tabloları güncellendi')
+      } catch (updateError) {
+        log('❌ PTS tablo güncelleme hatası:', updateError.message)
+      }
+    }
+
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ PTS Alım İade Bildirimi Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Alım iade bildirimi gönderilemedi'
     })
   }
 })

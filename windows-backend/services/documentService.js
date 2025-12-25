@@ -1,4 +1,4 @@
-import { getConnection } from '../config/database.js'
+import db, { getConnection } from '../config/database.js'
 import { getCarrierProductsRecursive } from './ptsDbService.js'
 import sql from 'mssql'
 import settingsService from './settingsService.js'
@@ -19,6 +19,15 @@ const documentService = {
         throw new Error('Tarih filtresi zorunludur')
       }
 
+      // Ayarlardan GLN ve UTS kolon bilgilerini al
+      const settings = await settingsService.getSettings()
+      const glnInfo = settingsService.parseColumnInfo(settings.cariGlnBilgisi || 'TBLCASABIT.EMAIL')
+      const utsInfo = settingsService.parseColumnInfo(settings.cariUtsBilgisi || 'TBLCASABITEK.KULL3S')
+
+      // Dinamik kolon isimleri
+      const glnColumn = glnInfo.table === 'TBLCASABIT' ? `C.${glnInfo.column}` : `CE.${glnInfo.column}`
+      const utsColumn = utsInfo.table === 'TBLCASABIT' ? `C.${utsInfo.column}` : `CE.${utsInfo.column}`
+
       // Filtre WHERE koşulları
       const additionalWhere = ` AND CAST(V.TARIH AS DATE) = @filterDate`
       const params = { filterDate: date }
@@ -36,8 +45,8 @@ const documentService = {
           C.CARI_ILCE,
           C.CARI_IL,
           C.CARI_TEL AS TEL,
-          C.EMAIL AS GLN,
-          CE.KULL3S AS UTS_NO,
+          ${glnColumn} AS GLN_NO,
+          ${utsColumn} AS UTS_NO,
           (CASE WHEN ISNULL(C.VERGI_NUMARASI,'')='' THEN CE.TCKIMLIKNO ELSE C.VERGI_NUMARASI END) AS VKN,
           CAST(V.KAYITTARIHI AS DATETIME) AS KAYIT_TARIHI,
           V.MIKTAR,
@@ -46,7 +55,9 @@ const documentService = {
           V.ITS_COUNT,
           V.UTS_COUNT,
           V.DGR_COUNT,
-          V.ITS_DURUM
+          V.ITS_DURUM,
+          V.ITS_TARIH,
+          V.ITS_KULLANICI
         FROM
         (
           SELECT 
@@ -64,7 +75,9 @@ const documentService = {
             (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='BESERI') AS ITS_COUNT,
             (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='UTS') AS UTS_COUNT,
             (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND (S.KOD_5 IS NULL OR S.KOD_5 NOT IN ('BESERI','UTS'))) AS DGR_COUNT,
-            A.ITS_DURUM
+            A.ITS_DURUM,
+            A.ITS_TARIH,
+            A.ITS_KULLANICI
           FROM 
             TBLSIPAMAS A WITH (NOLOCK)
           WHERE FTIRSIP='6' ${additionalWhere.replace('V.TARIH', 'A.TARIH')}
@@ -86,7 +99,9 @@ const documentService = {
             (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='BESERI') AS ITS_COUNT,
             (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='UTS') AS UTS_COUNT,
             (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND (S.KOD_5 IS NULL OR S.KOD_5 NOT IN ('BESERI','UTS'))) AS DGR_COUNT,
-            A.ITS_DURUM
+            A.ITS_DURUM,
+            A.ITS_TARIH,
+            A.ITS_KULLANICI
           FROM 
             TBLFATUIRS A WITH (NOLOCK)
           WHERE A.FTIRSIP IN ('1','2') ${additionalWhere.replace('V.TARIH', 'A.TARIH')}
@@ -124,7 +139,7 @@ const documentService = {
           CARI_ILCE: fixTurkishChars(row.CARI_ILCE),
           CARI_IL: fixTurkishChars(row.CARI_IL),
           TEL: row.TEL,
-          GLN: row.GLN,
+          GLN_NO: row.GLN_NO,
           UTS_NO: row.UTS_NO,
           VKN: row.VKN,
           KAYIT_TARIHI: row.KAYIT_TARIHI,
@@ -134,7 +149,9 @@ const documentService = {
           ITS_COUNT: row.ITS_COUNT || 0,
           UTS_COUNT: row.UTS_COUNT || 0,
           DGR_COUNT: row.DGR_COUNT || 0,
-          ITS_DURUM: row.ITS_DURUM || ''
+          ITS_DURUM: row.ITS_DURUM || '',
+          ITS_TARIH: row.ITS_TARIH,
+          ITS_KULLANICI: row.ITS_KULLANICI
         }
 
 
@@ -154,7 +171,7 @@ const documentService = {
           district: fixedRow.CARI_ILCE,
           city: fixedRow.CARI_IL,
           phone: fixedRow.TEL,
-          email: fixedRow.GLN,
+          glnNo: fixedRow.GLN_NO,
           utsNo: fixedRow.UTS_NO,
           vkn: fixedRow.VKN,
           kayitTarihi: fixedRow.KAYIT_TARIHI ? fixedRow.KAYIT_TARIHI.toISOString() : null,
@@ -164,7 +181,9 @@ const documentService = {
           preparedItems: fixedRow.OKUTULAN || 0,
           status: fixedRow.OKUTULAN === 0 ? 'pending' :
             fixedRow.OKUTULAN < fixedRow.MIKTAR ? 'preparing' : 'completed',
-          itsDurum: fixedRow.ITS_DURUM || ''
+          itsDurum: fixedRow.ITS_DURUM || '',
+          itsTarih: fixedRow.ITS_TARIH ? fixedRow.ITS_TARIH.toISOString() : null,
+          itsKullanici: fixedRow.ITS_KULLANICI || ''
         }
 
         return doc
@@ -183,21 +202,25 @@ const documentService = {
       log('📄 getDocumentById çağrıldı:', { subeKodu, ftirsip, fatirs_no })
       const pool = await getConnection()
 
-      // Ayarlardan GLN ve UTS kolon bilgilerini al
+      // Ayarlardan GLN, UTS ve ePosta kolon bilgilerini al
       const settings = await settingsService.getSettings()
       const glnInfo = settingsService.parseColumnInfo(settings.cariGlnBilgisi || 'TBLCASABIT.EMAIL')
       const utsInfo = settingsService.parseColumnInfo(settings.cariUtsBilgisi || 'TBLCASABITEK.KULL3S')
+      const epostaInfo = settingsService.parseColumnInfo(settings.cariEpostaBilgisi || 'TBLCASABITEK.CARIALIAS')
 
       log('🔧 Ayarlar:', {
         glnTable: glnInfo.table,
         glnColumn: glnInfo.column,
         utsTable: utsInfo.table,
-        utsColumn: utsInfo.column
+        utsColumn: utsInfo.column,
+        epostaTable: epostaInfo.table,
+        epostaColumn: epostaInfo.column
       })
 
       // Dinamik kolon isimleri
       const glnColumn = glnInfo.table === 'TBLCASABIT' ? `C.${glnInfo.column}` : `CE.${glnInfo.column}`
       const utsColumn = utsInfo.table === 'TBLCASABIT' ? `C.${utsInfo.column}` : `CE.${utsInfo.column}`
+      const epostaColumn = epostaInfo.table === 'TBLCASABIT' ? `C.${epostaInfo.column}` : `CE.${epostaInfo.column}`
 
       // Belge detayı için sorgu
       const detailQuery = `
@@ -213,8 +236,9 @@ const documentService = {
           C.CARI_ILCE,
           C.CARI_IL,
           C.CARI_TEL AS TEL,
-          ${glnColumn} AS GLN,
+          ${glnColumn} AS GLN_NO,
           ${utsColumn} AS UTS_NO,
+          ${epostaColumn} AS EPOSTA,
           (CASE WHEN ISNULL(C.VERGI_NUMARASI,'')='' THEN CE.TCKIMLIKNO ELSE C.VERGI_NUMARASI END) AS VKN,
           CAST(V.KAYITTARIHI AS DATETIME) AS KAYIT_TARIHI,
           V.MIKTAR,
@@ -309,8 +333,9 @@ const documentService = {
         CARI_ILCE: fixTurkishChars(row.CARI_ILCE),
         CARI_IL: fixTurkishChars(row.CARI_IL),
         TEL: row.TEL,
-        GLN: row.GLN,
+        GLN_NO: row.GLN_NO,
         UTS_NO: row.UTS_NO,
+        EPOSTA: row.EPOSTA,
         VKN: row.VKN,
         KAYIT_TARIHI: row.KAYIT_TARIHI,
         MIKTAR: row.MIKTAR,
@@ -334,8 +359,9 @@ const documentService = {
         district: fixedRow.CARI_ILCE,
         city: fixedRow.CARI_IL,
         phone: fixedRow.TEL,
-        email: fixedRow.GLN,
+        glnNo: fixedRow.GLN_NO,
         utsNo: fixedRow.UTS_NO,
+        eposta: fixedRow.EPOSTA,
         vkn: fixedRow.VKN,
         kayitTarihi: fixedRow.KAYIT_TARIHI ? fixedRow.KAYIT_TARIHI.toISOString() : null,
         miktar: fixedRow.MIKTAR || 0,
@@ -1923,6 +1949,9 @@ const documentService = {
     try {
       const pool = await getConnection()
 
+      // PTS database adını config'den al (dinamik)
+      const ptsDbName = db.ptsConfig?.database || process.env.PTS_DB_NAME || 'NETSIS'
+
       const query = `
       SELECT
         A.RECNO,
@@ -1938,7 +1967,7 @@ const documentService = {
         M.MESAJ AS DURUM_MESAJI
       FROM AKTBLITSUTS A WITH (NOLOCK)
       LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON A.STOK_KODU = S.STOK_KODU
-      LEFT JOIN NETSIS.dbo.AKTBLITSMESAJ M WITH (NOLOCK) ON A.DURUM = M.ID
+      LEFT JOIN ${ptsDbName}.dbo.AKTBLITSMESAJ M WITH (NOLOCK) ON A.DURUM = M.ID
       WHERE A.FATIRS_NO = @fatirs_no
         AND A.FTIRSIP = @ftirsip
         AND A.CARI_KODU = @cariKodu

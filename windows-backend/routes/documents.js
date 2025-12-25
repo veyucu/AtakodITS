@@ -931,7 +931,7 @@ router.post('/:id/pts-notification', async (req, res) => {
 router.post('/:id/its-satis-bildirimi', async (req, res) => {
   try {
     const { id } = req.params
-    const { karsiGlnNo, products, settings } = req.body
+    const { karsiGlnNo, products, settings, belgeInfo } = req.body
 
     log('📤 ITS Satış Bildirimi İsteği:', { documentId: id, productCount: products?.length })
 
@@ -965,6 +965,19 @@ router.post('/:id/its-satis-bildirimi', async (req, res) => {
       if (recordsToUpdate.length > 0) {
         await itsApiService.updateBildirimDurum(recordsToUpdate)
       }
+
+      // Belge ITS durumunu güncelle (tüm satırlar başarılı ise OK, değilse NOK)
+      if (belgeInfo?.subeKodu && belgeInfo?.fatirsNo) {
+        const tumBasarili = result.data.every(item => item.durum == 1)
+        await itsApiService.updateBelgeITSDurum(
+          belgeInfo.subeKodu,
+          belgeInfo.fatirsNo,
+          belgeInfo.ftirsip || '1',
+          belgeInfo.cariKodu,
+          tumBasarili,
+          belgeInfo.kullanici
+        )
+      }
     }
 
     res.json(result)
@@ -982,7 +995,7 @@ router.post('/:id/its-satis-bildirimi', async (req, res) => {
 router.post('/:id/its-satis-iptal', async (req, res) => {
   try {
     const { id } = req.params
-    const { karsiGlnNo, products, settings } = req.body
+    const { karsiGlnNo, products, settings, belgeInfo } = req.body
 
     log('🔴 ITS Satış İptal İsteği:', { documentId: id, productCount: products?.length })
 
@@ -1012,6 +1025,19 @@ router.post('/:id/its-satis-iptal', async (req, res) => {
       if (recordsToUpdate.length > 0) {
         await itsApiService.updateBildirimDurum(recordsToUpdate)
       }
+
+      // Belge ITS durumunu güncelle
+      if (belgeInfo?.subeKodu && belgeInfo?.fatirsNo) {
+        const tumBasarili = result.data.every(item => item.durum == 1)
+        await itsApiService.updateBelgeITSDurum(
+          belgeInfo.subeKodu,
+          belgeInfo.fatirsNo,
+          belgeInfo.ftirsip || '1',
+          belgeInfo.cariKodu,
+          tumBasarili,
+          belgeInfo.kullanici
+        )
+      }
     }
 
     res.json(result)
@@ -1021,6 +1047,123 @@ router.post('/:id/its-satis-iptal', async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Satış iptal bildirimi gönderilemedi'
+    })
+  }
+})
+
+// POST /api/documents/:id/its-alis-bildirimi - ITS Alış Bildirimi (Mal Alım)
+router.post('/:id/its-alis-bildirimi', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { products, settings, belgeInfo } = req.body
+
+    log('📥 ITS Alış Bildirimi (Mal Alım) İsteği:', { documentId: id, productCount: products?.length })
+
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bildirilecek ürün listesi boş'
+      })
+    }
+
+    // ITS API servisini import et
+    const itsApiService = await import('../services/itsApiService.js')
+
+    // Alış bildirimi yap (sadece productList gönderilir)
+    const result = await itsApiService.depoAlisBildirimi(products, settings)
+
+    if (result.success) {
+      // Başarılı sonuçları veritabanına kaydet
+      const recordsToUpdate = result.data.map((item, index) => ({
+        recNo: products[index]?.recNo,
+        durum: item.durum
+      })).filter(r => r.recNo)
+
+      if (recordsToUpdate.length > 0) {
+        await itsApiService.updateBildirimDurum(recordsToUpdate)
+      }
+
+      // Belge ITS durumunu güncelle
+      if (belgeInfo?.subeKodu && belgeInfo?.fatirsNo) {
+        const tumBasarili = result.data.every(item => item.durum == 1)
+        await itsApiService.updateBelgeITSDurum(
+          belgeInfo.subeKodu,
+          belgeInfo.fatirsNo,
+          belgeInfo.ftirsip || '2',
+          belgeInfo.cariKodu,
+          tumBasarili,
+          belgeInfo.kullanici
+        )
+      }
+    }
+
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ ITS Alış Bildirimi Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Alış bildirimi gönderilemedi'
+    })
+  }
+})
+
+// POST /api/documents/:id/its-iade-alis - ITS İade Alış Bildirimi (Mal İade)
+router.post('/:id/its-iade-alis', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { karsiGlnNo, products, settings, belgeInfo } = req.body
+
+    log('🔴 ITS İade Alış Bildirimi İsteği:', { documentId: id, productCount: products?.length })
+
+    if (!karsiGlnNo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Karşı taraf GLN numarası zorunludur'
+      })
+    }
+
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'İade edilecek ürün listesi boş'
+      })
+    }
+
+    const itsApiService = await import('../services/itsApiService.js')
+    const result = await itsApiService.depoIadeAlisBildirimi(karsiGlnNo, products, settings)
+
+    if (result.success) {
+      const recordsToUpdate = result.data.map((item, index) => ({
+        recNo: products[index]?.recNo,
+        durum: item.durum
+      })).filter(r => r.recNo)
+
+      if (recordsToUpdate.length > 0) {
+        await itsApiService.updateBildirimDurum(recordsToUpdate)
+      }
+
+      // Belge ITS durumunu güncelle
+      if (belgeInfo?.subeKodu && belgeInfo?.fatirsNo) {
+        const tumBasarili = result.data.every(item => item.durum == 1)
+        await itsApiService.updateBelgeITSDurum(
+          belgeInfo.subeKodu,
+          belgeInfo.fatirsNo,
+          belgeInfo.ftirsip || '2',
+          belgeInfo.cariKodu,
+          tumBasarili,
+          belgeInfo.kullanici
+        )
+      }
+    }
+
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ ITS İade Alış Bildirimi Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'İade alış bildirimi gönderilemedi'
     })
   }
 })

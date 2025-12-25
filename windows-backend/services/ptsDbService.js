@@ -1,4 +1,4 @@
-import { getPTSConnection, getConnection } from '../config/database.js'
+import db, { getPTSConnection, getConnection } from '../config/database.js'
 import sql from 'mssql'
 import iconv from 'iconv-lite'
 import { log } from '../utils/logger.js'
@@ -207,11 +207,23 @@ async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', st
     const masterData = masterResult.recordset[0]
     console.log(`✅ Paket bulundu: ${transferId}`)
 
-    // Ürün detaylarını getir (NETSIS.AKTBLPTSTRA)
+    // Ürün detaylarını getir - AKTBLITSMESAJ ve TBLSTSABIT ile cross-database join
+    // Database adını config'den al (dinamik)
+    const mainDbName = db.mainConfig?.database || process.env.DB_NAME || 'MUHASEBE2025'
+
     const productsRequest = ptsPool.request()
     productsRequest.input('transferId', sql.BigInt, BigInt(transferId))
     const productsResult = await productsRequest.query(`
-      SELECT * FROM AKTBLPTSTRA WHERE TRANSFER_ID = @transferId
+      SELECT 
+        p.*,
+        m.MESAJ AS DURUM_MESAJI,
+        s.STOK_ADI
+      FROM AKTBLPTSTRA p
+      LEFT JOIN AKTBLITSMESAJ m ON TRY_CAST(p.DURUM AS INT) = m.ID
+      LEFT JOIN ${mainDbName}.dbo.TBLSTSABIT s ON 
+        s.STOK_KODU = SUBSTRING(p.GTIN, PATINDEX('%[^0]%', p.GTIN + '0'), LEN(p.GTIN))
+        OR s.STOK_KODU = p.GTIN
+      WHERE p.TRANSFER_ID = @transferId
     `)
 
     console.log(`✅ ${productsResult.recordset.length} ürün bulundu`)
@@ -236,82 +248,12 @@ async function getPackageData(transferId, cariGlnColumn = 'TBLCASABIT.EMAIL', st
       }
     }
 
-    // Stok bilgilerini getir (GTIN'lere göre)
-    // GTIN'lerden baştaki sıfırları kırp
-    const uniqueGtins = [...new Set(productsResult.recordset.map(p => {
-      if (!p.GTIN) return null
-      // Başındaki sıfırları kaldır
-      return p.GTIN.replace(/^0+/, '') || '0'
-    }).filter(g => g))]
-
-    let stockMap = {}
-
-    if (uniqueGtins.length > 0) {
-      try {
-        // stockBarcodeColumn parametresini parse et (örn: "TBLSTSABIT.STOK_KODU" -> "STOK_KODU")
-        const rawStockColumn = stockBarcodeColumn.includes('.')
-          ? stockBarcodeColumn.split('.')[1]
-          : stockBarcodeColumn
-
-        // SQL Injection koruması - sadece izin verilen kolon adları
-        const ALLOWED_STOCK_COLUMNS = ['STOK_KODU', 'GTIN', 'BARKOD', 'STOK_ADI', 'KOD_1', 'KOD_2', 'KOD_3', 'KOD_4', 'KOD_5']
-        const stockColumn = ALLOWED_STOCK_COLUMNS.includes(rawStockColumn) ? rawStockColumn : 'STOK_KODU'
-
-        console.log(`📦 Stok bilgisi aranacak kolon: ${stockColumn}`)
-        console.log(`📦 Temizlenmiş GTIN örnekleri:`, uniqueGtins.slice(0, 3))
-
-        const stockRequest = mainPool.request()
-        const gtinPlaceholders = uniqueGtins.map((_, i) => `@gtin${i}`).join(',')
-        uniqueGtins.forEach((gtin, i) => {
-          stockRequest.input(`gtin${i}`, sql.VarChar, gtin)
-        })
-
-        const stockQuery = `
-          SELECT ${stockColumn}, STOK_ADI,STOK_KODU
-          FROM TBLSTSABIT WITH (NOLOCK)
-          WHERE ${stockColumn} IN (${gtinPlaceholders})
-        `
-        const stockResult = await stockRequest.query(stockQuery)
-
-        console.log(`✅ ${stockResult.recordset.length} stok bilgisi bulundu`)
-
-        // İlk birkaç sonucu logla (debug)
-        log('📦 TBLSTSABIT\'ten dönen ilk 3 kayıt:')
-        stockResult.recordset.slice(0, 3).forEach(s => {
-          console.log(`  ${stockColumn}: ${s[stockColumn]} -> STOK_ADI: ${s.STOK_ADI}`)
-        })
-
-        // Map oluştur: Temizlenmiş GTIN -> STOK_ADI
-        stockResult.recordset.forEach(s => {
-          // STOK_KODU virgülle ayrılmışsa ilk kısmı al (örn: "8699832090093,8699832090093" -> "8699832090093")
-          const rawKey = s[stockColumn]
-          const key = rawKey ? rawKey.toString().split(',')[0].trim() : null
-
-          if (key) {
-            stockMap[key] = {
-              STOK_ADI: fixTurkishChars(s.STOK_ADI)
-            }
-          }
-        })
-
-        // stockMap içeriğini logla
-        log('📦 stockMap anahtarları:', Object.keys(stockMap).slice(0, 3))
-      } catch (e) {
-        console.warn('⚠️ Stok bilgileri alınamadı:', e.message)
-      }
-    }
-
-    // Ürünlere stok bilgilerini ekle
+    // Ürünlere Türkçe karakter düzeltmesi uygula (STOK_ADI ve DURUM_MESAJI için)
     const enrichedProducts = productsResult.recordset.map(p => {
-      // GTIN'i temizle (baştaki sıfırları kaldır)
-      const cleanGtin = p.GTIN ? p.GTIN.replace(/^0+/, '') || '0' : null
-      const stockInfo = stockMap[cleanGtin]
-
       return {
         ...p,
-        STOK_ADI: stockInfo?.STOK_ADI || null,
-        STOK_KODU: stockInfo?.STOK_KODU || null,
-        CLEAN_GTIN: cleanGtin // Debug için
+        STOK_ADI: p.STOK_ADI ? fixTurkishChars(p.STOK_ADI) : null,
+        DURUM_MESAJI: p.DURUM_MESAJI ? fixTurkishChars(p.DURUM_MESAJI) : null
       }
     })
 
@@ -364,6 +306,9 @@ async function listPackages(startDate, endDate, dateFilterType = 'created') {
     // Tarih filtresi tipine göre sorgu oluştur
     const dateColumn = dateFilterType === 'document' ? 'DOCUMENT_DATE' : 'CREATED_DATE'
 
+    // Database adını config'den al (dinamik)
+    const mainDbName = db.mainConfig?.database || process.env.DB_NAME || 'MUHASEBE2025'
+
     // OPTİMİZE EDİLMİŞ: KALEM/ADET değerleri AKTBLPTSMAS tablosundan okunuyor
     // Bu sayede her listede hesaplama yapılmıyor, PTS indirme sırasında hesaplanıp kaydediliyor
     let query = `
@@ -375,35 +320,10 @@ async function listPackages(startDate, endDate, dateFilterType = 'created') {
       FROM AKTBLPTSMAS p WITH (NOLOCK)
       OUTER APPLY (
         SELECT TOP 1 CARI_ISIM 
-        FROM MUHASEBE2025.dbo.TBLCASABIT WITH (NOLOCK)
+        FROM ${mainDbName}.dbo.TBLCASABIT WITH (NOLOCK)
         WHERE EMAIL = p.SOURCE_GLN
       ) cari
     `
-
-    /* ESKİ SORGU YEDEK (subquery ile hesaplama - yavaş):
-    let query = `
-      SELECT 
-        p.*,
-        ISNULL(stats.UNIQUE_GTIN_COUNT, 0) AS UNIQUE_GTIN_COUNT,
-        ISNULL(stats.TOTAL_PRODUCT_COUNT, 0) AS TOTAL_PRODUCT_COUNT,
-        cari.CARI_ISIM AS SOURCE_GLN_NAME
-      FROM AKTBLPTSMAS p WITH (NOLOCK)
-      LEFT JOIN (
-        SELECT 
-          TRANSFER_ID,
-          COUNT(DISTINCT GTIN) AS UNIQUE_GTIN_COUNT,
-          COUNT(*) AS TOTAL_PRODUCT_COUNT
-        FROM AKTBLPTSTRA WITH (NOLOCK)
-        WHERE SERIAL_NUMBER IS NOT NULL
-        GROUP BY TRANSFER_ID
-      ) stats ON stats.TRANSFER_ID = p.TRANSFER_ID
-      OUTER APPLY (
-        SELECT TOP 1 CARI_ISIM 
-        FROM MUHASEBE2025.dbo.TBLCASABIT WITH (NOLOCK)
-        WHERE EMAIL = p.SOURCE_GLN
-      ) cari
-    `
-    */
 
     if (startDate && endDate) {
       query += ` WHERE CAST(p.${dateColumn} AS DATE) BETWEEN @startDate AND @endDate`

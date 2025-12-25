@@ -78,14 +78,14 @@ const DocumentsPage = () => {
     // Kalan sütunu için özel gösterim
     if (type === 'kalan' && (value === 0 || value === '0')) {
       return (
-        <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
           ✓
         </span>
       )
     }
 
     return (
-      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold ${styles[type]}`}>
+      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold ${styles[type]}`}>
         {value || 0}
       </span>
     )
@@ -224,16 +224,34 @@ const DocumentsPage = () => {
       cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
       cellRenderer: (params) => {
         const durum = params.value
+        const { itsTarih, itsKullanici } = params.data
+
+        // Tooltip içeriği oluştur - Tarih ve kullanıcı bilgisi varsa her zaman göster
+        let tooltipContent = durum === 'OK' ? 'ITS Bildirimi Yapıldı' : 'ITS Bildirimi Yapılmadı'
+        if (itsTarih || itsKullanici) {
+          const tarihStr = itsTarih ? new Date(itsTarih).toLocaleString('tr-TR', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+          }) : ''
+          tooltipContent = `${tarihStr}${itsKullanici ? ` - ${itsKullanici}` : ''}`
+        }
+
         if (durum === 'OK') {
           return (
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" title="ITS Bildirimi Yapıldı">
+            <span
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-help"
+              title={tooltipContent}
+            >
               ✓
             </span>
           )
         }
         // NOK veya boş ise
         return (
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/30" title="ITS Bildirimi Yapılmadı">
+          <span
+            className={`inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/30 ${itsTarih || itsKullanici ? 'cursor-help' : ''}`}
+            title={tooltipContent}
+          >
             -
           </span>
         )

@@ -108,5 +108,5 @@ export const closeConnection = async () => {
   }
 }
 
-export default { getConnection, getPTSConnection, closeConnection }
+export default { getConnection, getPTSConnection, closeConnection, mainConfig, ptsConfig }
 

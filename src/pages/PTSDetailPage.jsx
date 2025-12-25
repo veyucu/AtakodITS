@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Package, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, XCircle, Info } from 'lucide-react'
+import { ArrowLeft, Package, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, XCircle, Info, Send, RotateCcw, Filter } from 'lucide-react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -33,13 +33,16 @@ const getStatusStyle = (status) => {
 const PTSDetailPage = () => {
   const { transferId } = useParams()
   const navigate = useNavigate()
-  
+
   const [loading, setLoading] = useState(true)
   const [packageData, setPackageData] = useState(null)
   const [products, setProducts] = useState([])
   const [grouping, setGrouping] = useState(['gtin'])
   const [expanded, setExpanded] = useState({})
   const [sorting, setSorting] = useState([])
+  const [statusFilter, setStatusFilter] = useState('all') // Durum filtresi
+  const [actionLoading, setActionLoading] = useState(false)
+  const [message, setMessage] = useState(null) // {type: 'success'|'error', text: '...'}
 
   useEffect(() => {
     loadPackageDetails()
@@ -60,14 +63,14 @@ const PTSDetailPage = () => {
   const loadPackageDetails = async () => {
     try {
       setLoading(true)
-      
+
       const settings = getSettings()
       const response = await apiService.getPackageFromDB(transferId, settings)
-      
+
       if (response.success && response.data) {
         const data = response.data
         setPackageData(data)
-        
+
         const onlyProducts = (data.products || [])
           .filter(p => p.SERIAL_NUMBER)
           .map(p => ({
@@ -81,10 +84,11 @@ const PTSDetailPage = () => {
             carrierLabel: p.CARRIER_LABEL,
             containerType: p.CONTAINER_TYPE,
             durum: p.DURUM || data.DURUM || '-',
-            bildirimTarihi: p.BILDIRIM_TARIHI ? new Date(p.BILDIRIM_TARIHI).toLocaleDateString('tr-TR') : 
-                           (data.BILDIRIM_TARIHI ? new Date(data.BILDIRIM_TARIHI).toLocaleDateString('tr-TR') : '-')
+            durumMesaji: p.DURUM_MESAJI || null,
+            bildirimTarihi: p.BILDIRIM_TARIHI ? new Date(p.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) :
+              (data.BILDIRIM_TARIHI ? new Date(data.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : '-')
           }))
-        
+
         setProducts(onlyProducts)
       }
     } catch (error) {
@@ -94,13 +98,130 @@ const PTSDetailPage = () => {
     }
   }
 
+  // Durum istatistikleri - her durum mesajı için kayıt sayısı
+  const statusStats = useMemo(() => {
+    const stats = {}
+    products.forEach(p => {
+      const durumMesaji = p.durumMesaji || p.durum || '-'
+      stats[durumMesaji] = (stats[durumMesaji] || 0) + 1
+    })
+    return Object.entries(stats).sort((a, b) => b[1] - a[1]) // Adede göre sırala
+  }, [products])
+
+  // Filtrelenmiş ürünler
+  const filteredProducts = useMemo(() => {
+    if (statusFilter === 'all') return products
+    return products.filter(p => (p.durumMesaji || p.durum || '-') === statusFilter)
+  }, [products, statusFilter])
+
+  // Alım Bildirimi - /common/app/accept
+  const handleAlimBildirimi = async (e) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+
+    if (filteredProducts.length === 0) {
+      setMessage({ type: 'error', text: 'Bildirilecek ürün bulunamadı!' })
+      return
+    }
+
+    // Onay iste
+    const confirmed = window.confirm(
+      `${filteredProducts.length} adet ürün için Alım Bildirimi yapılacaktır.\n\nDevam etmek istiyor musunuz?`
+    )
+    if (!confirmed) return
+
+    setActionLoading(true)
+    setMessage(null)
+
+    try {
+      const settings = getSettings()
+
+      // Ürün listesini hazırla
+      const productsToSend = filteredProducts.map(p => ({
+        id: p.id,
+        gtin: p.gtin,
+        sn: p.serialNumber,
+        xd: p.expirationDate,
+        bn: p.lotNumber
+      }))
+
+      const result = await apiService.ptsAlimBildirimi(transferId, productsToSend, settings)
+
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message || 'Alım bildirimi başarıyla gönderildi!' })
+        // Not: Sayfa yenilemesi kaldırıldı, veriler korunacak
+      } else {
+        setMessage({ type: 'error', text: result.message || 'Alım bildirimi gönderilemedi!' })
+      }
+    } catch (error) {
+      console.error('Alım bildirimi hatası:', error)
+      setMessage({ type: 'error', text: error.message || 'Bir hata oluştu!' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // Alım İade Bildirimi - /common/app/return
+  const handleAlimIadeBildirimi = async (e) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+
+    if (filteredProducts.length === 0) {
+      setMessage({ type: 'error', text: 'İade edilecek ürün bulunamadı!' })
+      return
+    }
+
+    // Karşı taraf GLN kontrolü
+    const karsiGlnNo = packageData?.SOURCE_GLN
+    if (!karsiGlnNo) {
+      setMessage({ type: 'error', text: 'Karşı taraf GLN numarası tanımlı değil!' })
+      return
+    }
+
+    // Onay iste
+    const confirmed = window.confirm(
+      `${filteredProducts.length} adet ürün için İade Alım Bildirimi yapılacaktır.\n\nDevam etmek istiyor musunuz?`
+    )
+    if (!confirmed) return
+
+    setActionLoading(true)
+    setMessage(null)
+
+    try {
+      const settings = getSettings()
+
+      // Ürün listesini hazırla
+      const productsToSend = filteredProducts.map(p => ({
+        id: p.id,
+        gtin: p.gtin,
+        sn: p.serialNumber,
+        xd: p.expirationDate,
+        bn: p.lotNumber
+      }))
+
+      const result = await apiService.ptsAlimIadeBildirimi(transferId, karsiGlnNo, productsToSend, settings)
+
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message || 'Alım iade bildirimi başarıyla gönderildi!' })
+        // Not: Sayfa yenilemesi kaldırıldı, veriler korunacak
+      } else {
+        setMessage({ type: 'error', text: result.message || 'Alım iade bildirimi gönderilemedi!' })
+      }
+    } catch (error) {
+      console.error('Alım iade bildirimi hatası:', error)
+      setMessage({ type: 'error', text: error.message || 'Bir hata oluştu!' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const columns = useMemo(() => [
     {
       accessorKey: 'gtin',
       header: 'GTIN',
       enableSorting: true,
-      size: 170,
-      cell: info => <span className="font-mono font-bold text-primary-400">{info.getValue()}</span>,
+      size: 130,
+      cell: info => <span className="font-mono font-bold text-primary-400 text-xs">{info.getValue()}</span>,
       enableGrouping: true,
       aggregatedCell: ({ getValue, row }) => (
         <div className="flex items-center gap-2">
@@ -108,8 +229,8 @@ const PTSDetailPage = () => {
             onClick={row.getToggleExpandedHandler()}
             className="p-1 hover:bg-dark-600 rounded transition-all duration-200 bg-dark-700/50"
           >
-            {row.getIsExpanded() ? 
-              <ChevronDown className="w-3.5 h-3.5 text-primary-400" /> : 
+            {row.getIsExpanded() ?
+              <ChevronDown className="w-3.5 h-3.5 text-primary-400" /> :
               <ChevronRight className="w-3.5 h-3.5 text-primary-400" />
             }
           </button>
@@ -136,11 +257,11 @@ const PTSDetailPage = () => {
             }
           }
         })
-        
+
         const miadList = Object.entries(miadCounts).sort((a, b) => a[0].localeCompare(b[0]))
         const totalCount = row.subRows.length
         const showTotal = miadList.length > 1
-        
+
         return (
           <div className="flex items-center gap-3">
             <span className="font-semibold text-slate-100 text-sm">{row.subRows[0]?.original.stockName}</span>
@@ -218,16 +339,22 @@ const PTSDetailPage = () => {
       accessorKey: 'durum',
       header: 'Durum',
       enableSorting: true,
-      size: 130,
+      size: 200,
       cell: info => {
         const value = info.getValue()
+        const row = info.row.original
+        const mesaj = row.durumMesaji
+        const displayText = mesaj || value || '-'
         if (!value || value === '-') return <span className="text-slate-500">-</span>
         const style = getStatusStyle(value)
         const StatusIcon = style.icon
         return (
-          <div className={`inline-flex items-center gap-1.5 px-2 py-1 ${style.bg} ${style.border} border rounded text-xs font-medium`}>
-            <StatusIcon className={`w-3 h-3 ${style.text}`} />
-            <span className={style.text}>{value}</span>
+          <div
+            className={`inline-flex items-center gap-1.5 px-2 py-1 ${style.bg} ${style.border} border rounded text-xs font-medium`}
+            title={`Kod: ${value}`}
+          >
+            <StatusIcon className={`w-3 h-3 ${style.text} flex-shrink-0`} />
+            <span className={`${style.text} truncate`}>{displayText}</span>
           </div>
         )
       },
@@ -248,7 +375,7 @@ const PTSDetailPage = () => {
   const [columnSizing, setColumnSizing] = useState({})
 
   const table = useReactTable({
-    data: products,
+    data: filteredProducts,
     columns,
     state: {
       grouping,
@@ -318,7 +445,7 @@ const PTSDetailPage = () => {
             <div className="bg-primary-500/20 border border-primary-500/40 px-3 py-1 rounded flex-shrink-0">
               <span className="text-primary-300 text-sm font-bold font-mono">#{transferId}</span>
             </div>
-            
+
             {/* Orta - Belge Bilgileri */}
             <div className="flex items-center gap-3 ml-4">
               <div className="bg-dark-800/80 border border-dark-700 px-3 py-1.5 rounded">
@@ -345,8 +472,62 @@ const PTSDetailPage = () => {
               )}
             </div>
 
-            {/* Sağ - Durum, Bildirim */}
+            {/* Sağ - Durum Filtre, Aksiyon Butonları */}
             <div className="flex items-center gap-3 ml-auto">
+              {/* Durum Filtresi */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-dark-800 border border-dark-600 text-slate-200 text-sm rounded px-3 py-1.5 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 min-w-[180px]"
+                >
+                  <option value="all">Tüm Durumlar ({products.length})</option>
+                  {statusStats.map(([durum, count]) => (
+                    <option key={durum} value={durum}>
+                      {durum} ({count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Dikey Ayraç */}
+              <div className="w-px h-8 bg-dark-600" />
+
+              {/* Aksiyon Butonları */}
+              <button
+                type="button"
+                onClick={handleAlimBildirimi}
+                disabled={actionLoading || filteredProducts.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg shadow-lg shadow-emerald-600/30 hover:bg-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span className="font-medium">Alım Bildirimi</span>
+                <span className="text-xs opacity-75">(accept)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAlimIadeBildirimi}
+                disabled={actionLoading || filteredProducts.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg shadow-lg shadow-amber-600/30 hover:bg-amber-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                <span className="font-medium">Alım İade</span>
+                <span className="text-xs opacity-75">(return)</span>
+              </button>
+
+              {/* Dikey Ayraç */}
+              <div className="w-px h-8 bg-dark-600" />
+
               {/* Durum */}
               {(() => {
                 const durumValue = packageData.DURUM || '-'
@@ -371,6 +552,27 @@ const PTSDetailPage = () => {
         </div>
       </div>
 
+      {/* Mesaj Gösterimi */}
+      {message && (
+        <div className={`mx-6 mt-4 px-4 py-3 rounded-lg flex items-center gap-3 ${message.type === 'success'
+          ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
+          : 'bg-rose-500/20 border border-rose-500/30 text-rose-400'
+          }`}>
+          {message.type === 'success' ? (
+            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          )}
+          <span className="font-medium">{message.text}</span>
+          <button
+            onClick={() => setMessage(null)}
+            className="ml-auto text-current opacity-60 hover:opacity-100 transition-opacity"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* TanStack Table - Scrollable Area */}
       <div className="flex-1 flex flex-col min-h-0 px-6 py-4">
         <div className="flex-1 flex flex-col min-h-0 bg-dark-800/60 rounded-xl border border-dark-700 overflow-hidden shadow-xl shadow-dark-950/50">
@@ -378,99 +580,97 @@ const PTSDetailPage = () => {
           <div className="flex-1 overflow-auto">
             <table className="w-full">
               <thead className="bg-gradient-to-r from-dark-900 to-dark-800 text-slate-300 sticky top-0 z-10 border-b border-dark-600">
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map(header => (
-                    <th
-                      key={header.id}
-                      className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider relative group"
-                      style={{ width: header.getSize() }}
-                    >
-                      {header.isPlaceholder ? null : (
+                {table.getHeaderGroups().map(headerGroup => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map(header => (
+                      <th
+                        key={header.id}
+                        className="px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wider relative group"
+                        style={{ width: header.getSize() }}
+                      >
+                        {header.isPlaceholder ? null : (
+                          <div
+                            className={`flex items-center gap-2 ${header.column.getCanSort() ? 'cursor-pointer select-none hover:text-primary-400 transition-colors' : ''
+                              }`}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getCanSort() && (
+                              <span className="flex flex-col">
+                                {header.column.getIsSorted() === 'asc' ? (
+                                  <ArrowUp className="w-3.5 h-3.5 text-primary-400" />
+                                ) : header.column.getIsSorted() === 'desc' ? (
+                                  <ArrowDown className="w-3.5 h-3.5 text-primary-400" />
+                                ) : (
+                                  <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {/* Resize Handle */}
                         <div
-                          className={`flex items-center gap-2 ${
-                            header.column.getCanSort() ? 'cursor-pointer select-none hover:text-primary-400 transition-colors' : ''
-                          }`}
-                          onClick={header.column.getToggleSortingHandler()}
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none opacity-0 group-hover:opacity-100 transition-opacity ${header.column.getIsResizing() ? 'bg-primary-500 opacity-100' : 'bg-slate-500 hover:bg-primary-400'
+                            }`}
+                        />
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody className="divide-y divide-dark-700/50">
+                {table.getRowModel().rows.map(row => {
+                  const visibleCells = row.getVisibleCells()
+                  const isGrouped = row.getIsGrouped()
+
+                  // Gruplandırma satırı için özel render
+                  if (isGrouped) {
+                    // İlk iki hücreyi al (GTIN ve Stok Adı)
+                    const gtinCell = visibleCells[0]
+                    const stockNameCell = visibleCells[1]
+                    const remainingColSpan = visibleCells.length - 2
+
+                    return (
+                      <tr
+                        key={row.id}
+                        className="bg-gradient-to-r from-dark-700/80 to-dark-700/40 hover:from-dark-700 hover:to-dark-700/60 border-l-4 border-primary-500 transition-all duration-150 text-slate-200"
+                      >
+                        {/* GTIN */}
+                        <td className="px-4 py-1.5 text-sm font-semibold" style={{ width: gtinCell.column.getSize() }}>
+                          {flexRender(gtinCell.column.columnDef.aggregatedCell ?? gtinCell.column.columnDef.cell, gtinCell.getContext())}
+                        </td>
+                        {/* Stok Adı + Adet + MIAD'lar (colspan ile birleşik) */}
+                        <td
+                          colSpan={remainingColSpan + 1}
+                          className="px-4 py-1.5 text-sm font-semibold"
                         >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {header.column.getCanSort() && (
-                            <span className="flex flex-col">
-                              {header.column.getIsSorted() === 'asc' ? (
-                                <ArrowUp className="w-3.5 h-3.5 text-primary-400" />
-                              ) : header.column.getIsSorted() === 'desc' ? (
-                                <ArrowDown className="w-3.5 h-3.5 text-primary-400" />
-                              ) : (
-                                <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {/* Resize Handle */}
-                      <div
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
-                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none opacity-0 group-hover:opacity-100 transition-opacity ${
-                          header.column.getIsResizing() ? 'bg-primary-500 opacity-100' : 'bg-slate-500 hover:bg-primary-400'
-                        }`}
-                      />
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-dark-700/50">
-              {table.getRowModel().rows.map(row => {
-                const visibleCells = row.getVisibleCells()
-                const isGrouped = row.getIsGrouped()
-                
-                // Gruplandırma satırı için özel render
-                if (isGrouped) {
-                  // İlk iki hücreyi al (GTIN ve Stok Adı)
-                  const gtinCell = visibleCells[0]
-                  const stockNameCell = visibleCells[1]
-                  const remainingColSpan = visibleCells.length - 2
-                  
+                          {flexRender(stockNameCell.column.columnDef.aggregatedCell ?? stockNameCell.column.columnDef.cell, stockNameCell.getContext())}
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  // Normal satırlar
                   return (
                     <tr
                       key={row.id}
-                      className="bg-gradient-to-r from-dark-700/80 to-dark-700/40 hover:from-dark-700 hover:to-dark-700/60 border-l-4 border-primary-500 transition-all duration-150 text-slate-200"
+                      className="hover:bg-dark-700/20 border-l-4 border-transparent hover:border-primary-500/30 transition-all duration-150 text-slate-200"
                     >
-                      {/* GTIN */}
-                      <td className="px-4 py-1.5 text-sm font-semibold" style={{ width: gtinCell.column.getSize() }}>
-                        {flexRender(gtinCell.column.columnDef.aggregatedCell ?? gtinCell.column.columnDef.cell, gtinCell.getContext())}
-                      </td>
-                      {/* Stok Adı + Adet + MIAD'lar (colspan ile birleşik) */}
-                      <td 
-                        colSpan={remainingColSpan + 1} 
-                        className="px-4 py-1.5 text-sm font-semibold"
-                      >
-                        {flexRender(stockNameCell.column.columnDef.aggregatedCell ?? stockNameCell.column.columnDef.cell, stockNameCell.getContext())}
-                      </td>
+                      {visibleCells.map((cell, index) => (
+                        <td
+                          key={cell.id}
+                          className={`px-4 text-sm py-2 ${index === 0 ? 'pl-14' : ''}`}
+                          style={{ width: cell.column.getSize() }}
+                        >
+                          {cell.getIsPlaceholder() ? null : flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
                     </tr>
                   )
-                }
-                
-                // Normal satırlar
-                return (
-                  <tr
-                    key={row.id}
-                    className="hover:bg-dark-700/20 border-l-4 border-transparent hover:border-primary-500/30 transition-all duration-150 text-slate-200"
-                  >
-                    {visibleCells.map((cell, index) => (
-                      <td
-                        key={cell.id}
-                        className={`px-4 text-sm py-2 ${index === 0 ? 'pl-14' : ''}`}
-                        style={{ width: cell.column.getSize() }}
-                      >
-                        {cell.getIsPlaceholder() ? null : flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                )
-              })}
-            </tbody>
+                })}
+              </tbody>
             </table>
           </div>
           {/* Footer - Sabit */}
@@ -479,23 +679,29 @@ const PTSDetailPage = () => {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm text-slate-400">Toplam:</span>
+                  <span className="text-sm text-slate-400">Gösterilen:</span>
                   <span className="px-2.5 py-1 bg-primary-500/20 text-primary-400 border border-primary-500/30 rounded-lg text-sm font-bold">
-                    {products.length}
+                    {filteredProducts.length}
                   </span>
+                  {statusFilter !== 'all' && (
+                    <>
+                      <span className="text-slate-500">/</span>
+                      <span className="text-sm text-slate-400">{products.length} toplam</span>
+                    </>
+                  )}
                 </div>
                 <div className="w-px h-5 bg-dark-600" />
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-400">Kalem:</span>
                   <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-sm font-bold">
-                    {new Set(products.map(p => p.gtin)).size}
+                    {new Set(filteredProducts.map(p => p.gtin)).size}
                   </span>
                 </div>
                 <div className="w-px h-5 bg-dark-600" />
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-400">Koli:</span>
                   <span className="px-2.5 py-1 bg-violet-500/20 text-violet-400 border border-violet-500/30 rounded-lg text-sm font-bold">
-                    {new Set(products.filter(p => p.carrierLabel).map(p => p.carrierLabel)).size}
+                    {new Set(filteredProducts.filter(p => p.carrierLabel).map(p => p.carrierLabel)).size}
                   </span>
                 </div>
               </div>

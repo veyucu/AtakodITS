@@ -27,6 +27,8 @@ function loadITSConfig(frontendSettings = null) {
         tokenUrl: settingsHelper.getSetting('itsTokenUrl', '/token/app/token'),
         depoSatisUrl: settingsHelper.getSetting('itsDepoSatisUrl', '/wholesale/app/dispatch'),
         satisIptalUrl: settingsHelper.getSetting('itsSatisIptalUrl', '/wholesale/app/dispatchcancel'),
+        malAlimUrl: settingsHelper.getSetting('itsMalAlimUrl', '/common/app/accept'),
+        malIadeUrl: settingsHelper.getSetting('itsMalIadeUrl', '/common/app/return'),
         dogrulamaUrl: settingsHelper.getSetting('itsDogrulamaUrl', '/reference/app/verification'),
         checkStatusUrl: settingsHelper.getSetting('itsCheckStatusUrl', '/reference/app/check_status'),
         cevapKodUrl: settingsHelper.getSetting('itsCevapKodUrl', '/reference/app/errorcode')
@@ -44,7 +46,7 @@ function formatGtin(gtin) {
 
 /**
  * Miad verisini yyyy-MM-dd formatına çevir
- * Gelen format: YYMMDD, YYYYMMDD veya Date objesi olabilir
+ * Gelen format: YYMMDD, YYYYMMDD, DD.MM.YYYY veya Date objesi olabilir
  */
 function formatMiad(miad) {
     if (!miad) return miad
@@ -60,6 +62,12 @@ function formatMiad(miad) {
         // Eğer zaten yyyy-MM-dd formatında ise
         if (/^\d{4}-\d{2}-\d{2}$/.test(miadStr)) {
             return miadStr
+        }
+
+        // DD.MM.YYYY formatı (Türkçe format)
+        if (/^\d{2}\.\d{2}\.\d{4}$/.test(miadStr)) {
+            const parts = miadStr.split('.')
+            return `${parts[2]}-${parts[1]}-${parts[0]}`
         }
 
         // YYMMDD formatı (6 karakter)
@@ -270,6 +278,160 @@ export const depoSatisIptalBildirimi = async (karsiGlnNo, products, frontendSett
 }
 
 /**
+ * Depo Alış Bildirimi (Mal Alım)
+ * Alınan ürünlerin ITS'ye bildirilmesi
+ * Örnek C# koduna göre sadece productList gönderilir
+ * 
+ * @param {Array} products - Ürün listesi [{gtin, seriNo/sn, miad/xd, lotNo/bn}]
+ * @param {Object} frontendSettings - Frontend'den gelen ayarlar (opsiyonel)
+ * @returns {Object} - { success, message, data }
+ */
+export const depoAlisBildirimi = async (products, frontendSettings = null) => {
+    try {
+        if (!products || products.length === 0) {
+            return { success: false, message: 'Bildirilecek ürün bulunamadı', data: [] }
+        }
+
+        const config = loadITSConfig(frontendSettings)
+
+        if (!config.username || !config.password) {
+            return { success: false, message: 'ITS kullanıcı adı veya şifre tanımlı değil' }
+        }
+
+        // Access Token al
+        const token = await getAccessToken(config)
+
+        // Ürün listesini hazırla (C# örneğindeki gibi gtin, sn, xd, bn)
+        const productList = products.map(p => ({
+            gtin: formatGtin(p.gtin),
+            sn: p.seriNo || p.sn,
+            xd: formatMiad(p.miad || p.xd),   // Son kullanma tarihi (yyyy-MM-dd)
+            bn: p.lotNo || p.bn   // Lot numarası
+        }))
+
+        log('📥 ITS Alış Bildirimi gönderiliyor:', { productCount: productList.length })
+
+        // API isteği - /common/app/accept endpoint'i
+        // Örnek C# koduna göre sadece productList gönderiliyor
+        const response = await axios.post(
+            `${config.baseUrl}${config.malAlimUrl}`,
+            {
+                productList: productList
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                timeout: 30000
+            }
+        )
+
+        log('✅ ITS Alış Bildirimi yanıtı:', response.data)
+
+        // Sonuçları işle
+        const results = (response.data?.productList || []).map(item => ({
+            gtin: item.gtin,
+            seriNo: item.sn,
+            durum: item.uc  // uc = durum kodu (1 = başarılı vb.)
+        }))
+
+        const successCount = results.filter(r => r.durum == 1).length
+        const errorCount = results.length - successCount
+
+        return {
+            success: true,
+            message: `${successCount} ürün başarılı, ${errorCount} ürün hatalı`,
+            data: results
+        }
+
+    } catch (error) {
+        console.error('❌ ITS Alış Bildirimi Hatası:', error.message)
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Alış bildirimi başarısız',
+            data: []
+        }
+    }
+}
+
+/**
+ * İade Alış Bildirimi (Mal İade)
+ * Alınan ürünlerin tedarikçiye iadesi
+ * C# örneğine göre togln ve productList gönderilir
+ * 
+ * @param {string} karsiGlnNo - Karşı taraf GLN numarası (iade edilecek taraf)
+ * @param {Array} products - Ürün listesi [{gtin, seriNo/sn, miad/xd, lotNo/bn}]
+ * @param {Object} frontendSettings - Frontend'den gelen ayarlar (opsiyonel)
+ */
+export const depoIadeAlisBildirimi = async (karsiGlnNo, products, frontendSettings = null) => {
+    try {
+        if (!products || products.length === 0) {
+            return { success: false, message: 'İade edilecek ürün bulunamadı', data: [] }
+        }
+
+        const config = loadITSConfig(frontendSettings)
+
+        if (!config.username || !config.password) {
+            return { success: false, message: 'ITS kullanıcı adı veya şifre tanımlı değil' }
+        }
+
+        const token = await getAccessToken(config)
+
+        const productList = products.map(p => ({
+            gtin: formatGtin(p.gtin),
+            sn: p.seriNo || p.sn,
+            xd: formatMiad(p.miad || p.xd),
+            bn: p.lotNo || p.bn
+        }))
+
+        log('🔴 ITS İade Alış Bildirimi gönderiliyor:', { karsiGlnNo, productCount: productList.length })
+
+        // API isteği - /common/app/return endpoint'i (Mal İade)
+        // C# örneğine göre togln ve productList gönderiliyor
+        const response = await axios.post(
+            `${config.baseUrl}${config.malIadeUrl}`,
+            {
+                togln: karsiGlnNo,
+                productList: productList
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                timeout: 30000
+            }
+        )
+
+        log('✅ ITS İade Alış Bildirimi yanıtı:', response.data)
+
+        const results = (response.data?.productList || []).map(item => ({
+            gtin: item.gtin,
+            seriNo: item.sn,
+            durum: item.uc
+        }))
+
+        const successCount = results.filter(r => r.durum == 1).length
+        const errorCount = results.length - successCount
+
+        return {
+            success: true,
+            message: `${successCount} ürün başarıyla iade edildi, ${errorCount} ürün hatalı`,
+            data: results
+        }
+
+    } catch (error) {
+        console.error('❌ ITS İade Alış Bildirimi Hatası:', error.message)
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'İade alış bildirimi başarısız',
+            data: []
+        }
+    }
+}
+
+/**
  * Doğrulama İşlemi
  * Ürünlerin ITS'deki durumlarını doğrulama
  */
@@ -444,6 +606,136 @@ export const updateBildirimDurum = async (results) => {
 }
 
 /**
+ * Belgenin ITS Durumunu Güncelle
+ * TBLFATUIRS veya TBLSIPAMAS tablosunda ITS_DURUM, ITS_TARIH, ITS_KULLANICI alanlarını günceller
+ * 
+ * @param {string} subeKodu - Şube kodu
+ * @param {string} fatirs_no - Fatura/Sipariş numarası
+ * @param {string} ftirsip - Belge tipi (1=Satış Faturası, 2=Alış Faturası, 6=Sipariş)
+ * @param {string} cariKodu - Cari kodu
+ * @param {boolean} tumBasarili - Tüm satırlar başarılı mı (DURUM = 1)?
+ * @param {string} kullanici - Aktif kullanıcı adı
+ */
+export const updateBelgeITSDurum = async (subeKodu, fatirs_no, ftirsip, cariKodu, tumBasarili, kullanici) => {
+    try {
+        const pool = await getConnection()
+
+        // Belge tipi: '6' = Sipariş (TBLSIPAMAS), diğerleri = Fatura (TBLFATUIRS)
+        const tableName = ftirsip === '6' ? 'TBLSIPAMAS' : 'TBLFATUIRS'
+        const itsDurum = tumBasarili ? 'OK' : 'NOK'
+
+        log(`📋 Belge ITS durumu güncelleniyor: ${tableName}, FATIRS_NO=${fatirs_no}, CARI_KODU=${cariKodu}, ITS_DURUM=${itsDurum}`)
+
+        const query = `
+            UPDATE ${tableName}
+            SET ITS_DURUM = @itsDurum,
+                ITS_TARIH = GETDATE(),
+                ITS_KULLANICI = @kullanici
+            WHERE SUBE_KODU = @subeKodu 
+              AND FATIRS_NO = @fatirsNo
+              AND FTIRSIP = @ftirsip
+              AND CARI_KODU = @cariKodu
+        `
+
+        const request = pool.request()
+        request.input('itsDurum', itsDurum)
+        request.input('kullanici', kullanici || 'SYSTEM')
+        request.input('subeKodu', subeKodu)
+        request.input('fatirsNo', fatirs_no)
+        request.input('ftirsip', ftirsip)
+        request.input('cariKodu', cariKodu)
+
+        const result = await request.query(query)
+
+        if (result.rowsAffected[0] > 0) {
+            log(`✅ Belge ITS durumu güncellendi: ${tableName} -> ${itsDurum}`)
+            return { success: true, itsDurum }
+        } else {
+            log(`⚠️ Belge bulunamadı: ${tableName}, FATIRS_NO=${fatirs_no}, CARI_KODU=${cariKodu}`)
+            return { success: false, message: 'Belge bulunamadı' }
+        }
+
+    } catch (error) {
+        console.error('❌ Belge ITS Durum Güncelleme Hatası:', error.message)
+        throw error
+    }
+}
+
+/**
+ * PTS Bildirim Durumunu Güncelle
+ * AKTBLPTSTRA tablosunda her ürün için DURUM ve BILDIRIM_TARIHI günceller
+ * AKTBLPTSMAS tablosunda genel durum (OK/NOK) ve BILDIRIM_TARIHI günceller
+ * 
+ * @param {string} transferId - Transfer ID (AKTBLPTSMAS.ID)
+ * @param {Array} results - Bildirim sonuçları [{id, durum}]
+ * @param {boolean} tumBasarili - Tüm satırlar başarılı mı?
+ */
+export const updatePTSBildirimDurum = async (transferId, results, tumBasarili) => {
+    try {
+        log(`📋 PTS Bildirim durumu güncelleniyor: TRANSFER_ID=${transferId}, Sonuç sayısı=${results?.length || 0}, tumBasarili=${tumBasarili}`)
+
+        const pool = await getPTSConnection()
+        const ptsPool = pool  // PTS veritabanı bağlantısı
+
+        // 1. AKTBLPTSTRA tablosundaki her ürünün durumunu güncelle
+        // NOT: Tablo ID kolonu yok, TRANSFER_ID + GTIN + SERIAL_NUMBER kombinasyonu kullanılır
+        let updatedCount = 0
+        for (const item of results || []) {
+            if (item.gtin && item.sn && item.durum !== undefined) {
+                try {
+                    const traQuery = `
+                        UPDATE AKTBLPTSTRA
+                        SET DURUM = @durum,
+                            BILDIRIM_TARIHI = GETDATE()
+                        WHERE TRANSFER_ID = @transferId 
+                          AND GTIN = @gtin 
+                          AND SERIAL_NUMBER = @sn
+                    `
+                    const traRequest = ptsPool.request()
+                    traRequest.input('durum', String(item.durum))
+                    traRequest.input('transferId', transferId)
+                    traRequest.input('gtin', item.gtin)
+                    traRequest.input('sn', item.sn)
+                    const traResult = await traRequest.query(traQuery)
+                    if (traResult.rowsAffected[0] > 0) {
+                        updatedCount++
+                    }
+                    log(`   ✅ AKTBLPTSTRA GTIN=${item.gtin} SN=${item.sn} güncellendi, durum=${item.durum}`)
+                } catch (itemError) {
+                    log(`   ❌ AKTBLPTSTRA GTIN=${item.gtin} SN=${item.sn} hata: ${itemError.message}`)
+                }
+            }
+        }
+        log(`📝 AKTBLPTSTRA: ${updatedCount}/${results?.length || 0} kayıt güncellendi`)
+
+        // 2. AKTBLPTSMAS tablosundaki genel durumu güncelle
+        const masDurum = tumBasarili ? 'OK' : 'NOK'
+        const masQuery = `
+            UPDATE AKTBLPTSMAS
+            SET DURUM = @durum,
+                BILDIRIM_TARIHI = GETDATE()
+            WHERE TRANSFER_ID = @transferId
+        `
+        const masRequest = ptsPool.request()
+        masRequest.input('durum', masDurum)
+        masRequest.input('transferId', transferId)
+        const masResult = await masRequest.query(masQuery)
+
+        if (masResult.rowsAffected[0] > 0) {
+            log(`✅ PTS Bildirim durumu güncellendi: TRANSFER_ID=${transferId} -> ${masDurum}`)
+            return { success: true, durum: masDurum }
+        } else {
+            log(`⚠️ PTS Master kayıt bulunamadı: TRANSFER_ID=${transferId}`)
+            return { success: false, message: 'PTS kayıt bulunamadı' }
+        }
+
+    } catch (error) {
+        console.error('❌ PTS Bildirim Durum Güncelleme Hatası:', error.message)
+        throw error
+    }
+}
+
+/**
  * ITS'den Cevap Kodlarını Çek ve Veritabanına Kaydet
  * AKTBLITSMESAJ tablosuna ID ve MESAJ olarak kaydeder
  */
@@ -591,9 +883,12 @@ export default {
     loadITSConfig,
     depoSatisBildirimi,
     depoSatisIptalBildirimi,
+    depoAlisBildirimi,
+    depoIadeAlisBildirimi,
     dogrulamaYap,
     basarisizlariSorgula,
     updateBildirimDurum,
+    updateBelgeITSDurum,
     getCevapKodlari,
     getAllMesajKodlari,
     getMesajByCode

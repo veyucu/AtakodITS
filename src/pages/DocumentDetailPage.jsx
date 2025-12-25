@@ -344,13 +344,13 @@ const DocumentDetailPage = () => {
       cellRenderer: (params) => {
         if (params.node.rowPinned === 'bottom') {
           return (
-            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-primary-500/20 text-primary-400 border border-primary-500/30">
+            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-primary-500/20 text-primary-400 border border-primary-500/30">
               {params.value}
             </span>
           )
         }
         return (
-          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-primary-500/20 text-primary-400 border border-primary-500/30">
+          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-primary-500/20 text-primary-400 border border-primary-500/30">
             {params.value}
           </span>
         )
@@ -372,13 +372,13 @@ const DocumentDetailPage = () => {
           const val = params.value || 0
           if (val > 0) {
             return (
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 {val}
               </span>
             )
           }
           return (
-            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-slate-500/20 text-slate-400 border border-slate-500/30">
+            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-slate-500/20 text-slate-400 border border-slate-500/30">
               {val}
             </span>
           )
@@ -391,7 +391,7 @@ const DocumentDetailPage = () => {
           return (
             <button
               onClick={() => handleOpenITSModal(item)}
-              className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors cursor-pointer"
               title="ITS karekod detaylarını görüntüle"
             >
               {okutulan} 🔍
@@ -404,7 +404,7 @@ const DocumentDetailPage = () => {
           return (
             <button
               onClick={() => handleOpenUTSModal(item)}
-              className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold transition-colors cursor-pointer ${okutulan > 0
+              className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold transition-colors cursor-pointer ${okutulan > 0
                 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30'
                 : 'bg-slate-500/20 text-slate-400 border border-slate-500/30 hover:bg-slate-500/30'
                 }`}
@@ -418,13 +418,13 @@ const DocumentDetailPage = () => {
         // Diğer ürünler için normal badge
         if (okutulan > 0) {
           return (
-            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
               {okutulan}
             </span>
           )
         }
         return (
-          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-slate-500/20 text-slate-400 border border-slate-500/30">
+          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-slate-500/20 text-slate-400 border border-slate-500/30">
             {okutulan}
           </span>
         )
@@ -450,20 +450,20 @@ const DocumentDetailPage = () => {
           const val = params.value || 0
           if (val > 0) {
             return (
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
                 {val}
               </span>
             )
           }
           if (val < 0) {
             return (
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+              <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
                 {val}
               </span>
             )
           }
           return (
-            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
               ✓
             </span>
           )
@@ -471,20 +471,20 @@ const DocumentDetailPage = () => {
         const kalan = params.value || 0
         if (kalan > 0) {
           return (
-            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
               {kalan}
             </span>
           )
         }
         if (kalan < 0) {
           return (
-            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
               {kalan}
             </span>
           )
         }
         return (
-          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-sm font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+          <span className="inline-flex items-center justify-center px-3 py-1 rounded-md text-base font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
             ✓
           </span>
         )
@@ -2104,7 +2104,7 @@ const DocumentDetailPage = () => {
                     <div className="flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                       <span className="text-slate-400">GLN No:</span>
-                      <span className="text-slate-200 font-semibold">{order.email || '-'}</span>
+                      <span className="text-slate-200 font-semibold">{order.glnNo || '-'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
@@ -2115,6 +2115,11 @@ const DocumentDetailPage = () => {
                       <FileText className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                       <span className="text-slate-400">Telefon:</span>
                       <span className="text-slate-200 font-semibold">{order.phone || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span className="text-slate-400">ePosta:</span>
+                      <span className="text-slate-200 font-semibold">{order.eposta || '-'}</span>
                     </div>
                   </div>
                 </div>

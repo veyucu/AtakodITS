@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   itsDeaktivasyonUrl: '/common/app/deactivation',
   itsMalAlimUrl: '/common/app/accept',
   itsMalIadeUrl: '/common/app/return',
+  itsMalAlimIptalUrl: '/common/app/acceptcancel',
   itsSatisIptalUrl: '/wholesale/app/dispatchcancel',
   itsEczaneSatisUrl: '/prescription/app/pharmacysale',
   itsEczaneSatisIptalUrl: '/prescription/app/pharmacysalecancel',
@@ -40,11 +41,11 @@ export function getSettings(frontendSettings = null) {
     cachedSettings = { ...DEFAULT_SETTINGS, ...frontendSettings }
     return cachedSettings
   }
-  
+
   if (cachedSettings) {
     return cachedSettings
   }
-  
+
   return DEFAULT_SETTINGS
 }
 

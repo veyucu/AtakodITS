@@ -211,7 +211,7 @@ const ITSBildirimModal = ({
             'satis': 'Satış Bildirimi',
             'satis-iptal': 'Satış İptal Bildirimi',
             'alis': 'Alış Bildirimi',
-            'alis-iptal': 'Alış İptal Bildirimi',
+            'iade-alis': 'İade Alış Bildirimi',
             'dogrulama': 'Doğrulama',
             'basarisiz-sorgula': 'Başarısız Ürün Sorgulama'
         }
@@ -237,38 +237,53 @@ const ITSBildirimModal = ({
                 lotNo: r.lotNo
             }))
 
+            // Belge bilgilerini hazırla (ITS durumunu güncellemek için)
+            const belgeInfo = {
+                subeKodu: order?.subeKodu,
+                fatirsNo: order?.orderNo,
+                ftirsip: order?.docType || docType,
+                cariKodu: order?.customerCode,
+                kullanici: localStorage.getItem('username') || 'SYSTEM'
+            }
+
             let result
 
             switch (actionType) {
                 case 'satis':
                     // GLN kontrolü
-                    const glnNo = order?.glnNo || order?.email
+                    const glnNo = order?.glnNo
                     if (!glnNo) {
                         setMessage({ type: 'error', text: 'Alıcı GLN numarası tanımlı değil!' })
                         playErrorSound?.()
                         return
                     }
-                    result = await apiService.itsSatisBildirimi(order.id, glnNo, products, settings)
+                    result = await apiService.itsSatisBildirimi(order.id, glnNo, products, settings, belgeInfo)
                     break
 
                 case 'satis-iptal':
-                    const glnNoIptal = order?.glnNo || order?.email
+                    const glnNoIptal = order?.glnNo
                     if (!glnNoIptal) {
                         setMessage({ type: 'error', text: 'Alıcı GLN numarası tanımlı değil!' })
                         playErrorSound?.()
                         return
                     }
-                    result = await apiService.itsSatisIptalBildirimi(order.id, glnNoIptal, products, settings)
+                    result = await apiService.itsSatisIptalBildirimi(order.id, glnNoIptal, products, settings, belgeInfo)
                     break
 
                 case 'alis':
-                    // Alış bildirimi - TODO: Backend API'si eklenince güncellenecek
-                    result = await apiService.itsAlisBildirimi(order.id, products, settings)
+                    // Alış bildirimi (Mal Alım) - GLN gerekmez, sadece productList gönderilir
+                    result = await apiService.itsAlisBildirimi(order.id, products, settings, belgeInfo)
                     break
 
-                case 'alis-iptal':
-                    // Alış iptal bildirimi - TODO: Backend API'si eklenince güncellenecek
-                    result = await apiService.itsAlisIptalBildirimi(order.id, products, settings)
+                case 'iade-alis':
+                    // İade Alış bildirimi (Mal İade) - Karşı taraf GLN kontrolü
+                    const karsiGlnNo = order?.glnNo
+                    if (!karsiGlnNo) {
+                        setMessage({ type: 'error', text: 'Karşı taraf GLN numarası tanımlı değil!' })
+                        playErrorSound?.()
+                        return
+                    }
+                    result = await apiService.itsIadeAlisBildirimi(order.id, karsiGlnNo, products, settings, belgeInfo)
                     break
 
                 case 'dogrulama':
@@ -502,15 +517,15 @@ const ITSBildirimModal = ({
                                 className="px-3 py-1.5 rounded-lg text-white bg-emerald-600 hover:bg-emerald-500 transition-all font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                             >
                                 <Send className="w-4 h-4" />
-                                Alış Bildirimi
+                                Alım Bildirimi
                             </button>
                             <button
-                                onClick={() => handleAction('alis-iptal')}
+                                onClick={() => handleAction('iade-alis')}
                                 disabled={actionLoading || records.length === 0}
-                                className="px-3 py-1.5 rounded-lg text-white bg-rose-600 hover:bg-rose-500 transition-all font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                className="px-3 py-1.5 rounded-lg text-white bg-orange-600 hover:bg-orange-500 transition-all font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                             >
                                 <X className="w-4 h-4" />
-                                Alış İptal
+                                İade Alım Bildirimi
                             </button>
                         </>
                     )}

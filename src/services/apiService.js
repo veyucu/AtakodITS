@@ -727,13 +727,14 @@ const apiService = {
   // ==================== ITS BİLDİRİM İŞLEMLERİ ====================
 
   // ITS Satış Bildirimi
-  itsSatisBildirimi: async (documentId, karsiGlnNo, products, settings = null) => {
+  itsSatisBildirimi: async (documentId, karsiGlnNo, products, settings = null, belgeInfo = null) => {
     try {
       log('📤 ITS Satış Bildirimi gönderiliyor:', { documentId, productCount: products?.length })
       const response = await apiClient.post(`/documents/${documentId}/its-satis-bildirimi`, {
         karsiGlnNo,
         products,
-        settings
+        settings,
+        belgeInfo
       })
       return response.data
     } catch (error) {
@@ -746,13 +747,14 @@ const apiService = {
   },
 
   // ITS Satış İptal Bildirimi
-  itsSatisIptalBildirimi: async (documentId, karsiGlnNo, products, settings = null) => {
+  itsSatisIptalBildirimi: async (documentId, karsiGlnNo, products, settings = null, belgeInfo = null) => {
     try {
       log('🔴 ITS Satış İptal gönderiliyor:', { documentId, productCount: products?.length })
       const response = await apiClient.post(`/documents/${documentId}/its-satis-iptal`, {
         karsiGlnNo,
         products,
-        settings
+        settings,
+        belgeInfo
       })
       return response.data
     } catch (error) {
@@ -800,13 +802,14 @@ const apiService = {
     }
   },
 
-  // ITS Alış Bildirimi
-  itsAlisBildirimi: async (documentId, products, settings = null) => {
+  // ITS Alış Bildirimi (Mal Alım) - sadece productList gönderilir
+  itsAlisBildirimi: async (documentId, products, settings = null, belgeInfo = null) => {
     try {
       log('📥 ITS Alış Bildirimi gönderiliyor:', { documentId, productCount: products?.length })
       const response = await apiClient.post(`/documents/${documentId}/its-alis-bildirimi`, {
         products,
-        settings
+        settings,
+        belgeInfo
       })
       return response.data
     } catch (error) {
@@ -818,20 +821,22 @@ const apiService = {
     }
   },
 
-  // ITS Alış İptal Bildirimi
-  itsAlisIptalBildirimi: async (documentId, products, settings = null) => {
+  // ITS İade Alış Bildirimi (Mal İade) - karsiGlnNo gerekli (togln)
+  itsIadeAlisBildirimi: async (documentId, karsiGlnNo, products, settings = null, belgeInfo = null) => {
     try {
-      log('🔴 ITS Alış İptal gönderiliyor:', { documentId, productCount: products?.length })
-      const response = await apiClient.post(`/documents/${documentId}/its-alis-iptal`, {
+      log('🔴 ITS İade Alış Bildirimi gönderiliyor:', { documentId, karsiGlnNo, productCount: products?.length })
+      const response = await apiClient.post(`/documents/${documentId}/its-iade-alis`, {
+        karsiGlnNo,
         products,
-        settings
+        settings,
+        belgeInfo
       })
       return response.data
     } catch (error) {
-      console.error('❌ ITS Alış İptal hatası:', error)
+      console.error('❌ ITS İade Alış Bildirimi hatası:', error)
       return {
         success: false,
-        message: error.response?.data?.message || error.message || 'Alış iptal bildirimi gönderilemedi'
+        message: error.response?.data?.message || error.message || 'İade alış bildirimi gönderilemedi'
       }
     }
   },
@@ -919,6 +924,45 @@ const apiService = {
       return {
         success: false,
         message: error.response?.data?.message || error.message || 'Mesaj kodları güncellenemedi'
+      }
+    }
+  },
+
+  // ==================== PTS BİLDİRİM İŞLEMLERİ ====================
+
+  // PTS Alım Bildirimi (Mal Alım) - /common/app/accept
+  ptsAlimBildirimi: async (transferId, products, settings = null) => {
+    try {
+      log('📥 PTS Alım Bildirimi gönderiliyor:', { transferId, productCount: products?.length })
+      const response = await apiClient.post(`/pts/${transferId}/alim-bildirimi`, {
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS Alım Bildirimi hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Alım bildirimi gönderilemedi'
+      }
+    }
+  },
+
+  // PTS Alım İade Bildirimi (Mal İade) - /common/app/return
+  ptsAlimIadeBildirimi: async (transferId, karsiGlnNo, products, settings = null) => {
+    try {
+      log('🔴 PTS Alım İade Bildirimi gönderiliyor:', { transferId, karsiGlnNo, productCount: products?.length })
+      const response = await apiClient.post(`/pts/${transferId}/alim-iade-bildirimi`, {
+        karsiGlnNo,
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS Alım İade Bildirimi hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Alım iade bildirimi gönderilemedi'
       }
     }
   }
