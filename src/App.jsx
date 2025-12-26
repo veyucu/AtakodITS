@@ -92,9 +92,6 @@ function App() {
             }
           />
 
-          {/* Legacy routes - yönlendirme */}
-          <Route path="/orders" element={<Navigate to="/documents" replace />} />
-          <Route path="/orders/:id" element={<Navigate to="/documents/:id" replace />} />
 
           {/* Default Route - Login'e yönlendir */}
           <Route path="/" element={<Navigate to="/login" replace />} />

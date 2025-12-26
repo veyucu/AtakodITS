@@ -7,7 +7,7 @@ import apiService from '../services/apiService'
  * @returns {Object} - Belge state ve fonksiyonları
  */
 export const useDocument = (documentId) => {
-  const [order, setOrder] = useState(null)
+  const [document, setDocument] = useState(null)
   const [items, setItems] = useState([])
   const [stats, setStats] = useState({ total: 0, prepared: 0, remaining: 0 })
   const [loading, setLoading] = useState(true)
@@ -28,7 +28,7 @@ export const useDocument = (documentId) => {
       
       if (response.success && response.data) {
         const doc = response.data
-        setOrder(doc)
+        setDocument(doc)
         setItems(doc.items || [])
         updateStats(doc.items || [])
         return { success: true, data: doc }
@@ -83,13 +83,13 @@ export const useDocument = (documentId) => {
 
   return {
     // State
-    order,
+    document,
     items,
     stats,
     loading,
     
     // Setters
-    setOrder,
+    setDocument,
     setItems: updateItems,
     
     // Functions
@@ -101,5 +101,6 @@ export const useDocument = (documentId) => {
 }
 
 export default useDocument
+
 
 

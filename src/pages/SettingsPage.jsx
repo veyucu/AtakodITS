@@ -27,6 +27,9 @@ const DEFAULT_SETTINGS = {
   itsPaketGonderUrl: '/pts/app/SendPackage',
   itsDogrulamaUrl: '/reference/app/verification',
 
+  // Genel ITS Ayarları
+  depoAdi: 'DEPO',  // Bizim GLN'in ekrandaki gösterim adı
+
   // UTS Ayarları
   utsNo: '',
   utsId: '',
@@ -257,6 +260,11 @@ const SettingsPage = () => {
                   field="itsUsername"
                   placeholder="86800010845240000"
                   required
+                />
+                <InputField
+                  label="Depo Adı (Sorgulama Ekranında Gösterilecek)"
+                  field="depoAdi"
+                  placeholder="DEPO"
                 />
               </div>
 

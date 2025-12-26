@@ -1197,6 +1197,35 @@ router.post('/:id/its-dogrulama', async (req, res) => {
   }
 })
 
+// POST /api/documents/:id/its-sorgula - Durum Sorgula (check_status)
+router.post('/:id/its-sorgula', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { products, settings } = req.body
+
+    log('🔍 ITS Durum Sorgulama İsteği:', { documentId: id, productCount: products?.length })
+
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sorgulanacak ürün listesi boş'
+      })
+    }
+
+    const itsApiService = await import('../services/itsApiService.js')
+    const result = await itsApiService.durumSorgula(products, settings)
+
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ ITS Durum Sorgulama Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Sorgulama başarısız'
+    })
+  }
+})
+
 // POST /api/documents/:id/its-basarisiz-sorgula - Başarısız Ürünleri Sorgula
 router.post('/:id/its-basarisiz-sorgula', async (req, res) => {
   try {

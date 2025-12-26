@@ -14,23 +14,25 @@ export const parseITSBarcode = (barcode) => {
   }
 
   try {
-    // AI kodlarının pozisyonlarını bul
-    const ai01Index = barcode.indexOf('01')
-    const ai21Index = barcode.indexOf('21')
-    const ai17Index = barcode.indexOf('17')
-    const ai10Index = barcode.indexOf('10')
+    // Format: 01 + 14 hane GTIN + 21 + değişken seri no + 17 + 6 hane MIAD + 10 + değişken lot
 
-    // Temel AI kodları var mı kontrol et
-    if (ai01Index === -1 || ai21Index === -1 || ai17Index === -1 || ai10Index === -1) {
+    // 01 ile başlamalı
+    if (!barcode.startsWith('01')) {
       return null
     }
 
-    // GTIN: 01'den sonraki 14 karakter
-    const gtin = barcode.substring(ai01Index + 2, ai01Index + 16)
+    // GTIN: 01'den sonraki 14 karakter (sabit)
+    const gtin = barcode.substring(2, 16)
+
+    // 21 pozisyon 16'da olmalı
+    if (barcode.substring(16, 18) !== '21') {
+      return null
+    }
 
     // Doğru 17 pozisyonunu bul (17YYMMDD10 formatı)
+    // 17'den sonra 6 karakter tarih, sonra '10' gelmeli
     let correctAi17Index = -1
-    let searchStart = ai21Index + 2
+    let searchStart = 18 // 21'den sonra
 
     while (true) {
       const tempIndex = barcode.indexOf('17', searchStart)
@@ -51,8 +53,8 @@ export const parseITSBarcode = (barcode) => {
       return null
     }
 
-    // Seri No: 21'den sonra, doğru 17'ye kadar
-    const serialNumber = barcode.substring(ai21Index + 2, correctAi17Index)
+    // Seri No: 21'den sonra (pozisyon 18), 17'ye kadar
+    const serialNumber = barcode.substring(18, correctAi17Index)
 
     // MIAD: 17'den sonra 6 karakter (YYMMDD)
     const expiryDate = barcode.substring(correctAi17Index + 2, correctAi17Index + 8)
@@ -62,15 +64,19 @@ export const parseITSBarcode = (barcode) => {
     const lotNumber = barcode.substring(lotStartIndex)
 
     // Validasyonlar
-    if (gtin.length !== 14) {
+    if (gtin.length !== 14 || !/^\d{14}$/.test(gtin)) {
       return null
     }
 
-    if (serialNumber.length < 5 || serialNumber.length > 20) {
+    if (serialNumber.length < 1 || serialNumber.length > 50) {
       return null
     }
 
-    if (expiryDate.length !== 6) {
+    if (expiryDate.length !== 6 || !/^\d{6}$/.test(expiryDate)) {
+      return null
+    }
+
+    if (lotNumber.length < 1) {
       return null
     }
 

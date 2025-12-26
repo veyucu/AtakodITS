@@ -6,6 +6,7 @@ import 'ag-grid-community/styles/ag-theme-alpine.css'
 import { Package, Search, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle, AlertCircle, Home } from 'lucide-react'
 import apiService from '../services/apiService'
 import usePageTitle from '../hooks/usePageTitle'
+import { encodeDocumentId } from '../utils/documentIdUtils'
 
 const DocumentsPage = () => {
   usePageTitle('Ürün Hazırlama')
@@ -44,7 +45,7 @@ const DocumentsPage = () => {
   const [dateFilter, setDateFilter] = useState(savedFilters.dateFilter)
   const [hideCompleted, setHideCompleted] = useState(savedFilters.hideCompleted) // Okutulanları gizle
   const [rowData, setRowData] = useState([])
-  const [allOrders, setAllOrders] = useState([])
+  const [allDocuments, setAllDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [serverStatus, setServerStatus] = useState('checking') // checking, online, offline
@@ -103,7 +104,7 @@ const DocumentsPage = () => {
     },
     {
       headerName: 'Belge No',
-      field: 'orderNo',
+      field: 'documentNo',
       width: 150,
       pinned: 'left',
       cellClass: 'font-semibold text-blue-600',
@@ -216,8 +217,8 @@ const DocumentsPage = () => {
     },
     {
       headerName: 'ITS',
-      field: 'itsDurum',
-      width: 70,
+      field: 'itsBildirim',
+      width: 60,
       cellClass: 'text-center',
       wrapHeaderText: true,
       autoHeaderHeight: true,
@@ -225,35 +226,128 @@ const DocumentsPage = () => {
       cellRenderer: (params) => {
         const durum = params.value
         const { itsTarih, itsKullanici } = params.data
-
-        // Tooltip içeriği oluştur - Tarih ve kullanıcı bilgisi varsa her zaman göster
-        let tooltipContent = durum === 'OK' ? 'ITS Bildirimi Yapıldı' : 'ITS Bildirimi Yapılmadı'
-        if (itsTarih || itsKullanici) {
-          const tarihStr = itsTarih ? new Date(itsTarih).toLocaleString('tr-TR', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-          }) : ''
-          tooltipContent = `${tarihStr}${itsKullanici ? ` - ${itsKullanici}` : ''}`
-        }
+        const tarihStr = itsTarih ? new Date(itsTarih).toLocaleString('tr-TR', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : ''
+        const tooltip = tarihStr ? `ITS: ${tarihStr}${itsKullanici ? ` - ${itsKullanici}` : ''}` : ''
 
         if (durum === 'OK') {
           return (
-            <span
-              className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-help"
-              title={tooltipContent}
-            >
-              ✓
-            </span>
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/40 cursor-help" title={tooltip}>
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
+            </div>
           )
         }
-        // NOK veya boş ise
+        if (durum === 'NOK') {
+          return (
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/20 border border-red-500/40 cursor-help" title={tooltip}>
+              <AlertCircle className="w-5 h-5 text-red-400" />
+            </div>
+          )
+        }
         return (
-          <span
-            className={`inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/30 ${itsTarih || itsKullanici ? 'cursor-help' : ''}`}
-            title={tooltipContent}
-          >
-            -
-          </span>
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-700/50 border border-slate-600">
+            <div className="w-3 h-3 rounded-full border-2 border-slate-500" />
+          </div>
+        )
+      }
+    },
+    {
+      headerName: 'PTS',
+      field: 'ptsId',
+      width: 60,
+      cellClass: 'text-center',
+      wrapHeaderText: true,
+      autoHeaderHeight: true,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellRenderer: (params) => {
+        const ptsId = params.value
+        const { ptsTarih, ptsKullanici } = params.data
+        const tarihStr = ptsTarih ? new Date(ptsTarih).toLocaleString('tr-TR', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : ''
+
+        if (ptsId) {
+          const handleClick = (e) => {
+            e.stopPropagation()
+            // Popup oluştur
+            const popup = document.createElement('div')
+            popup.className = 'fixed bg-dark-800 border border-dark-600 rounded-lg shadow-xl z-50 p-3'
+            popup.style.left = `${e.clientX - 100}px`
+            popup.style.top = `${e.clientY + 10}px`
+            popup.innerHTML = `
+              <div class="text-xs text-slate-400 mb-1">PTS ID (seçip kopyalayın):</div>
+              <input type="text" value="${ptsId}" readonly 
+                class="w-full bg-dark-900 border border-dark-500 rounded px-2 py-1 text-sm text-slate-100 font-mono select-all" 
+                style="min-width: 200px"
+              />
+              <div class="text-[10px] text-slate-500 mt-1">${tarihStr}${ptsKullanici ? ` - ${ptsKullanici}` : ''}</div>
+            `
+            document.body.appendChild(popup)
+            // Input'a fokusla ve seç
+            const input = popup.querySelector('input')
+            input.focus()
+            input.select()
+            // Dışarı tıklayınca kapat
+            const closePopup = (ev) => {
+              if (!popup.contains(ev.target)) {
+                popup.remove()
+                document.removeEventListener('click', closePopup)
+              }
+            }
+            setTimeout(() => document.addEventListener('click', closePopup), 100)
+          }
+          return (
+            <div
+              className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/40 cursor-pointer hover:bg-emerald-500/40 transition-colors"
+              title="Tıkla ve PTS ID'yi kopyala"
+              onClick={handleClick}
+            >
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
+            </div>
+          )
+        }
+        return (
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-700/50 border border-slate-600">
+            <div className="w-3 h-3 rounded-full border-2 border-slate-500" />
+          </div>
+        )
+      }
+    },
+    {
+      headerName: 'UTS',
+      field: 'utsBildirim',
+      width: 60,
+      cellClass: 'text-center',
+      wrapHeaderText: true,
+      autoHeaderHeight: true,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellRenderer: (params) => {
+        const durum = params.value
+        const { utsTarih, utsKullanici } = params.data
+        const tarihStr = utsTarih ? new Date(utsTarih).toLocaleString('tr-TR', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : ''
+        const tooltip = tarihStr ? `UTS: ${tarihStr}${utsKullanici ? ` - ${utsKullanici}` : ''}` : ''
+
+        if (durum === 'OK') {
+          return (
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/40 cursor-help" title={tooltip}>
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
+            </div>
+          )
+        }
+        if (durum === 'NOK') {
+          return (
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/20 border border-red-500/40 cursor-help" title={tooltip}>
+              <AlertCircle className="w-5 h-5 text-red-400" />
+            </div>
+          )
+        }
+        return (
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-700/50 border border-slate-600">
+            <div className="w-3 h-3 rounded-full border-2 border-slate-500" />
+          </div>
         )
       }
     }
@@ -273,7 +367,7 @@ const DocumentsPage = () => {
     const params = {
       fileName: `Urun_Hazirlama_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '-')}.xlsx`,
       sheetName: 'Ürün Hazırlama',
-      columnKeys: ['docType', 'orderNo', 'kayitTarihi', 'customerName', 'customerCode', 'district', 'city', 'phone', 'totalItems', 'miktar', 'okutulan', 'kalan'],
+      columnKeys: ['docType', 'documentNo', 'kayitTarihi', 'customerName', 'customerCode', 'district', 'city', 'phone', 'totalItems', 'miktar', 'okutulan', 'kalan'],
       processCellCallback: (params) => {
         // Belge tipi için text'e çevir
         if (params.column.colId === 'docType') {
@@ -309,9 +403,19 @@ const DocumentsPage = () => {
     gridRef.current.api.exportDataAsExcel(params)
   }, [])
 
-  // Row Double Click Handler
+  // Row Double Click Handler - Base64 encoded ID ile navigate
   const onRowDoubleClicked = useCallback((event) => {
-    navigate(`/documents/${event.data.id}`)
+    const row = event.data
+    if (row) {
+      // Composite key: SUBE_KODU|FTIRSIP|FATIRS_NO|CARI_KODU -> Base64
+      const encodedId = encodeDocumentId(
+        row.subeKodu || '0',
+        row.docType || '1',
+        row.documentNo,
+        row.customerCode || ''
+      )
+      navigate(`/documents/${encodedId}`)
+    }
   }, [navigate])
 
   // Fetch Documents from API (tarih zorunlu)
@@ -326,7 +430,7 @@ const DocumentsPage = () => {
       const response = await apiService.getDocuments(date)
 
       if (response.success && response.data) {
-        setAllOrders(response.data)
+        setAllDocuments(response.data)
         // İlk yüklemede filtreleme yapma, tüm veriyi göster
         setRowData(response.data)
         setServerStatus('online')
@@ -385,40 +489,40 @@ const DocumentsPage = () => {
 
   // Diğer filtreler değiştiğinde client-side filtrele
   useEffect(() => {
-    if (!isInitialLoad && allOrders.length > 0) {
+    if (!isInitialLoad && allDocuments.length > 0) {
       handleFilter()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docTypeFilter, statusFilter, searchText, hideCompleted, allOrders, isInitialLoad])
+  }, [docTypeFilter, statusFilter, searchText, hideCompleted, allDocuments, isInitialLoad])
 
   // Filter Handler - Client-side filtreleme
   const handleFilter = () => {
-    let filtered = allOrders
+    let filtered = allDocuments
 
     // Belge tipi filtresi
     if (docTypeFilter !== 'all') {
-      filtered = filtered.filter(order => order.docType === docTypeFilter)
+      filtered = filtered.filter(document => document.docType === docTypeFilter)
     }
 
     // Durum filtresi
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => order.status === statusFilter)
+      filtered = filtered.filter(document => document.status === statusFilter)
     }
 
     // Tamamlananları gizle (kalan = 0 olanları filtrele)
     if (hideCompleted) {
-      filtered = filtered.filter(order => order.kalan > 0)
+      filtered = filtered.filter(document => document.kalan > 0)
     }
 
     // Arama filtresi
     if (searchText) {
       const search = searchText.toLowerCase()
-      filtered = filtered.filter(order =>
-        order.orderNo?.toLowerCase().includes(search) ||
-        order.customerName?.toLowerCase().includes(search) ||
-        order.customerCode?.toLowerCase().includes(search) ||
-        order.city?.toLowerCase().includes(search) ||
-        order.district?.toLowerCase().includes(search)
+      filtered = filtered.filter(document =>
+        document.documentNo?.toLowerCase().includes(search) ||
+        document.customerName?.toLowerCase().includes(search) ||
+        document.customerCode?.toLowerCase().includes(search) ||
+        document.city?.toLowerCase().includes(search) ||
+        document.district?.toLowerCase().includes(search)
       )
     }
 
@@ -460,7 +564,7 @@ const DocumentsPage = () => {
     setHideCompleted(false)
     const today = new Date().toISOString().split('T')[0]
     setDateFilter(today) // Bugüne sıfırla
-    setRowData(allOrders)
+    setRowData(allDocuments)
 
     // LocalStorage'ı temizle
     localStorage.removeItem('documentsPageFilters')
@@ -743,7 +847,7 @@ const DocumentsPage = () => {
                   if (savedColumnState) {
                     params.api.applyColumnState({
                       state: JSON.parse(savedColumnState),
-                      applyOrder: true
+                      applyDocument: true
                     })
                   } else {
                     params.api.sizeColumnsToFit()

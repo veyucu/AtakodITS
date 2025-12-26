@@ -55,9 +55,15 @@ const documentService = {
           V.ITS_COUNT,
           V.UTS_COUNT,
           V.DGR_COUNT,
-          V.ITS_DURUM,
+          V.ITS_BILDIRIM,
           V.ITS_TARIH,
-          V.ITS_KULLANICI
+          V.ITS_KULLANICI,
+          V.UTS_BILDIRIM,
+          V.UTS_TARIH,
+          V.UTS_KULLANICI,
+          V.PTS_ID,
+          V.PTS_TARIH,
+          V.PTS_KULLANICI
         FROM
         (
           SELECT 
@@ -75,9 +81,15 @@ const documentService = {
             (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='BESERI') AS ITS_COUNT,
             (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='UTS') AS UTS_COUNT,
             (SELECT COUNT(*) FROM TBLSIPATRA H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND (S.KOD_5 IS NULL OR S.KOD_5 NOT IN ('BESERI','UTS'))) AS DGR_COUNT,
-            A.ITS_DURUM,
+            A.ITS_BILDIRIM,
             A.ITS_TARIH,
-            A.ITS_KULLANICI
+            A.ITS_KULLANICI,
+            A.UTS_BILDIRIM,
+            A.UTS_TARIH,
+            A.UTS_KULLANICI,
+            A.PTS_ID,
+            A.PTS_TARIH,
+            A.PTS_KULLANICI
           FROM 
             TBLSIPAMAS A WITH (NOLOCK)
           WHERE FTIRSIP='6' ${additionalWhere.replace('V.TARIH', 'A.TARIH')}
@@ -99,9 +111,15 @@ const documentService = {
             (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='BESERI') AS ITS_COUNT,
             (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND S.KOD_5='UTS') AS UTS_COUNT,
             (SELECT COUNT(*) FROM TBLSTHAR H WITH (NOLOCK) INNER JOIN TBLSTSABIT S WITH (NOLOCK) ON H.STOK_KODU=S.STOK_KODU WHERE H.FISNO=A.FATIRS_NO AND H.SUBE_KODU=A.SUBE_KODU AND H.STHAR_ACIKLAMA=A.CARI_KODU AND H.STHAR_FTIRSIP=A.FTIRSIP AND (S.KOD_5 IS NULL OR S.KOD_5 NOT IN ('BESERI','UTS'))) AS DGR_COUNT,
-            A.ITS_DURUM,
+            A.ITS_BILDIRIM,
             A.ITS_TARIH,
-            A.ITS_KULLANICI
+            A.ITS_KULLANICI,
+            A.UTS_BILDIRIM,
+            A.UTS_TARIH,
+            A.UTS_KULLANICI,
+            A.PTS_ID,
+            A.PTS_TARIH,
+            A.PTS_KULLANICI
           FROM 
             TBLFATUIRS A WITH (NOLOCK)
           WHERE A.FTIRSIP IN ('1','2') ${additionalWhere.replace('V.TARIH', 'A.TARIH')}
@@ -149,9 +167,15 @@ const documentService = {
           ITS_COUNT: row.ITS_COUNT || 0,
           UTS_COUNT: row.UTS_COUNT || 0,
           DGR_COUNT: row.DGR_COUNT || 0,
-          ITS_DURUM: row.ITS_DURUM || '',
+          ITS_BILDIRIM: row.ITS_BILDIRIM || '',
           ITS_TARIH: row.ITS_TARIH,
-          ITS_KULLANICI: row.ITS_KULLANICI
+          ITS_KULLANICI: row.ITS_KULLANICI,
+          UTS_BILDIRIM: row.UTS_BILDIRIM || '',
+          UTS_TARIH: row.UTS_TARIH,
+          UTS_KULLANICI: row.UTS_KULLANICI,
+          PTS_ID: row.PTS_ID || '',
+          PTS_TARIH: row.PTS_TARIH,
+          PTS_KULLANICI: row.PTS_KULLANICI
         }
 
 
@@ -160,8 +184,8 @@ const documentService = {
           subeKodu: fixedRow.SUBE_KODU,
           docType: fixedRow.FTIRSIP,
           tipi: fixedRow.TIPI,
-          orderNo: fixedRow.FATIRS_NO,
-          orderDate: fixedRow.TARIH,
+          documentNo: fixedRow.FATIRS_NO,
+          documentDate: fixedRow.TARIH,
           totalItems: fixedRow.KALEM || 0,
           itsCount: fixedRow.ITS_COUNT,
           utsCount: fixedRow.UTS_COUNT,
@@ -181,9 +205,15 @@ const documentService = {
           preparedItems: fixedRow.OKUTULAN || 0,
           status: fixedRow.OKUTULAN === 0 ? 'pending' :
             fixedRow.OKUTULAN < fixedRow.MIKTAR ? 'preparing' : 'completed',
-          itsDurum: fixedRow.ITS_DURUM || '',
+          itsBildirim: fixedRow.ITS_BILDIRIM || '',
           itsTarih: fixedRow.ITS_TARIH ? fixedRow.ITS_TARIH.toISOString() : null,
-          itsKullanici: fixedRow.ITS_KULLANICI || ''
+          itsKullanici: fixedRow.ITS_KULLANICI || '',
+          utsBildirim: fixedRow.UTS_BILDIRIM || '',
+          utsTarih: fixedRow.UTS_TARIH ? fixedRow.UTS_TARIH.toISOString() : null,
+          utsKullanici: fixedRow.UTS_KULLANICI || '',
+          ptsId: fixedRow.PTS_ID || '',
+          ptsTarih: fixedRow.PTS_TARIH ? fixedRow.PTS_TARIH.toISOString() : null,
+          ptsKullanici: fixedRow.PTS_KULLANICI || ''
         }
 
         return doc
@@ -246,7 +276,13 @@ const documentService = {
           V.MIKTAR - ISNULL(V.OKUTULAN,0) AS KALAN,
           V.PTS_ID,
           V.PTS_TARIH,
-          V.PTS_KULLANICI
+          V.PTS_KULLANICI,
+          V.ITS_BILDIRIM,
+          V.ITS_TARIH,
+          V.ITS_KULLANICI,
+          V.UTS_BILDIRIM,
+          V.UTS_TARIH,
+          V.UTS_KULLANICI
         FROM
         (
           SELECT 
@@ -261,6 +297,12 @@ const documentService = {
             NULL AS PTS_ID,
             NULL AS PTS_TARIH,
             NULL AS PTS_KULLANICI,
+            A.ITS_BILDIRIM,
+            A.ITS_TARIH,
+            A.ITS_KULLANICI,
+            A.UTS_BILDIRIM,
+            A.UTS_TARIH,
+            A.UTS_KULLANICI,
             (SELECT SUM(STHAR_GCMIK) FROM TBLSIPATRA X WITH (NOLOCK) WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS MIKTAR,
             (SELECT SUM(Y.MIKTAR) FROM TBLSIPATRA X WITH (NOLOCK) INNER JOIN AKTBLITSUTS Y WITH (NOLOCK) ON (X.FISNO = Y.FATIRS_NO AND X.INCKEYNO = Y.HAR_RECNO AND X.STOK_KODU=Y.STOK_KODU AND X.STHAR_FTIRSIP = Y.FTIRSIP)
             WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN
@@ -282,6 +324,12 @@ const documentService = {
             A.PTS_ID,
             A.PTS_TARIH,
             A.PTS_KULLANICI,
+            A.ITS_BILDIRIM,
+            A.ITS_TARIH,
+            A.ITS_KULLANICI,
+            A.UTS_BILDIRIM,
+            A.UTS_TARIH,
+            A.UTS_KULLANICI,
             (SELECT SUM(STHAR_GCMIK) FROM TBLSTHAR X WITH (NOLOCK) WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS MIKTAR,
             (SELECT SUM(Y.MIKTAR) FROM TBLSTHAR X WITH (NOLOCK) INNER JOIN AKTBLITSUTS Y WITH (NOLOCK) ON (X.FISNO = Y.FATIRS_NO AND X.INCKEYNO = Y.HAR_RECNO AND X.STOK_KODU=Y.STOK_KODU AND X.STHAR_FTIRSIP = Y.FTIRSIP)
             WHERE X.FISNO=A.FATIRS_NO AND X.SUBE_KODU=A.SUBE_KODU AND X.STHAR_ACIKLAMA=A.CARI_KODU AND X.STHAR_FTIRSIP=A.FTIRSIP) AS OKUTULAN
@@ -343,7 +391,13 @@ const documentService = {
         KALAN: row.KALAN,
         PTS_ID: row.PTS_ID,
         PTS_TARIH: row.PTS_TARIH,
-        PTS_KULLANICI: row.PTS_KULLANICI
+        PTS_KULLANICI: row.PTS_KULLANICI,
+        ITS_BILDIRIM: row.ITS_BILDIRIM,
+        ITS_TARIH: row.ITS_TARIH,
+        ITS_KULLANICI: row.ITS_KULLANICI,
+        UTS_BILDIRIM: row.UTS_BILDIRIM,
+        UTS_TARIH: row.UTS_TARIH,
+        UTS_KULLANICI: row.UTS_KULLANICI
       }
 
       const document = {
@@ -351,8 +405,8 @@ const documentService = {
         subeKodu: fixedRow.SUBE_KODU,
         docType: fixedRow.FTIRSIP,
         tipi: fixedRow.TIPI,
-        orderNo: fixedRow.FATIRS_NO,
-        orderDate: fixedRow.TARIH,
+        documentNo: fixedRow.FATIRS_NO,
+        documentDate: fixedRow.TARIH,
         totalItems: fixedRow.KALEM || 0,
         customerCode: fixedRow.CARI_KODU,
         customerName: fixedRow.CARI_ISIM,
@@ -373,7 +427,13 @@ const documentService = {
         items: items,
         ptsId: fixedRow.PTS_ID || null,
         ptsTarih: fixedRow.PTS_TARIH ? fixedRow.PTS_TARIH.toISOString() : null,
-        ptsKullanici: fixedRow.PTS_KULLANICI || null
+        ptsKullanici: fixedRow.PTS_KULLANICI || null,
+        itsBildirim: fixedRow.ITS_BILDIRIM || null,
+        itsTarih: fixedRow.ITS_TARIH ? fixedRow.ITS_TARIH.toISOString() : null,
+        itsKullanici: fixedRow.ITS_KULLANICI || null,
+        utsBildirim: fixedRow.UTS_BILDIRIM || null,
+        utsTarih: fixedRow.UTS_TARIH ? fixedRow.UTS_TARIH.toISOString() : null,
+        utsKullanici: fixedRow.UTS_KULLANICI || null
       }
 
       return document
@@ -996,7 +1056,7 @@ const documentService = {
           LOT_NO,
           HAR_RECNO,
           MIKTAR,
-          KULLANICI,
+          KAYIT_KULLANICI,
           KAYIT_TARIHI
         ) VALUES (
           'I',
@@ -1058,7 +1118,13 @@ const documentService = {
 
     } catch (error) {
       console.error('❌ ITS Karekod Kaydetme Hatası:', error)
-      throw error
+      console.error('Hata detayı:', error.message)
+      console.error('Gelen data:', JSON.stringify(data, null, 2))
+      return {
+        success: false,
+        error: 'DATABASE_ERROR',
+        message: `Veritabanı hatası: ${error.message}`
+      }
     }
   },
 
@@ -1961,13 +2027,13 @@ const documentService = {
         A.LOT_NO,
         A.CARRIER_LABEL,
         A.CONTAINER_TYPE,
-        A.DURUM,
+        A.BILDIRIM,
         A.BILDIRIM_TARIHI,
         S.STOK_ADI,
-        M.MESAJ AS DURUM_MESAJI
+        M.MESAJ AS BILDIRIM_MESAJI
       FROM AKTBLITSUTS A WITH (NOLOCK)
       LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON A.STOK_KODU = S.STOK_KODU
-      LEFT JOIN ${ptsDbName}.dbo.AKTBLITSMESAJ M WITH (NOLOCK) ON A.DURUM = M.ID
+      LEFT JOIN ${ptsDbName}.dbo.AKTBLITSMESAJ M WITH (NOLOCK) ON A.BILDIRIM = M.ID
       WHERE A.FATIRS_NO = @fatirs_no
         AND A.FTIRSIP = @ftirsip
         AND A.CARI_KODU = @cariKodu
@@ -1991,8 +2057,8 @@ const documentService = {
         lotNo: row.LOT_NO,
         carrierLabel: row.CARRIER_LABEL,
         containerType: row.CONTAINER_TYPE,
-        durum: row.DURUM,
-        durumMesaji: fixTurkishChars(row.DURUM_MESAJI),
+        bildirim: row.BILDIRIM,
+        bildirimMesaji: fixTurkishChars(row.BILDIRIM_MESAJI),
         bildirimTarihi: row.BILDIRIM_TARIHI
       }))
 
@@ -2018,7 +2084,7 @@ const documentService = {
         A.LOT_NO,
         A.MIKTAR,
         A.URETIM_TARIHI,
-        A.DURUM,
+        A.BILDIRIM,
         A.BILDIRIM_TARIHI,
         S.STOK_ADI
       FROM AKTBLITSUTS A WITH (NOLOCK)
@@ -2046,7 +2112,7 @@ const documentService = {
         lotNo: row.LOT_NO,
         miktar: row.MIKTAR,
         uretimTarihi: row.URETIM_TARIHI,
-        durum: row.DURUM,
+        bildirim: row.BILDIRIM,
         bildirimTarihi: row.BILDIRIM_TARIHI
       }))
 

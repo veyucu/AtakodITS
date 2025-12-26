@@ -10,7 +10,7 @@ const UTSModal = ({
   isOpen,
   onClose,
   selectedItem,
-  order,
+  document,
   records,
   setRecords,
   originalRecords,
@@ -229,8 +229,8 @@ const UTSModal = ({
 
       // Belge tarihini formatla
       let belgeTarihiFormatted
-      if (order.orderDate) {
-        const date = new Date(order.orderDate)
+      if (document.documentDate) {
+        const date = new Date(document.documentDate)
         belgeTarihiFormatted = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
       } else {
         const today = new Date()
@@ -241,17 +241,17 @@ const UTSModal = ({
       const result = await apiService.saveUTSRecords({
         records: validRows,
         originalRecords: originalRecords,
-        documentId: order.id,
+        documentId: document.id,
         itemId: selectedItem.itemId,
         stokKodu: selectedItem.stokKodu,
         belgeTip: selectedItem.stharHtur,
         gckod: selectedItem.stharGckod || '',
-        belgeNo: order.orderNo,
+        belgeNo: document.documentNo,
         belgeTarihi: belgeTarihiFormatted,
-        docType: order.docType,
+        docType: document.docType,
         expectedQuantity: selectedItem.quantity,
         barcode: selectedItem.barcode || selectedItem.stokKodu,
-        cariKodu: order.customerCode,
+        cariKodu: document.customerCode,
         kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER'
       })
 
@@ -261,7 +261,7 @@ const UTSModal = ({
         setHasChanges(false)
 
         // Grid'i yenile
-        const response = await apiService.getUTSBarcodeRecords(order.id, selectedItem.itemId)
+        const response = await apiService.getUTSBarcodeRecords(document.id, selectedItem.itemId)
         if (response.success) {
           const enrichedRecords = (response.data || []).map(record => {
             let uretimTarihiDisplay = ''
@@ -443,5 +443,6 @@ const UTSModal = ({
 }
 
 export default UTSModal
+
 
 

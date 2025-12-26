@@ -12,23 +12,43 @@ import apiService from '../services/apiService'
 import { log } from '../utils/debug'
 import { useSound } from '../hooks/useSound'
 import { parseITSBarcode } from '../utils/barcodeParser'
+import { decodeDocumentId, isEncodedId } from '../utils/documentIdUtils'
 import PTSModal from '../components/modals/PTSModal'
+import ITSModal from '../components/modals/ITSModal'
+import UTSModal from '../components/modals/UTSModal'
+import BulkScanModal from '../components/modals/BulkScanModal'
 import ITSBildirimModal from '../components/modals/ITSBildirimModal'
 import UTSBildirimModal from '../components/modals/UTSBildirimModal'
 import usePageTitle from '../hooks/usePageTitle'
 
 const DocumentDetailPage = () => {
   usePageTitle('Belge Detay')
-  const { id } = useParams()
+  const { id: rawId } = useParams()
   const navigate = useNavigate()
   const barcodeInputRef = useRef(null)
   const utsGridRef = useRef(null)
   const itsGridRef = useRef(null)
 
+  // Decode document ID - Base64 veya eski format desteği
+  const documentInfo = useMemo(() => {
+    if (!rawId) return null
+
+    // Base64 encoded mi kontrol et
+    if (isEncodedId(rawId)) {
+      return decodeDocumentId(rawId)
+    }
+
+    // Eski format: SUBE_KODU-FTIRSIP-FATIRS_NO
+    return decodeDocumentId(rawId)
+  }, [rawId])
+
+  // API çağrıları için compositeId
+  const id = documentInfo?.compositeId || rawId
+
   // Custom Hooks
   const { playSuccessSound, playErrorSound, playWarningSound } = useSound()
 
-  const [order, setOrder] = useState(null)
+  const [document, setDocument] = useState(null)
   const [items, setItems] = useState([])
   const [barcodeInput, setBarcodeInput] = useState('')
   const [messages, setMessages] = useState([])
@@ -112,7 +132,7 @@ const DocumentDetailPage = () => {
       if (response.success && response.data) {
         const doc = response.data
         log('Document data:', doc)
-        setOrder(doc)
+        setDocument(doc)
         setItems(doc.items || [])
         updateStats(doc.items || [])
       } else {
@@ -125,7 +145,7 @@ const DocumentDetailPage = () => {
     }
   }, [id, updateStats])
 
-  // Load order and items from API
+  // Load document and items from API
   useEffect(() => {
     fetchDocument()
   }, [fetchDocument])
@@ -836,9 +856,9 @@ const DocumentDetailPage = () => {
     setBulkScanLoading(false)
 
     // Belgeyi yenile
-    const response = await apiService.getDocumentById(order.id)
+    const response = await apiService.getDocumentById(document.id)
     if (response.success && response.data) {
-      setOrder(response.data)
+      setDocument(response.data)
       setItems(response.data.items || [])
       updateStats(response.data.items || [])
     }
@@ -883,8 +903,8 @@ const DocumentDetailPage = () => {
     }
 
     let belgeTarihiFormatted
-    if (order.orderDate) {
-      const date = new Date(order.orderDate)
+    if (document.documentDate) {
+      const date = new Date(document.documentDate)
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
@@ -899,16 +919,16 @@ const DocumentDetailPage = () => {
 
     const result = await apiService.saveITSBarcode({
       barcode: itsBarcode,
-      documentId: order.id,
+      documentId: document.id,
       itemId: item.itemId,
       stokKodu: item.stokKodu,
       belgeTip: item.stharHtur,
       gckod: item.stharGckod || '',
-      belgeNo: order.orderNo,
+      belgeNo: document.documentNo,
       belgeTarihi: belgeTarihiFormatted,
-      docType: order.docType,
+      docType: document.docType,
       expectedQuantity: item.quantity,
-      cariKodu: order.customerCode,
+      cariKodu: document.customerCode,
       kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER'
     })
 
@@ -949,8 +969,8 @@ const DocumentDetailPage = () => {
     }
 
     let belgeTarihiFormatted
-    if (order.orderDate) {
-      const date = new Date(order.orderDate)
+    if (document.documentDate) {
+      const date = new Date(document.documentDate)
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
@@ -966,16 +986,16 @@ const DocumentDetailPage = () => {
     for (let i = 0; i < quantity; i++) {
       const result = await apiService.saveDGRBarcode({
         barcode: actualBarcode,
-        documentId: order.id,
+        documentId: document.id,
         itemId: item.itemId,
         stokKodu: item.stokKodu,
         belgeTip: item.stharHtur,
         gckod: item.stharGckod || '',
-        belgeNo: order.orderNo,
+        belgeNo: document.documentNo,
         belgeTarihi: belgeTarihiFormatted,
-        docType: order.docType,
+        docType: document.docType,
         expectedQuantity: item.quantity,
-        cariKodu: order.customerCode,
+        cariKodu: document.customerCode,
         kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER'
       })
 
@@ -999,8 +1019,8 @@ const DocumentDetailPage = () => {
       const result = await apiService.saveCarrierBarcode({
         carrierLabel,
         docId: id, // Belge KAYITNO
-        ftirsip: order.docType,
-        cariKodu: order.customerCode,
+        ftirsip: document.docType,
+        cariKodu: document.customerCode,
         kullanici: username
       })
 
@@ -1147,8 +1167,8 @@ const DocumentDetailPage = () => {
 
     // Belge tarihini saat bilgisi olmadan formatla (YYYY-MM-DD) - Local time
     let belgeTarihiFormatted
-    if (order.orderDate) {
-      const date = new Date(order.orderDate)
+    if (document.documentDate) {
+      const date = new Date(document.documentDate)
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
@@ -1166,16 +1186,16 @@ const DocumentDetailPage = () => {
       // Backend'e DGR barkod gönder (TBLSERITRA'ya kayıt)
       const result = await apiService.saveDGRBarcode({
         barcode: actualBarcode,
-        documentId: order.id,
+        documentId: document.id,
         itemId: item.itemId,
         stokKodu: item.stokKodu,
         belgeTip: item.stharHtur,     // STHAR_HTUR
         gckod: item.stharGckod || '', // STHAR_GCKOD
-        belgeNo: order.orderNo,
+        belgeNo: document.documentNo,
         belgeTarihi: belgeTarihiFormatted, // Belge tarihi (saat yok)
-        docType: order.docType,
+        docType: document.docType,
         expectedQuantity: item.quantity, // Miktar kontrolü için
-        cariKodu: order.customerCode,    // Belgedeki CARI_KODU
+        cariKodu: document.customerCode,    // Belgedeki CARI_KODU
         kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER' // Sisteme giriş yapan kullanıcı
       })
 
@@ -1198,7 +1218,7 @@ const DocumentDetailPage = () => {
 
     // Tüm döngü başarılıysa, son güncellemeyi göster
     // Backend'den son durumu al
-    const docResponse = await apiService.getDocumentById(order.id)
+    const docResponse = await apiService.getDocumentById(document.id)
     if (docResponse.success && docResponse.data) {
       setItems(docResponse.data.items || [])
       updateStats(docResponse.data.items || [])
@@ -1266,7 +1286,7 @@ const DocumentDetailPage = () => {
 
       // Backend'e silme isteği gönder
       const result = await apiService.deleteITSBarcodeRecords(
-        order.id,
+        document.id,
         item.itemId,
         [seriNo]
       )
@@ -1275,7 +1295,7 @@ const DocumentDetailPage = () => {
         log('✅ ITS Barkod silindi!')
 
         // Grid'i yenile
-        const docResponse = await apiService.getDocumentById(order.id)
+        const docResponse = await apiService.getDocumentById(document.id)
         if (docResponse.success && docResponse.data) {
           setItems(docResponse.data.items || [])
           updateStats(docResponse.data.items || [])
@@ -1323,7 +1343,7 @@ const DocumentDetailPage = () => {
 
       // Backend'e silme isteği gönder (DGR için seri_no = stok_kodu)
       const result = await apiService.deleteITSBarcodeRecords(
-        order.id,
+        document.id,
         item.itemId,
         [item.stokKodu],  // DGR için SERI_NO = STOK_KODU
         item.turu  // 'DGR' veya 'UTS'
@@ -1333,7 +1353,7 @@ const DocumentDetailPage = () => {
         log('✅ DGR Barkod silindi!')
 
         // Grid'i yenile
-        const docResponse = await apiService.getDocumentById(order.id)
+        const docResponse = await apiService.getDocumentById(document.id)
         if (docResponse.success && docResponse.data) {
           setItems(docResponse.data.items || [])
           updateStats(docResponse.data.items || [])
@@ -1361,15 +1381,34 @@ const DocumentDetailPage = () => {
     try {
       log('🔍 ITS Karekod okutuldu:', itsBarcode.substring(0, 50) + '...')
 
-      // ITS karekoddan barkodu parse et (basit parse - ilk 01'den sonraki 14 karakter)
-      const barkodPart = itsBarcode.substring(3, 16) // 13 digit barkod
-      log('📦 Barkod parse edildi:', barkodPart)
+      // Frontend'de parse et ve validasyon yap
+      const parsedData = parseITSBarcode(itsBarcode)
 
-      // Ürünü bul
-      const itemIndex = items.findIndex(item => item.barcode === barkodPart || item.stokKodu === barkodPart)
+      if (!parsedData) {
+        showMessage('❌ Geçersiz karekod formatı!', 'error')
+        playErrorSound()
+        return
+      }
+
+      if (!parsedData.gtin || !parsedData.serialNumber) {
+        showMessage('❌ Karekodda GTIN veya Seri No bulunamadı!', 'error')
+        playErrorSound()
+        return
+      }
+
+      log('📦 Parse edildi:', parsedData)
+
+      // Ürünü bul (baştaki sıfırları kaldırarak karşılaştır)
+      const itemIndex = items.findIndex(item => {
+        const normalizedGtin = item.barcode?.replace(/^0+/, '')
+        const normalizedParsedGtin = parsedData.gtin?.replace(/^0+/, '')
+        return normalizedGtin === normalizedParsedGtin ||
+          item.stokKodu === parsedData.gtin ||
+          item.barcode === parsedData.gtinRaw?.substring(1)
+      })
 
       if (itemIndex === -1) {
-        showMessage(`❌ Ürün bulunamadı: ${barkodPart}`, 'error')
+        showMessage(`❌ Ürün bulunamadı: ${parsedData.gtin}`, 'error')
         playErrorSound()
         return
       }
@@ -1385,8 +1424,8 @@ const DocumentDetailPage = () => {
 
       // Belge tarihini saat bilgisi olmadan formatla (YYYY-MM-DD) - Local time
       let belgeTarihiFormatted
-      if (order.orderDate) {
-        const date = new Date(order.orderDate)
+      if (document.documentDate) {
+        const date = new Date(document.documentDate)
         const year = date.getFullYear()
         const month = String(date.getMonth() + 1).padStart(2, '0')
         const day = String(date.getDate()).padStart(2, '0')
@@ -1402,16 +1441,16 @@ const DocumentDetailPage = () => {
       // Backend'e ITS karekod gönder
       const result = await apiService.saveITSBarcode({
         barcode: itsBarcode,
-        documentId: order.id,
+        documentId: document.id,
         itemId: item.itemId,
         stokKodu: item.stokKodu,
         belgeTip: item.stharHtur, // STHAR_HTUR
         gckod: item.stharGckod || '', // STHAR_GCKOD
-        belgeNo: order.orderNo,
+        belgeNo: document.documentNo,
         belgeTarihi: belgeTarihiFormatted, // Belge tarihi (saat yok)
-        docType: order.docType,
+        docType: document.docType,
         expectedQuantity: item.quantity, // Miktar kontrolü için
-        cariKodu: order.customerCode,    // Belgedeki CARI_KODU
+        cariKodu: document.customerCode,    // Belgedeki CARI_KODU
         kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER' // Sisteme giriş yapan kullanıcı
       })
 
@@ -1498,7 +1537,7 @@ const DocumentDetailPage = () => {
       setUtsHasChanges(false) // Temiz başlangıç
 
       // UTS kayıtlarını getir
-      const response = await apiService.getUTSBarcodeRecords(order.id, item.itemId)
+      const response = await apiService.getUTSBarcodeRecords(document.id, item.itemId)
 
       if (response.success) {
         // Kayıtlara uretimTarihiDisplay ve benzersiz id ekle (YYMMDD -> YYYY-MM-DD)
@@ -1714,8 +1753,8 @@ const DocumentDetailPage = () => {
 
       // Belge tarihini formatla
       let belgeTarihiFormatted
-      if (order.orderDate) {
-        const date = new Date(order.orderDate)
+      if (document.documentDate) {
+        const date = new Date(document.documentDate)
         const year = date.getFullYear()
         const month = String(date.getMonth() + 1).padStart(2, '0')
         const day = String(date.getDate()).padStart(2, '0')
@@ -1732,17 +1771,17 @@ const DocumentDetailPage = () => {
       const result = await apiService.saveUTSRecords({
         records: validRows,
         originalRecords: originalUtsRecords,
-        documentId: order.id,
+        documentId: document.id,
         itemId: selectedUTSItem.itemId,
         stokKodu: selectedUTSItem.stokKodu,
         belgeTip: selectedUTSItem.stharHtur,
         gckod: selectedUTSItem.stharGckod || '',
-        belgeNo: order.orderNo,
+        belgeNo: document.documentNo,
         belgeTarihi: belgeTarihiFormatted,
-        docType: order.docType,
+        docType: document.docType,
         expectedQuantity: selectedUTSItem.quantity,
         barcode: selectedUTSItem.barcode || selectedUTSItem.stokKodu,
-        cariKodu: order.customerCode,    // Belgedeki CARI_KODU
+        cariKodu: document.customerCode,    // Belgedeki CARI_KODU
         kullanici: JSON.parse(localStorage.getItem('user') || '{}').username || 'USER' // Sisteme giriş yapan kullanıcı
       })
 
@@ -1757,7 +1796,7 @@ const DocumentDetailPage = () => {
       }
 
       // Grid'i yenile
-      const response = await apiService.getUTSBarcodeRecords(order.id, selectedUTSItem.itemId)
+      const response = await apiService.getUTSBarcodeRecords(document.id, selectedUTSItem.itemId)
       if (response.success) {
         // Kayıtlara uretimTarihiDisplay ekle (YYMMDD -> YYYY-MM-DD)
         const enrichedRecords = (response.data || []).map(record => {
@@ -1779,7 +1818,7 @@ const DocumentDetailPage = () => {
       }
 
       // Ana grid'i güncelle
-      const docResponse = await apiService.getDocumentById(order.id)
+      const docResponse = await apiService.getDocumentById(document.id)
       if (docResponse.success && docResponse.data) {
         setItems(docResponse.data.items || [])
         updateStats(docResponse.data.items || [])
@@ -1806,7 +1845,7 @@ const DocumentDetailPage = () => {
       setItsLoading(true)
 
       // ITS kayıtlarını getir
-      const response = await apiService.getITSBarcodeRecords(order.id, item.itemId)
+      const response = await apiService.getITSBarcodeRecords(document.id, item.itemId)
 
       if (response.success) {
         setItsRecords(response.data || [])
@@ -1929,7 +1968,7 @@ const DocumentDetailPage = () => {
 
     try {
       const result = await apiService.deleteITSBarcodeRecords(
-        order.id,
+        document.id,
         selectedItem.itemId,
         selectedRecords
       )
@@ -1937,14 +1976,14 @@ const DocumentDetailPage = () => {
       if (result.success) {
         log('✅ ITS kayıtlar silindi:', result.deletedCount)
         // Kayıtları yeniden yükle
-        const response = await apiService.getITSBarcodeRecords(order.id, selectedItem.itemId)
+        const response = await apiService.getITSBarcodeRecords(document.id, selectedItem.itemId)
         if (response.success) {
           setItsRecords(response.data || [])
           setSelectedRecords([])
         }
 
         // Ana grid'i yenile
-        const docResponse = await apiService.getDocumentById(order.id)
+        const docResponse = await apiService.getDocumentById(document.id)
         if (docResponse.success && docResponse.data) {
           setItems(docResponse.data.items || [])
         }
@@ -2021,7 +2060,7 @@ const DocumentDetailPage = () => {
     )
   }
 
-  if (!order) {
+  if (!document) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -2053,39 +2092,39 @@ const DocumentDetailPage = () => {
               >
                 <ArrowLeft className="w-5 h-5 text-slate-300" />
               </button>
-              <div className={`px-2 h-9 flex flex-col justify-center rounded-lg border ${order.docType === '6'
+              <div className={`px-2 h-9 flex flex-col justify-center rounded-lg border ${document.docType === '6'
                 ? 'bg-violet-500/20 border-violet-500/30'
-                : order.docType === '1'
+                : document.docType === '1'
                   ? 'bg-emerald-500/20 border-emerald-500/30'
                   : 'bg-amber-500/20 border-amber-500/30'
                 }`}>
                 <div className="flex items-center gap-1.5">
-                  <p className={`text-[9px] font-medium leading-none ${order.docType === '6'
+                  <p className={`text-[9px] font-medium leading-none ${document.docType === '6'
                     ? 'text-violet-400'
-                    : order.docType === '1'
+                    : document.docType === '1'
                       ? 'text-emerald-400'
                       : 'text-amber-400'
                     }`}>
-                    {getDocumentTypeName(order.docType, order.tipi)}
+                    {getDocumentTypeName(document.docType, document.tipi)}
                   </p>
                   <span className="text-slate-600 text-[9px]">•</span>
                   <p className="text-[9px] text-slate-400 leading-none">
-                    {order.orderDate ? new Date(order.orderDate).toLocaleDateString('tr-TR') : '-'}
+                    {document.documentDate ? new Date(document.documentDate).toLocaleDateString('tr-TR') : '-'}
                   </p>
                 </div>
-                <h1 className={`text-xs font-bold leading-none ${order.docType === '6'
+                <h1 className={`text-xs font-bold leading-none ${document.docType === '6'
                   ? 'text-violet-300'
-                  : order.docType === '1'
+                  : document.docType === '1'
                     ? 'text-emerald-300'
                     : 'text-amber-300'
-                  }`}>{order.orderNo}</h1>
+                  }`}>{document.documentNo}</h1>
               </div>
 
               {/* Cari İsim - Tooltip ile detaylı bilgi */}
               <div className="bg-dark-800/80 px-2 h-9 w-72 flex items-center rounded-lg border border-dark-700 relative group cursor-help">
                 <div className="flex items-start gap-1.5 w-full">
                   <User className="w-3 h-3 text-primary-400 shrink-0 mt-0.5" />
-                  <p className="text-xs font-bold text-slate-200 leading-tight line-clamp-2 flex-1">{order.customerName}</p>
+                  <p className="text-xs font-bold text-slate-200 leading-tight line-clamp-2 flex-1">{document.customerName}</p>
                   <Info className="w-3 h-3 text-slate-500 shrink-0 mt-0.5" />
                 </div>
                 {/* Tooltip */}
@@ -2094,34 +2133,34 @@ const DocumentDetailPage = () => {
                     <div className="flex items-center gap-2">
                       <Hash className="w-3.5 h-3.5 text-violet-400 shrink-0" />
                       <span className="text-slate-400">Cari Kodu:</span>
-                      <span className="text-slate-200 font-semibold">{order.customerCode}</span>
+                      <span className="text-slate-200 font-semibold">{document.customerCode}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       <span className="text-slate-400">Konum:</span>
                       <span className="text-slate-200 font-semibold">
-                        {order.district ? `${order.district} / ${order.city}` : order.city || '-'}
+                        {document.district ? `${document.district} / ${document.city}` : document.city || '-'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                       <span className="text-slate-400">GLN No:</span>
-                      <span className="text-slate-200 font-semibold">{order.glnNo || '-'}</span>
+                      <span className="text-slate-200 font-semibold">{document.glnNo || '-'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                       <span className="text-slate-400">UTS No:</span>
-                      <span className="text-slate-200 font-semibold">{order.utsNo || '-'}</span>
+                      <span className="text-slate-200 font-semibold">{document.utsNo || '-'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                       <span className="text-slate-400">Telefon:</span>
-                      <span className="text-slate-200 font-semibold">{order.phone || '-'}</span>
+                      <span className="text-slate-200 font-semibold">{document.phone || '-'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                       <span className="text-slate-400">ePosta:</span>
-                      <span className="text-slate-200 font-semibold">{order.eposta || '-'}</span>
+                      <span className="text-slate-200 font-semibold">{document.eposta || '-'}</span>
                     </div>
                   </div>
                 </div>
@@ -2188,31 +2227,44 @@ const DocumentDetailPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowITSBildirimModal(true)}
-                    className="w-9 h-9 flex items-center justify-center rounded transition-all bg-dark-700 text-slate-200 hover:bg-dark-600 border border-dark-600"
-                    title="ITS Bildirim"
+                    className={`w-9 h-9 flex items-center justify-center rounded transition-all border ${document?.itsBildirim?.toString().trim().toUpperCase() === 'OK'
+                      ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-600/30'
+                      : document?.itsBildirim?.toString().trim().toUpperCase() === 'NOK'
+                        ? 'bg-red-600/20 text-red-400 border-red-500/40 hover:bg-red-600/30'
+                        : 'bg-dark-700 text-slate-200 border-dark-600 hover:bg-dark-600'
+                      }`}
+                    title={`ITS Bildirim${document?.itsTarih ? `\n${new Date(document.itsTarih).toLocaleString('tr-TR')}` : ''}${document?.itsKullanici ? ` - ${document.itsKullanici}` : ''}`}
                   >
                     ITS
                   </button>
-                  {/* UTS butonu sadece Satış Faturası için */}
-                  {order?.docType === '1' && (
-                    <button
-                      type="button"
-                      onClick={() => setShowUTSBildirimModal(true)}
-                      className="w-9 h-9 flex items-center justify-center rounded transition-all bg-dark-700 text-slate-200 hover:bg-dark-600 border border-dark-600"
-                      title="UTS Bildirim"
-                    >
-                      UTS
-                    </button>
-                  )}
                   {/* PTS butonu sadece Satış Faturası için (Alış Faturası'nda gizli) */}
-                  {order?.docType !== '2' && (
+                  {document?.docType !== '2' && (
                     <button
                       type="button"
                       onClick={() => setShowPTSModal(true)}
-                      className="w-9 h-9 flex items-center justify-center rounded transition-all bg-dark-700 text-slate-200 hover:bg-dark-600 border border-dark-600"
-                      title="PTS Gönderimi"
+                      className={`w-9 h-9 flex items-center justify-center rounded transition-all border ${document?.ptsId
+                        ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-600/30'
+                        : 'bg-dark-700 text-slate-200 border-dark-600 hover:bg-dark-600'
+                        }`}
+                      title={`PTS Gönderimi${document?.ptsId ? `\nID: ${document.ptsId}` : ''}${document?.ptsTarih ? `\n${new Date(document.ptsTarih).toLocaleString('tr-TR')}` : ''}${document?.ptsKullanici ? ` - ${document.ptsKullanici}` : ''}`}
                     >
                       PTS
+                    </button>
+                  )}
+                  {/* UTS butonu sadece Satış Faturası için */}
+                  {document?.docType === '1' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowUTSBildirimModal(true)}
+                      className={`w-9 h-9 flex items-center justify-center rounded transition-all border ${document?.utsBildirim?.toString().trim().toUpperCase() === 'OK'
+                        ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-600/30'
+                        : document?.utsBildirim?.toString().trim().toUpperCase() === 'NOK'
+                          ? 'bg-red-600/20 text-red-400 border-red-500/40 hover:bg-red-600/30'
+                          : 'bg-dark-700 text-slate-200 border-dark-600 hover:bg-dark-600'
+                        }`}
+                      title={`UTS Bildirim${document?.utsTarih ? `\n${new Date(document.utsTarih).toLocaleString('tr-TR')}` : ''}${document?.utsKullanici ? ` - ${document.utsKullanici}` : ''}`}
+                    >
+                      UTS
                     </button>
                   )}
                 </>
@@ -2265,6 +2317,8 @@ const DocumentDetailPage = () => {
             suppressCellFocus={true}
             pinnedBottomRowData={[totals]}
             suppressRowHoverHighlight={false}
+            domLayout='normal'
+            suppressPaginationPanel={true}
             getRowClass={(params) => {
               if (params.node.rowPinned === 'bottom') {
                 return 'footer-row-no-hover'
@@ -2673,7 +2727,7 @@ const DocumentDetailPage = () => {
       <PTSModal
         isOpen={showPTSModal}
         onClose={() => setShowPTSModal(false)}
-        order={order}
+        document={document}
         playSuccessSound={playSuccessSound}
         playErrorSound={playErrorSound}
         onSuccess={fetchDocument}
@@ -2683,8 +2737,8 @@ const DocumentDetailPage = () => {
       <ITSBildirimModal
         isOpen={showITSBildirimModal}
         onClose={() => setShowITSBildirimModal(false)}
-        order={order}
-        docType={order?.docType}
+        document={document}
+        docType={document?.docType}
         playSuccessSound={playSuccessSound}
         playErrorSound={playErrorSound}
       />
@@ -2693,7 +2747,53 @@ const DocumentDetailPage = () => {
       <UTSBildirimModal
         isOpen={showUTSBildirimModal}
         onClose={() => setShowUTSBildirimModal(false)}
-        order={order}
+        document={document}
+        playSuccessSound={playSuccessSound}
+        playErrorSound={playErrorSound}
+      />
+
+      {/* ITS Kayıtları Modal - Okutulan sütununa tıklandığında açılır */}
+      <ITSModal
+        isOpen={showITSModal}
+        onClose={() => {
+          setShowITSModal(false)
+          setSelectedItem(null)
+          setItsRecords([])
+        }}
+        selectedItem={selectedItem}
+        documentId={document?.id}
+        records={itsRecords}
+        setRecords={setItsRecords}
+        loading={itsLoading}
+        onRecordsChange={fetchDocument}
+        playSuccessSound={playSuccessSound}
+        playErrorSound={playErrorSound}
+      />
+
+      {/* UTS Kayıtları Modal - Okutulan sütununa tıklandığında açılır */}
+      <UTSModal
+        isOpen={showUTSModal}
+        onClose={(skipWarning) => handleCloseUTSModal(skipWarning)}
+        selectedItem={selectedItem}
+        document={document}
+        records={utsRecords}
+        setRecords={setUtsRecords}
+        originalRecords={originalUtsRecords}
+        setOriginalRecords={setOriginalUtsRecords}
+        loading={utsLoading}
+        onRecordsChange={fetchDocument}
+        playSuccessSound={playSuccessSound}
+        playErrorSound={playErrorSound}
+      />
+
+      {/* Toplu ITS Okutma Modal */}
+      <BulkScanModal
+        isOpen={showBulkScanModal}
+        onClose={() => setShowBulkScanModal(false)}
+        documentId={document?.id}
+        documentNo={document?.documentNo}
+        docType={document?.docType}
+        onSuccess={fetchDocument}
         playSuccessSound={playSuccessSound}
         playErrorSound={playErrorSound}
       />
@@ -2703,6 +2803,7 @@ const DocumentDetailPage = () => {
 }
 
 export default DocumentDetailPage
+
 
 
 

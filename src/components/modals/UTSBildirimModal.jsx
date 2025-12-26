@@ -13,7 +13,7 @@ import apiService from '../../services/apiService'
 const UTSBildirimModal = ({
     isOpen,
     onClose,
-    order,
+    document,
     playSuccessSound,
     playErrorSound
 }) => {
@@ -26,17 +26,17 @@ const UTSBildirimModal = ({
 
     // Modal açıldığında kayıtları getir
     useEffect(() => {
-        if (isOpen && order?.id) {
+        if (isOpen && document?.id) {
             fetchRecords()
         }
-    }, [isOpen, order?.id])
+    }, [isOpen, document?.id])
 
     // Kayıtları getir
     const fetchRecords = async () => {
         setLoading(true)
         setMessage(null)
         try {
-            const response = await apiService.getAllUTSRecordsForDocument(order.id, order.customerCode)
+            const response = await apiService.getAllUTSRecordsForDocument(document.id, document.customerCode)
             if (response.success) {
                 // Grid için sıra numarası ekle
                 const enrichedRecords = (response.data || []).map((r, index) => ({
@@ -161,12 +161,12 @@ const UTSBildirimModal = ({
             switch (actionType) {
                 case 'verme':
                     // UTS Verme bildirimi - TODO: Backend API'si eklenince güncellenecek
-                    result = await apiService.utsVermeBildirimi(order.id, products, settings)
+                    result = await apiService.utsVermeBildirimi(document.id, products, settings)
                     break
 
                 case 'verme-iptal':
                     // UTS Verme iptal bildirimi - TODO: Backend API'si eklenince güncellenecek
-                    result = await apiService.utsVermeIptalBildirimi(order.id, products, settings)
+                    result = await apiService.utsVermeIptalBildirimi(document.id, products, settings)
                     break
 
                 default:
@@ -230,11 +230,11 @@ const UTSBildirimModal = ({
                         <div className="flex items-center gap-4 text-sm">
                             <span className="text-slate-400">
                                 <FileText className="w-3.5 h-3.5 inline mr-1" />
-                                <span className="font-bold text-slate-100">{order?.orderNo}</span>
+                                <span className="font-bold text-slate-100">{document?.documentNo}</span>
                             </span>
-                            <span className="text-slate-400" title={order?.customerName}>
+                            <span className="text-slate-400" title={document?.customerName}>
                                 <User className="w-3.5 h-3.5 inline mr-1" />
-                                <span className="font-bold text-slate-100 max-w-[180px] truncate inline-block align-bottom">{order?.customerName}</span>
+                                <span className="font-bold text-slate-100 max-w-[180px] truncate inline-block align-bottom">{document?.customerName}</span>
                             </span>
                         </div>
                     </div>
@@ -321,3 +321,4 @@ const UTSBildirimModal = ({
 }
 
 export default UTSBildirimModal
+

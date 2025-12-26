@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Package, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, XCircle, Info, Send, RotateCcw, Filter } from 'lucide-react'
+import { ArrowLeft, Package, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, XCircle, Info, Send, Search, Filter } from 'lucide-react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -105,10 +105,11 @@ const PTSDetailPage = () => {
             productionDate: p.PRODUCTION_DATE ? new Date(p.PRODUCTION_DATE).toLocaleDateString('tr-TR') : '',
             carrierLabel: p.CARRIER_LABEL,
             containerType: p.CONTAINER_TYPE,
-            durum: p.DURUM || data.DURUM || '-',
+            durum: p.DURUM || null,
             durumMesaji: p.DURUM_MESAJI || null,
-            bildirimTarihi: p.BILDIRIM_TARIHI ? new Date(p.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) :
-              (data.BILDIRIM_TARIHI ? new Date(data.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : '-')
+            bildirim: p.BILDIRIM || null,
+            bildirimTarihi: p.BILDIRIM_TARIHI ? new Date(p.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : null,
+            bildirimKullanici: p.BILDIRIM_KULLANICI || null
           }))
 
         setProducts(onlyProducts)
@@ -142,10 +143,11 @@ const PTSDetailPage = () => {
             productionDate: p.PRODUCTION_DATE ? new Date(p.PRODUCTION_DATE).toLocaleDateString('tr-TR') : '',
             carrierLabel: p.CARRIER_LABEL,
             containerType: p.CONTAINER_TYPE,
-            durum: p.DURUM || data.DURUM || '-',
+            durum: p.DURUM || null,
             durumMesaji: p.DURUM_MESAJI || null,
-            bildirimTarihi: p.BILDIRIM_TARIHI ? new Date(p.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) :
-              (data.BILDIRIM_TARIHI ? new Date(data.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : '-')
+            bildirim: p.BILDIRIM || null,
+            bildirimTarihi: p.BILDIRIM_TARIHI ? new Date(p.BILDIRIM_TARIHI).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }) : null,
+            bildirimKullanici: p.BILDIRIM_KULLANICI || null
           }))
 
         setProducts(onlyProducts)
@@ -208,7 +210,7 @@ const PTSDetailPage = () => {
         bn: p.lotNumber
       }))
 
-      const result = await apiService.ptsAlimBildirimi(transferId, productsToSend, settings)
+      const result = await apiService.ptsAlimBildirimi(transferId, productsToSend, settings, JSON.parse(localStorage.getItem('user'))?.username)
 
       // Mesajları gruplandır (durumMesaji alanını kullan)
       const groupedResults = []
@@ -251,35 +253,28 @@ const PTSDetailPage = () => {
     }
   }
 
-  // Alım İade Bildirimi - /common/app/return
-  const handleAlimIadeBildirimi = async (e) => {
+  // Sorgulama - /common/app/verify - Sadece grid'i günceller, veritabanına yazmaz
+  const handleSorgula = async (e) => {
     e?.preventDefault()
     e?.stopPropagation()
 
     if (filteredProducts.length === 0) {
-      setMessage({ type: 'error', text: 'İade edilecek ürün bulunamadı!' })
-      return
-    }
-
-    // Karşı taraf GLN kontrolü
-    const karsiGlnNo = packageData?.SOURCE_GLN
-    if (!karsiGlnNo) {
-      setMessage({ type: 'error', text: 'Karşı taraf GLN numarası tanımlı değil!' })
+      setMessage({ type: 'error', text: 'Sorgulanacak ürün bulunamadı!' })
       return
     }
 
     // Onay iste
     const confirmed = window.confirm(
-      `${filteredProducts.length} adet ürün için İade Alım Bildirimi yapılacaktır.\n\nDevam etmek istiyor musunuz?`
+      `${filteredProducts.length} adet ürün için Sorgulama yapılacaktır.\n\nDevam etmek istiyor musunuz?`
     )
     if (!confirmed) return
 
     // Popup göster
     setBildirimModal({
       show: true,
-      type: 'iade',
+      type: 'sorgulama',
       status: 'loading',
-      message: 'Lütfen bekleyin, iade bildirimi yapılıyor...',
+      message: 'Lütfen bekleyin, sorgulama yapılıyor...',
       productCount: filteredProducts.length
     })
 
@@ -290,12 +285,10 @@ const PTSDetailPage = () => {
       const productsToSend = filteredProducts.map(p => ({
         id: p.id,
         gtin: p.gtin,
-        sn: p.serialNumber,
-        xd: p.expirationDate,
-        bn: p.lotNumber
+        sn: p.serialNumber
       }))
 
-      const result = await apiService.ptsAlimIadeBildirimi(transferId, karsiGlnNo, productsToSend, settings)
+      const result = await apiService.ptsSorgula(transferId, productsToSend, settings)
 
       // Mesajları gruplandır (durumMesaji alanını kullan)
       const groupedResults = []
@@ -309,27 +302,39 @@ const PTSDetailPage = () => {
           groupedResults.push({ message: msg, count })
         })
         groupedResults.sort((a, b) => b.count - a.count)
+
+        // Grid'deki ürünlerin bildirim değerlerini güncelle (SADECE UI, veritabanına yazmaz)
+        setProducts(prev => prev.map(p => {
+          const resultItem = result.data.find(r => r.gtin === p.gtin && r.seriNo === p.serialNumber)
+          if (resultItem) {
+            return {
+              ...p,
+              bildirim: resultItem.durum,
+              durumMesaji: resultItem.durumMesaji || null
+            }
+          }
+          return p
+        }))
       }
 
       if (result.success) {
         setBildirimModal(prev => ({
           ...prev,
           status: 'success',
-          message: result.message || 'Alım iade bildirimi başarıyla gönderildi!',
+          message: result.message || 'Sorgulama tamamlandı!',
           results: groupedResults
         }))
-        // Verileri yenile (grid ve header durumu - loading göstermeden)
-        await refreshData()
+        // NOT: Veritabanına yazmadığımız için refreshData çağırmıyoruz
       } else {
         setBildirimModal(prev => ({
           ...prev,
           status: 'error',
-          message: result.message || 'Alım iade bildirimi gönderilemedi!',
+          message: result.message || 'Sorgulama yapılamadı!',
           results: groupedResults
         }))
       }
     } catch (error) {
-      console.error('Alım iade bildirimi hatası:', error)
+      console.error('Sorgulama hatası:', error)
       setBildirimModal(prev => ({
         ...prev,
         status: 'error',
@@ -366,10 +371,13 @@ const PTSDetailPage = () => {
       header: 'Stok Adı',
       enableSorting: true,
       size: 300,
-      cell: info => <span className="font-medium text-slate-200">{info.getValue()}</span>,
+      cell: info => <span className="font-medium text-slate-200 text-xs md:text-sm">{info.getValue()}</span>,
       aggregatedCell: ({ row }) => {
         // MIAD'ları adetleriyle grupla
         const miadCounts = {}
+        const now = new Date()
+        const oneYearLater = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
+
         row.subRows.forEach(r => {
           const date = r.original.expirationDate
           if (date) {
@@ -381,6 +389,13 @@ const PTSDetailPage = () => {
           }
         })
 
+        // Miad'ın 1 yıldan az mı kontrol fonksiyonu
+        const isMiadExpiringSoon = (miadStr) => {
+          const [ay, yil] = miadStr.split('/')
+          const miadDate = new Date(parseInt(yil), parseInt(ay) - 1, 1)
+          return miadDate <= oneYearLater
+        }
+
         const miadList = Object.entries(miadCounts).sort((a, b) => a[0].localeCompare(b[0]))
         const totalCount = row.subRows.length
         const showTotal = miadList.length > 1
@@ -390,14 +405,17 @@ const PTSDetailPage = () => {
             <span className="font-semibold text-slate-100 text-sm">{row.subRows[0]?.original.stockName}</span>
             <span className="text-slate-600">|</span>
             <div className="flex items-center gap-2">
-              {miadList.map(([miad, count], idx) => (
-                <span key={idx} className="flex items-center gap-1">
-                  <span className="text-emerald-400 text-xs font-bold">{count}</span>
-                  <span className="px-1.5 py-0.5 bg-amber-500/15 text-amber-400 border border-amber-500/20 rounded text-xs">
-                    {miad}
+              {miadList.map(([miad, count], idx) => {
+                const isExpiring = isMiadExpiringSoon(miad)
+                return (
+                  <span key={idx} className="flex items-center gap-1">
+                    <span className={`text-xs font-bold ${isExpiring ? 'text-rose-400' : 'text-emerald-400'}`}>{count}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${isExpiring ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'}`}>
+                      {miad}
+                    </span>
                   </span>
-                </span>
-              ))}
+                )
+              })}
               {showTotal && (
                 <>
                   <span className="text-slate-600">=</span>
@@ -423,11 +441,31 @@ const PTSDetailPage = () => {
       header: 'Miad',
       enableSorting: true,
       size: 90,
-      cell: info => (
-        <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-medium text-xs">
-          {info.getValue() || '-'}
-        </span>
-      ),
+      cell: info => {
+        const dateStr = info.getValue()
+        if (!dateStr || dateStr === '-') {
+          return <span className="text-slate-500 text-xs">-</span>
+        }
+        // Tarih formatı: GG.AA.YYYY
+        const parts = dateStr.split('.')
+        if (parts.length >= 3) {
+          const miadDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+          const now = new Date()
+          const oneYearLater = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
+          const isExpiring = miadDate <= oneYearLater
+
+          return (
+            <span className={`px-1.5 py-0.5 rounded font-medium text-xs ${isExpiring ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+              {dateStr}
+            </span>
+          )
+        }
+        return (
+          <span className="px-1.5 py-0.5 bg-slate-500/20 text-slate-300 border border-slate-500/30 rounded font-medium text-xs">
+            {dateStr}
+          </span>
+        )
+      },
     },
     {
       accessorKey: 'lotNumber',
@@ -459,8 +497,8 @@ const PTSDetailPage = () => {
       ),
     },
     {
-      accessorKey: 'durum',
-      header: 'Durum',
+      accessorKey: 'bildirim',
+      header: 'Bildirim',
       enableSorting: true,
       size: 220,
       cell: info => {
@@ -484,14 +522,19 @@ const PTSDetailPage = () => {
     },
     {
       accessorKey: 'bildirimTarihi',
-      header: 'Bildirim',
+      header: 'Bildirim Tarihi',
       enableSorting: true,
       size: 120,
-      cell: info => (
-        <span className="text-slate-500 text-xs">
-          {info.getValue() || '-'}
-        </span>
-      ),
+      cell: info => {
+        const tarih = info.getValue()
+        const kullanici = info.row.original.bildirimKullanici
+        return (
+          <div className="flex flex-col leading-tight">
+            <span className="text-slate-400 text-xs">{tarih || '-'}</span>
+            {kullanici && <span className="text-slate-500 text-[10px]">{kullanici}</span>}
+          </div>
+        )
+      },
     },
   ], [])
 
@@ -673,16 +716,16 @@ const PTSDetailPage = () => {
 
               <button
                 type="button"
-                onClick={handleAlimIadeBildirimi}
+                onClick={handleSorgula}
                 disabled={actionLoading || filteredProducts.length === 0}
-                className="flex items-center gap-1 px-3 md:px-2 py-1.5 md:py-0.5 text-xs md:text-xs bg-amber-600 text-white rounded shadow-sm hover:bg-amber-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-1"
+                className="flex items-center gap-1 px-3 md:px-2 py-1.5 md:py-0.5 text-xs md:text-xs bg-primary-600 text-white rounded shadow-sm hover:bg-primary-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-1"
               >
                 {actionLoading ? (
                   <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <Search className="w-3.5 h-3.5" />
                 )}
-                <span className="hidden sm:inline">İade</span>
+                <span className="hidden sm:inline">Sorgula</span>
               </button>
 
               {/* Bildirim Durumu - Desktop için */}
@@ -930,7 +973,8 @@ const PTSDetailPage = () => {
 
               {/* Başlık */}
               <h3 className="text-xl font-bold text-center text-slate-100 mb-2">
-                {bildirimModal.type === 'alim' ? 'Alım Bildirimi' : 'İade Bildirimi'}
+                {bildirimModal.type === 'alim' ? 'Alım Bildirimi' :
+                  bildirimModal.type === 'sorgulama' ? 'Sorgulama' : 'İade Bildirimi'}
               </h3>
 
               {/* Ürün Sayısı */}
@@ -988,3 +1032,4 @@ const PTSDetailPage = () => {
 }
 
 export default PTSDetailPage
+

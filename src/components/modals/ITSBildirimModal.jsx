@@ -13,7 +13,7 @@ import apiService from '../../services/apiService'
 const ITSBildirimModal = ({
     isOpen,
     onClose,
-    order,
+    document,
     docType,
     playSuccessSound,
     playErrorSound
@@ -28,15 +28,15 @@ const ITSBildirimModal = ({
     const [durumDropdownOpen, setDurumDropdownOpen] = useState(false)
 
     // Belge tipi kontrolü - Satış Faturası mı?
-    const isSatisFaturasi = order?.docType === '1' && String(order?.tipi || '').toLowerCase().includes('sat')
+    const isSatisFaturasi = document?.docType === '1' && String(document?.tipi || '').toLowerCase().includes('sat')
 
     // Modal açıldığında kayıtları getir
     useEffect(() => {
-        if (isOpen && order?.id) {
+        if (isOpen && document?.id) {
             fetchRecords()
             setSelectedDurumlar([])
         }
-    }, [isOpen, order?.id])
+    }, [isOpen, document?.id])
 
     // Dışarı tıklayınca dropdown'ı kapat
     useEffect(() => {
@@ -45,8 +45,8 @@ const ITSBildirimModal = ({
                 setDurumDropdownOpen(false)
             }
         }
-        document.addEventListener('click', handleClickOutside)
-        return () => document.removeEventListener('click', handleClickOutside)
+        window.document.addEventListener('click', handleClickOutside)
+        return () => window.document.removeEventListener('click', handleClickOutside)
     }, [])
 
     // Kayıtları getir
@@ -54,7 +54,7 @@ const ITSBildirimModal = ({
         setLoading(true)
         setMessage(null)
         try {
-            const response = await apiService.getAllITSRecordsForDocument(order.id, order.customerCode)
+            const response = await apiService.getAllITSRecordsForDocument(document.id, document.customerCode)
             if (response.success) {
                 // Grid için sıra numarası ekle
                 const enrichedRecords = (response.data || []).map((r, index) => ({
@@ -74,15 +74,15 @@ const ITSBildirimModal = ({
         }
     }
 
-    // Benzersiz durumlar listesi
+    // Benzersiz bildirim durumları listesi
     const uniqueDurumlar = useMemo(() => {
         const durumMap = new Map()
         records.forEach(r => {
-            const key = r.durum ?? 'null'
+            const key = r.bildirim ?? 'null'
             if (!durumMap.has(key)) {
                 durumMap.set(key, {
-                    durum: r.durum,
-                    mesaj: r.durumMesaji || (r.durum === 0 || r.durum === '0' ? 'Beklemede' : r.durum ? `Kod: ${r.durum}` : 'Beklemede'),
+                    bildirim: r.bildirim,
+                    mesaj: r.bildirimMesaji || (r.bildirim === 0 || r.bildirim === '0' ? 'Beklemede' : r.bildirim ? `Kod: ${r.bildirim}` : 'Beklemede'),
                     count: 0
                 })
             }
@@ -95,7 +95,7 @@ const ITSBildirimModal = ({
     const filteredRecords = useMemo(() => {
         if (selectedDurumlar.length === 0) return records
         return records.filter(r => {
-            const key = r.durum ?? 'null'
+            const key = r.bildirim ?? 'null'
             return selectedDurumlar.includes(key)
         })
     }, [records, selectedDurumlar])
@@ -114,7 +114,7 @@ const ITSBildirimModal = ({
         if (selectedDurumlar.length === uniqueDurumlar.length) {
             setSelectedDurumlar([])
         } else {
-            setSelectedDurumlar(uniqueDurumlar.map(d => d.durum ?? 'null'))
+            setSelectedDurumlar(uniqueDurumlar.map(d => d.bildirim ?? 'null'))
         }
     }
 
@@ -168,22 +168,23 @@ const ITSBildirimModal = ({
             cellClass: 'font-mono text-sm'
         },
         {
-            headerName: 'Durum',
-            field: 'durum',
-            width: 200,
-            cellClass: 'text-center',
+            headerName: 'Bildirim',
+            field: 'bildirim',
+            flex: 1,
+            minWidth: 300,
+            cellClass: 'text-left',
             cellRenderer: (params) => {
-                const durumKodu = params.value
+                const bildirimKodu = params.value
                 // Backend'den join ile gelen mesajı kullan
-                const mesaj = params.data?.durumMesaji || durumKodu || '-'
+                const mesaj = params.data?.bildirimMesaji || bildirimKodu || '-'
 
-                // Durum koduna göre renklendirme
+                // Bildirim koduna göre renklendirme
                 // 1 = Başarılı, diğerleri hata
-                const isSuccess = durumKodu == 1 || String(mesaj).toLowerCase().includes('başarı')
-                const colorClass = isSuccess ? 'text-emerald-400' : durumKodu ? 'text-rose-400' : 'text-slate-400'
+                const isSuccess = bildirimKodu == 1 || String(mesaj).toLowerCase().includes('başarı')
+                const colorClass = isSuccess ? 'text-emerald-400' : bildirimKodu ? 'text-rose-400' : 'text-slate-400'
 
                 return (
-                    <span className={`font-semibold text-xs ${colorClass}`} title={`Kod: ${durumKodu || '-'}`}>
+                    <span className={`font-semibold text-xs ${colorClass}`} title={`Kod: ${bildirimKodu || '-'}`}>
                         {mesaj}
                     </span>
                 )
@@ -213,6 +214,7 @@ const ITSBildirimModal = ({
             'alis': 'Alış Bildirimi',
             'iade-alis': 'İade Alış Bildirimi',
             'dogrulama': 'Doğrulama',
+            'sorgula': 'Sorgula',
             'basarisiz-sorgula': 'Başarısız Ürün Sorgulama'
         }
 
@@ -239,10 +241,10 @@ const ITSBildirimModal = ({
 
             // Belge bilgilerini hazırla (ITS durumunu güncellemek için)
             const belgeInfo = {
-                subeKodu: order?.subeKodu,
-                fatirsNo: order?.orderNo,
-                ftirsip: order?.docType || docType,
-                cariKodu: order?.customerCode,
+                subeKodu: document?.subeKodu,
+                fatirsNo: document?.documentNo,
+                ftirsip: document?.docType || docType,
+                cariKodu: document?.customerCode,
                 kullanici: localStorage.getItem('username') || 'SYSTEM'
             }
 
@@ -251,43 +253,43 @@ const ITSBildirimModal = ({
             switch (actionType) {
                 case 'satis':
                     // GLN kontrolü
-                    const glnNo = order?.glnNo
+                    const glnNo = document?.glnNo
                     if (!glnNo) {
                         setMessage({ type: 'error', text: 'Alıcı GLN numarası tanımlı değil!' })
                         playErrorSound?.()
                         return
                     }
-                    result = await apiService.itsSatisBildirimi(order.id, glnNo, products, settings, belgeInfo)
+                    result = await apiService.itsSatisBildirimi(document.id, glnNo, products, settings, belgeInfo)
                     break
 
                 case 'satis-iptal':
-                    const glnNoIptal = order?.glnNo
+                    const glnNoIptal = document?.glnNo
                     if (!glnNoIptal) {
                         setMessage({ type: 'error', text: 'Alıcı GLN numarası tanımlı değil!' })
                         playErrorSound?.()
                         return
                     }
-                    result = await apiService.itsSatisIptalBildirimi(order.id, glnNoIptal, products, settings, belgeInfo)
+                    result = await apiService.itsSatisIptalBildirimi(document.id, glnNoIptal, products, settings, belgeInfo)
                     break
 
                 case 'alis':
                     // Alış bildirimi (Mal Alım) - GLN gerekmez, sadece productList gönderilir
-                    result = await apiService.itsAlisBildirimi(order.id, products, settings, belgeInfo)
+                    result = await apiService.itsAlisBildirimi(document.id, products, settings, belgeInfo)
                     break
 
                 case 'iade-alis':
                     // İade Alış bildirimi (Mal İade) - Karşı taraf GLN kontrolü
-                    const karsiGlnNo = order?.glnNo
+                    const karsiGlnNo = document?.glnNo
                     if (!karsiGlnNo) {
                         setMessage({ type: 'error', text: 'Karşı taraf GLN numarası tanımlı değil!' })
                         playErrorSound?.()
                         return
                     }
-                    result = await apiService.itsIadeAlisBildirimi(order.id, karsiGlnNo, products, settings, belgeInfo)
+                    result = await apiService.itsIadeAlisBildirimi(document.id, karsiGlnNo, products, settings, belgeInfo)
                     break
 
                 case 'dogrulama':
-                    result = await apiService.itsDogrulama(order.id, products, settings)
+                    result = await apiService.itsDogrulama(document.id, products, settings)
                     // Doğrulama sonuçlarını grid'de göster (DB'ye yazma)
                     if (result.success && result.data?.length > 0) {
                         // Mesaj kodlarını tekilleştir ve getir
@@ -305,8 +307,35 @@ const ITSBildirimModal = ({
                             if (sonuc) {
                                 return {
                                     ...r,
-                                    durum: sonuc.durum,
-                                    durumMesaji: mesajMap[sonuc.durum] || `Kod: ${sonuc.durum}`
+                                    bildirim: sonuc.durum,
+                                    bildirimMesaji: mesajMap[sonuc.durum] || `Kod: ${sonuc.durum}`
+                                }
+                            }
+                            return r
+                        })
+                        setRecords(updatedRecords)
+                        setMessage({ type: 'success', text: result.message })
+                        playSuccessSound?.()
+                        return
+                    }
+                    break
+
+                case 'sorgula':
+                    result = await apiService.itsSorgula(document.id, products, settings)
+                    // Sorgulama sonuçlarını grid'de göster (DB'ye yazma)
+                    if (result.success && result.data?.length > 0) {
+                        // Grid kayıtlarını güncelle
+                        const updatedRecords = records.map(r => {
+                            const sonuc = result.data.find(s => s.seriNo === r.seriNo)
+                            if (sonuc) {
+                                return {
+                                    ...r,
+                                    bildirim: sonuc.durum,
+                                    bildirimMesaji: sonuc.durumMesaji || `Kod: ${sonuc.durum}`,
+                                    gln1: sonuc.gln1,
+                                    gln2: sonuc.gln2,
+                                    gln1Adi: sonuc.gln1Adi,  // Kaynak GLN adı (BİZİM veya Cari İsim)
+                                    gln2Adi: sonuc.gln2Adi   // Hedef GLN adı (BİZİM veya Cari İsim)
                                 }
                             }
                             return r
@@ -319,7 +348,7 @@ const ITSBildirimModal = ({
                     break
 
                 case 'basarisiz-sorgula':
-                    result = await apiService.itsBasarisizSorgula(order.id, products, settings)
+                    result = await apiService.itsBasarisizSorgula(document.id, products, settings)
                     // Başarısız sorgulama sonuçlarını grid'de göster (DB'ye yazma)
                     if (result.success && result.data?.length > 0) {
                         // Mesaj kodlarını tekilleştir ve getir
@@ -337,8 +366,8 @@ const ITSBildirimModal = ({
                             if (sonuc) {
                                 return {
                                     ...r,
-                                    durum: sonuc.durum,
-                                    durumMesaji: mesajMap[sonuc.durum] || sonuc.hataMesaji || `Kod: ${sonuc.durum}`
+                                    bildirim: sonuc.durum,
+                                    bildirimMesaji: mesajMap[sonuc.durum] || sonuc.hataMesaji || `Kod: ${sonuc.durum}`
                                 }
                             }
                             return r
@@ -412,16 +441,16 @@ const ITSBildirimModal = ({
                         <div className="flex items-center gap-4 text-sm">
                             <span className="text-slate-400">
                                 <FileText className="w-3.5 h-3.5 inline mr-1" />
-                                <span className="font-bold text-slate-100">{order?.orderNo}</span>
+                                <span className="font-bold text-slate-100">{document?.documentNo}</span>
                             </span>
-                            <span className="text-slate-400" title={order?.customerName}>
+                            <span className="text-slate-400" title={document?.customerName}>
                                 <User className="w-3.5 h-3.5 inline mr-1" />
-                                <span className="font-bold text-slate-100 max-w-[180px] truncate inline-block align-bottom">{order?.customerName}</span>
+                                <span className="font-bold text-slate-100 max-w-[180px] truncate inline-block align-bottom">{document?.customerName}</span>
                             </span>
                             <span className="text-slate-400">
                                 <Hash className="w-3.5 h-3.5 inline mr-1" />
-                                <span className={`font-bold ${(order?.glnNo || order?.email) ? 'text-indigo-400' : 'text-rose-400'}`}>
-                                    {order?.glnNo || order?.email || 'GLN Yok'}
+                                <span className={`font-bold ${(document?.glnNo || document?.email) ? 'text-indigo-400' : 'text-rose-400'}`}>
+                                    {document?.glnNo || document?.email || 'GLN Yok'}
                                 </span>
                             </span>
                         </div>
@@ -539,12 +568,12 @@ const ITSBildirimModal = ({
                         Doğrulama
                     </button>
                     <button
-                        onClick={() => handleAction('basarisiz-sorgula')}
+                        onClick={() => handleAction('sorgula')}
                         disabled={actionLoading || records.length === 0}
-                        className="px-3 py-1.5 rounded-lg text-white bg-amber-600 hover:bg-amber-500 transition-all font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        className="px-3 py-1.5 rounded-lg text-white bg-sky-600 hover:bg-sky-500 transition-all font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                         <Search className="w-4 h-4" />
-                        Başarısız Sorgula
+                        Sorgula
                     </button>
 
                     {/* Durum Filtresi - Multi Select Dropdown */}
@@ -578,12 +607,12 @@ const ITSBildirimModal = ({
                                     <span className="text-sm font-medium text-slate-200">Tümünü Seç/Kaldır</span>
                                 </div>
 
-                                {/* Durum listesi */}
+                                {/* Bildirim durum listesi */}
                                 {uniqueDurumlar.map((d) => {
-                                    const key = d.durum ?? 'null'
+                                    const key = d.bildirim ?? 'null'
                                     const isSelected = selectedDurumlar.includes(key)
-                                    const isSuccess = d.durum == 1 || String(d.mesaj).toLowerCase().includes('başarı')
-                                    const isPending = !d.durum || d.durum === 0 || d.durum === '0'
+                                    const isSuccess = d.bildirim == 1 || String(d.mesaj).toLowerCase().includes('başarı')
+                                    const isPending = !d.bildirim || d.bildirim === 0 || d.bildirim === '0'
 
                                     return (
                                         <div
@@ -614,3 +643,4 @@ const ITSBildirimModal = ({
 }
 
 export default ITSBildirimModal
+

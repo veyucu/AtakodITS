@@ -514,12 +514,28 @@ export const dogrulamaYap = async (products, frontendSettings = null) => {
 
         log('✅ ITS Doğrulama yanıtı:', response.data)
 
-        const results = (response.data?.productList || []).map(item => ({
-            gtin: item.gtin,
-            seriNo: item.sn,
-            durum: item.uc,
-            statu: item.status
-        }))
+        // Durum mesajlarını al
+        let durumMesajlari = {}
+        try {
+            const ptsPool = await getPTSConnection()
+            const mesajResult = await ptsPool.request().query('SELECT ID, MESAJ FROM AKTBLITSMESAJ')
+            mesajResult.recordset.forEach(row => {
+                durumMesajlari[row.ID] = fixTurkishChars(row.MESAJ)
+            })
+        } catch (e) {
+            log('⚠️ Mesaj kodları alınamadı:', e.message)
+        }
+
+        const results = (response.data?.productList || []).map(item => {
+            const normalizedUc = String(item.uc).replace(/^0+/, '') || '0'
+            return {
+                gtin: item.gtin,
+                seriNo: item.sn,
+                durum: item.uc,
+                statu: item.status,
+                durumMesaji: durumMesajlari[normalizedUc] || durumMesajlari[item.uc] || (normalizedUc == '0' ? 'Başarılı' : `Hata: ${item.uc}`)
+            }
+        })
 
         return {
             success: true,
@@ -538,10 +554,10 @@ export const dogrulamaYap = async (products, frontendSettings = null) => {
 }
 
 /**
- * Başarısız Ürünleri Sorgula (Check Status)
- * Daha önce yapılan bildirimlerde başarısız olan ürünleri sorgulama
+ * Durum Sorgula (Check Status)
+ * Ürünlerin ITS'deki durumunu sorgular - gln1, gln2 bilgilerini de döner
  */
-export const basarisizlariSorgula = async (products, frontendSettings = null) => {
+export const durumSorgula = async (products, frontendSettings = null) => {
     try {
         if (!products || products.length === 0) {
             return { success: false, message: 'Sorgulanacak ürün bulunamadı', data: [] }
@@ -553,6 +569,9 @@ export const basarisizlariSorgula = async (products, frontendSettings = null) =>
             return { success: false, message: 'ITS kullanıcı adı veya şifre tanımlı değil' }
         }
 
+        // Bizim GLN numaramız
+        const bizimGln = config.glnNo || ''
+
         const token = await getAccessToken(config)
 
         const productList = products.map(p => ({
@@ -560,7 +579,7 @@ export const basarisizlariSorgula = async (products, frontendSettings = null) =>
             sn: p.seriNo || p.sn
         }))
 
-        log('❓ ITS Başarısız Sorgulama gönderiliyor:', { productCount: productList.length })
+        log('🔍 ITS Durum Sorgulama gönderiliyor:', { productCount: productList.length, bizimGln })
 
         const response = await axios.post(
             `${config.baseUrl}${config.checkStatusUrl}`,
@@ -576,32 +595,123 @@ export const basarisizlariSorgula = async (products, frontendSettings = null) =>
             }
         )
 
-        log('✅ ITS Başarısız Sorgulama yanıtı:', response.data)
+        log('✅ ITS Durum Sorgulama yanıtı:', response.data)
 
-        const results = (response.data?.productList || []).map(item => ({
-            gtin: item.gtin,
-            seriNo: item.sn,
-            durum: item.uc,
-            hataKodu: item.errorCode || item.ec,
-            hataMesaji: item.errorMessage || item.em
-        }))
+        // Mesaj kodlarını al
+        let durumMesajlari = {}
+        try {
+            const ptsPool = await getPTSConnection()
+            const mesajResult = await ptsPool.request().query('SELECT ID, MESAJ FROM AKTBLITSMESAJ')
+            mesajResult.recordset.forEach(row => {
+                durumMesajlari[row.ID] = fixTurkishChars(row.MESAJ)
+            })
+        } catch (e) {
+            log('⚠️ Mesaj kodları alınamadı:', e.message)
+        }
 
-        const failedCount = results.filter(r => r.durum != 1).length
+        // responseObjectList'den parse et (C# kodundaki gibi)
+        const responseList = response.data?.responseObjectList || response.data?.productList || []
+
+        // Benzersiz GLN'leri topla (bizimGln hariç)
+        const uniqueGlns = new Set()
+        responseList.forEach(item => {
+            if (item.gln1 && item.gln1 !== bizimGln) uniqueGlns.add(item.gln1)
+            if (item.gln2 && item.gln2 !== bizimGln) uniqueGlns.add(item.gln2)
+        })
+
+        // GLN -> Cari bilgi haritası oluştur (tek sorguda)
+        const glnCariMap = {}
+        if (uniqueGlns.size > 0) {
+            try {
+                const pool = await getConnection()
+                const glnArray = Array.from(uniqueGlns)
+
+                // Cari GLN kolon adını ayarlardan al (dinamik)
+                const cariGlnBilgisi = settingsHelper.getSetting('cariGlnBilgisi', 'TBLCASABIT.EMAIL')
+                const glnColumnParts = cariGlnBilgisi.split('.')
+                const glnColumn = glnColumnParts.length > 1 ? glnColumnParts[1] : glnColumnParts[0]
+
+                // GLN'leri parametre olarak ekle
+                const glnParams = glnArray.map((_, i) => `@gln${i}`).join(', ')
+                const query = `
+                    SELECT ${glnColumn} AS GLN_NO, CARI_ISIM 
+                    FROM TBLCASABIT WITH (NOLOCK) 
+                    WHERE ${glnColumn} IN (${glnParams})
+                `
+
+                const request = pool.request()
+                glnArray.forEach((gln, i) => {
+                    request.input(`gln${i}`, gln)
+                })
+
+                const result = await request.query(query)
+                result.recordset.forEach(row => {
+                    glnCariMap[row.GLN_NO] = fixTurkishChars(row.CARI_ISIM)
+                })
+
+                log('📋 GLN-Cari eşleşmesi:', Object.keys(glnCariMap).length, 'cari bulundu')
+            } catch (e) {
+                log('⚠️ Cari bilgileri alınamadı:', e.message)
+            }
+        }
+
+        // Depo Adı ayarını al (BİZİM yerine kullanılacak)
+        const depoAdi = settingsHelper.getSetting('depoAdi', 'BİZİM')
+
+        // GLN'i okunabilir isme çevir
+        const formatGlnName = (gln) => {
+            if (!gln) return null
+            if (gln === bizimGln) return depoAdi  // BİZİM yerine Depo Adı
+            return glnCariMap[gln] || gln  // Cari bulunamazsa GLN'in kendisini göster
+        }
+
+        const results = responseList.map(item => {
+            const normalizedUc = String(item.uc || '').replace(/^0+/, '') || '0'
+            const gln1Adi = formatGlnName(item.gln1)
+            const gln2Adi = formatGlnName(item.gln2)
+
+            // Mesajı al ve GLN1/GLN2 ifadelerini değiştir
+            let mesaj = durumMesajlari[normalizedUc] || durumMesajlari[item.uc] || (normalizedUc == '0' ? 'Başarılı' : `Kod: ${item.uc}`)
+            if (gln1Adi) mesaj = mesaj.replace(/GLN1/gi, gln1Adi)
+            if (gln2Adi) mesaj = mesaj.replace(/GLN2/gi, gln2Adi)
+
+            return {
+                gtin: item.gtin,
+                seriNo: item.sn,
+                gln1: item.gln1 || null,
+                gln2: item.gln2 || null,
+                gln1Adi: gln1Adi,
+                gln2Adi: gln2Adi,
+                durum: item.uc,
+                durumMesaji: mesaj
+            }
+        })
+
+        const failedCount = results.filter(r => r.durum != 1 && r.durum != '1' && r.durum != '0' && r.durum != 0).length
 
         return {
             success: true,
-            message: `${results.length} ürün sorgulandı, ${failedCount} adet başarısız`,
+            message: `${results.length} ürün sorgulandı${failedCount > 0 ? `, ${failedCount} adet sorunlu` : ''}`,
             data: results
         }
 
     } catch (error) {
-        console.error('❌ Başarısız Sorgulama Hatası:', error.message)
+        console.error('❌ Durum Sorgulama Hatası:', error.message)
         return {
             success: false,
             message: error.response?.data?.message || error.message || 'Sorgulama başarısız',
             data: []
         }
     }
+}
+
+/**
+ * Başarısız Ürünleri Sorgula (Check Status)
+ * Daha önce yapılan bildirimlerde başarısız olan ürünleri sorgulama
+ */
+export const basarisizlariSorgula = async (products, frontendSettings = null) => {
+    // durumSorgula ile aynı işlevi kullan
+    return await durumSorgula(products, frontendSettings)
 }
 
 /**
@@ -643,7 +753,7 @@ export const updateBildirimDurum = async (results) => {
 
 /**
  * Belgenin ITS Durumunu Güncelle
- * TBLFATUIRS veya TBLSIPAMAS tablosunda ITS_DURUM, ITS_TARIH, ITS_KULLANICI alanlarını günceller
+ * TBLFATUIRS veya TBLSIPAMAS tablosunda ITS_BILDIRIM, ITS_TARIH, ITS_KULLANICI alanlarını günceller
  * 
  * @param {string} subeKodu - Şube kodu
  * @param {string} fatirs_no - Fatura/Sipariş numarası
@@ -658,13 +768,13 @@ export const updateBelgeITSDurum = async (subeKodu, fatirs_no, ftirsip, cariKodu
 
         // Belge tipi: '6' = Sipariş (TBLSIPAMAS), diğerleri = Fatura (TBLFATUIRS)
         const tableName = ftirsip === '6' ? 'TBLSIPAMAS' : 'TBLFATUIRS'
-        const itsDurum = tumBasarili ? 'OK' : 'NOK'
+        const itsBildirim = tumBasarili ? 'OK' : 'NOK'
 
-        log(`📋 Belge ITS durumu güncelleniyor: ${tableName}, FATIRS_NO=${fatirs_no}, CARI_KODU=${cariKodu}, ITS_DURUM=${itsDurum}`)
+        log(`📋 Belge ITS durumu güncelleniyor: ${tableName}, FATIRS_NO=${fatirs_no}, CARI_KODU=${cariKodu}, ITS_BILDIRIM=${itsBildirim}`)
 
         const query = `
             UPDATE ${tableName}
-            SET ITS_DURUM = @itsDurum,
+            SET ITS_BILDIRIM = @itsBildirim,
                 ITS_TARIH = GETDATE(),
                 ITS_KULLANICI = @kullanici
             WHERE SUBE_KODU = @subeKodu 
@@ -674,7 +784,7 @@ export const updateBelgeITSDurum = async (subeKodu, fatirs_no, ftirsip, cariKodu
         `
 
         const request = pool.request()
-        request.input('itsDurum', itsDurum)
+        request.input('itsBildirim', itsBildirim)
         request.input('kullanici', kullanici || 'SYSTEM')
         request.input('subeKodu', subeKodu)
         request.input('fatirsNo', fatirs_no)
@@ -706,9 +816,9 @@ export const updateBelgeITSDurum = async (subeKodu, fatirs_no, ftirsip, cariKodu
  * @param {Array} results - Bildirim sonuçları [{id, durum}]
  * @param {boolean} tumBasarili - Tüm satırlar başarılı mı?
  */
-export const updatePTSBildirimDurum = async (transferId, results, tumBasarili) => {
+export const updatePTSBildirimDurum = async (transferId, results, tumBasarili, kullanici = null) => {
     try {
-        log(`📋 PTS Bildirim durumu güncelleniyor: TRANSFER_ID=${transferId}, Sonuç sayısı=${results?.length || 0}, tumBasarili=${tumBasarili}`)
+        log(`📋 PTS Bildirim durumu güncelleniyor: TRANSFER_ID=${transferId}, Sonuç sayısı=${results?.length || 0}, tumBasarili=${tumBasarili}, kullanici=${kullanici}`)
 
         const pool = await getPTSConnection()
         const ptsPool = pool  // PTS veritabanı bağlantısı
@@ -747,10 +857,12 @@ export const updatePTSBildirimDurum = async (transferId, results, tumBasarili) =
                         request.input('transferId', transferId)
                         request.input('minId', minId)
                         request.input('maxId', maxId)
+                        request.input('kullanici', kullanici || 'SYSTEM')
                         const updateQuery = `
                             UPDATE AKTBLPTSTRA
                             SET BILDIRIM = @durum,
-                                BILDIRIM_TARIHI = GETDATE()
+                                BILDIRIM_TARIHI = GETDATE(),
+                                BILDIRIM_KULLANICI = @kullanici
                             WHERE TRANSFER_ID = @transferId
                               AND ID BETWEEN @minId AND @maxId
                         `
@@ -766,10 +878,12 @@ export const updatePTSBildirimDurum = async (transferId, results, tumBasarili) =
                             const request = ptsPool.request()
                             request.input('durum', durum)
                             request.input('transferId', transferId)
+                            request.input('kullanici', kullanici || 'SYSTEM')
                             const updateQuery = `
                                 UPDATE AKTBLPTSTRA
                                 SET BILDIRIM = @durum,
-                                    BILDIRIM_TARIHI = GETDATE()
+                                    BILDIRIM_TARIHI = GETDATE(),
+                                    BILDIRIM_KULLANICI = @kullanici
                                 WHERE TRANSFER_ID = @transferId
                                   AND ID IN (${idList})
                             `
@@ -793,12 +907,14 @@ export const updatePTSBildirimDurum = async (transferId, results, tumBasarili) =
         const masQuery = `
             UPDATE AKTBLPTSMAS
             SET BILDIRIM = @durum,
-                BILDIRIM_TARIHI = GETDATE()
+                BILDIRIM_TARIHI = GETDATE(),
+                BILDIRIM_KULLANICI = @kullanici
             WHERE TRANSFER_ID = @transferId
         `
         const masRequest = ptsPool.request()
         masRequest.input('durum', masDurum)
         masRequest.input('transferId', transferId)
+        masRequest.input('kullanici', kullanici || 'SYSTEM')
         const masResult = await masRequest.query(masQuery)
 
         if (masResult.rowsAffected[0] > 0) {

@@ -1,9 +1,39 @@
 import axios from 'axios'
 import AdmZip from 'adm-zip'
 import xml2js from 'xml2js'
+import iconv from 'iconv-lite'
 import * as ptsDbService from './ptsDbService.js'
 import * as settingsHelper from '../utils/settingsHelper.js'
 import { log } from '../utils/logger.js'
+
+/**
+ * Türkçe karakter düzeltme fonksiyonu - SQL Server CP1254 to UTF-8
+ */
+const fixTurkishChars = (str) => {
+  if (!str || typeof str !== 'string') return str
+  try {
+    let fixed = str
+    try {
+      const buf = Buffer.from(fixed, 'latin1')
+      fixed = iconv.decode(buf, 'cp1254')
+    } catch (e) { /* iconv hatası - devam et */ }
+    if (fixed.includes('?') || fixed.match(/[\u0080-\u00FF]/)) {
+      const charMap = {
+        'Ä°': 'İ', 'Ä±': 'ı', 'ÅŸ': 'ş', 'Åž': 'Ş',
+        'Ã§': 'ç', 'Ã‡': 'Ç', 'ÄŸ': 'ğ', 'Äž': 'Ğ',
+        'Ã¼': 'ü', 'Ãœ': 'Ü', 'Ã¶': 'ö', 'Ã–': 'Ö',
+        'Â': '', '�': '', '\\u00DD': 'İ', '\\u00FD': 'ı',
+        '\\u00DE': 'Ş', '\\u00FE': 'ş', '\\u00D0': 'Ğ', '\\u00F0': 'ğ',
+      }
+      for (const [wrong, correct] of Object.entries(charMap)) {
+        fixed = fixed.split(wrong).join(correct)
+      }
+    }
+    return fixed.trim()
+  } catch (error) {
+    return str
+  }
+}
 
 // PTS Web Servis Entegrasyonu - Ayarlardan yüklenir
 let PTS_CONFIG = null
@@ -28,6 +58,7 @@ function loadPTSConfig(frontendSettings = null) {
     searchUrl: settingsHelper.getSetting('itsPaketSorguUrl', '/pts/app/search'),
     getPackageUrl: settingsHelper.getSetting('itsPaketIndirUrl', '/pts/app/GetPackage'),
     sendPackageUrl: settingsHelper.getSetting('itsPaketGonderUrl', '/pts/app/SendPackage'),
+    checkStatusUrl: settingsHelper.getSetting('itsCheckStatusUrl', '/common/app/verify'),
     simulationMode: false
   }
 
@@ -576,6 +607,174 @@ function generatePTSNotificationXML(packageData) {
 
   return xml
 }
+/**
+ * PTS Durum Sorgula (Verify/Check Status)
+ * Ürünlerin PTS'deki durumunu sorgular - gln1, gln2 bilgilerini de döner
+ * @param {string} transferId - Transfer ID
+ * @param {Array} products - Ürün listesi [{gtin, sn}, ...]
+ * @param {Object} settings - Frontend ayarları (opsiyonel)
+ * @returns {Promise<Object>}
+ */
+async function durumSorgula(transferId, products, settings = null) {
+  // Ayarlar verildiyse güncelle
+  if (settings) {
+    loadPTSConfig(settings)
+  }
+
+  try {
+    if (!products || products.length === 0) {
+      return { success: false, message: 'Sorgulanacak ürün bulunamadı', data: [] }
+    }
+
+    // Bizim GLN numaramız
+    const bizimGln = PTS_CONFIG.glnNo || ''
+
+    log('🔍 PTS Durum Sorgulama başlıyor:', { transferId, productCount: products.length, bizimGln })
+
+    const token = await getAccessToken()
+    if (!token) {
+      return { success: false, message: 'Token alınamadı' }
+    }
+
+    // Ürün listesini hazırla - GTIN'i 14 haneye tamamla
+    const productList = products.map(p => ({
+      gtin: String(p.gtin || '').padStart(14, '0'),
+      sn: p.sn || p.serialNumber || p.seriNo
+    }))
+
+    log('📤 PTS Verify API çağrılıyor:', { endpoint: PTS_CONFIG.checkStatusUrl, productCount: productList.length })
+
+    const response = await axios.post(
+      `${PTS_CONFIG.baseUrl}${PTS_CONFIG.checkStatusUrl}`,
+      {
+        productList: productList
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 60000 // 60 saniye (çok ürün olabilir)
+      }
+    )
+
+    log('✅ PTS Verify API yanıtı alındı')
+
+    // Response'dan ürün listesini al
+    const responseList = response.data?.responseObjectList || response.data?.productList || []
+
+    // Mesaj kodlarını AKTBLITSMESAJ tablosundan al
+    let durumMesajlari = {}
+    try {
+      const db = await import('../config/database.js')
+      const pool = await db.getPTSConnection()
+      const mesajResult = await pool.request().query('SELECT ID, MESAJ FROM AKTBLITSMESAJ')
+      mesajResult.recordset.forEach(row => {
+        durumMesajlari[row.ID] = fixTurkishChars(row.MESAJ)
+      })
+      log(`📋 ${Object.keys(durumMesajlari).length} mesaj kodu yüklendi`)
+    } catch (e) {
+      log('⚠️ Mesaj kodları alınamadı:', e.message)
+    }
+
+    // Benzersiz GLN'leri topla (bizimGln hariç)
+    const uniqueGlns = new Set()
+    responseList.forEach(item => {
+      if (item.gln1 && item.gln1 !== bizimGln) uniqueGlns.add(item.gln1)
+      if (item.gln2 && item.gln2 !== bizimGln) uniqueGlns.add(item.gln2)
+    })
+
+    // GLN -> Cari bilgi haritası oluştur (tek sorguda)
+    const glnCariMap = {}
+    if (uniqueGlns.size > 0) {
+      try {
+        const db = await import('../config/database.js')
+        const mainPool = await db.getConnection()
+        const glnArray = Array.from(uniqueGlns)
+
+        // Cari GLN kolon adını ayarlardan al (dinamik)
+        const cariGlnBilgisi = settingsHelper.getSetting('cariGlnBilgisi', 'TBLCASABIT.EMAIL')
+        const glnColumnParts = cariGlnBilgisi.split('.')
+        const glnColumn = glnColumnParts.length > 1 ? glnColumnParts[1] : glnColumnParts[0]
+
+        // GLN'leri parametre olarak ekle
+        const glnParams = glnArray.map((_, i) => `@gln${i}`).join(', ')
+        const query = `
+          SELECT ${glnColumn} AS GLN_NO, CARI_ISIM 
+          FROM TBLCASABIT WITH (NOLOCK) 
+          WHERE ${glnColumn} IN (${glnParams})
+        `
+
+        const request = mainPool.request()
+        glnArray.forEach((gln, i) => {
+          request.input(`gln${i}`, gln)
+        })
+
+        const result = await request.query(query)
+        result.recordset.forEach(row => {
+          glnCariMap[row.GLN_NO] = fixTurkishChars(row.CARI_ISIM)
+        })
+
+        log('📋 GLN-Cari eşleşmesi:', Object.keys(glnCariMap).length, 'cari bulundu')
+      } catch (e) {
+        log('⚠️ Cari bilgileri alınamadı:', e.message)
+      }
+    }
+
+    // Depo Adı ayarını al (BİZİM yerine kullanılacak)
+    const depoAdi = settingsHelper.getSetting('depoAdi', 'BİZİM')
+
+    // GLN'i okunabilir isme çevir
+    const formatGlnName = (gln) => {
+      if (!gln) return null
+      if (gln === bizimGln) return depoAdi  // BİZİM yerine Depo Adı
+      return glnCariMap[gln] || gln  // Cari bulunamazsa GLN'in kendisini göster
+    }
+
+    // Sonuçları map'le
+    const results = responseList.map(item => {
+      const normalizedUc = String(item.uc || '').replace(/^0+/, '') || '0'
+      const gln1Adi = formatGlnName(item.gln1)
+      const gln2Adi = formatGlnName(item.gln2)
+
+      // Mesajı al ve GLN1/GLN2 ifadelerini değiştir
+      let mesaj = durumMesajlari[normalizedUc] || durumMesajlari[item.uc] || (normalizedUc == '0' ? 'Başarılı' : `Kod: ${item.uc}`)
+      if (gln1Adi) mesaj = mesaj.replace(/GLN1/gi, gln1Adi)
+      if (gln2Adi) mesaj = mesaj.replace(/GLN2/gi, gln2Adi)
+
+      return {
+        gtin: item.gtin,
+        seriNo: item.sn,
+        gln1: item.gln1 || null,
+        gln2: item.gln2 || null,
+        gln1Adi: gln1Adi,
+        gln2Adi: gln2Adi,
+        durum: item.uc,
+        durumMesaji: mesaj
+      }
+    })
+
+    const failedCount = results.filter(r => r.durum != 1 && r.durum != '1' && r.durum != '0' && r.durum != 0).length
+
+    return {
+      success: true,
+      message: `${results.length} ürün sorgulandı`,
+      data: results
+    }
+
+  } catch (error) {
+    console.error('❌ PTS Durum Sorgulama hatası:', error.message)
+    if (error.response) {
+      console.error('Response status:', error.response.status)
+      console.error('Response data:', error.response.data)
+    }
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Sorgulama başarısız',
+      data: []
+    }
+  }
+}
 
 export {
   getAccessToken,
@@ -583,6 +782,7 @@ export {
   downloadPackage,
   queryPackage,
   sendPackage,
+  durumSorgula,
   loadPTSConfig,
   PTS_CONFIG
 }

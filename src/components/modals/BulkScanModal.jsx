@@ -8,8 +8,8 @@ import apiService from '../../services/apiService'
 const BulkScanModal = ({
   isOpen,
   onClose,
-  orderId,
-  orderNo,
+  documentId,
+  documentNo,
   docType,
   onSuccess,
   playSuccessSound,
@@ -47,7 +47,7 @@ const BulkScanModal = ({
   // Toplu okutma işlemi
   const handleBulkScan = async () => {
     const lines = barcodeText.split('\n').filter(line => line.trim())
-    
+
     if (lines.length === 0) {
       alert('⚠️ Lütfen en az bir karekod girin')
       return
@@ -58,15 +58,15 @@ const BulkScanModal = ({
 
     try {
       const response = await apiService.bulkScanITSBarcodes({
-        documentId: orderId,
+        documentId: documentId,
         barcodes: lines,
-        belgeNo: orderNo,
+        belgeNo: documentNo,
         docType: docType
       })
 
       if (response.success) {
         setResults(response.data)
-        
+
         if (response.data.successCount > 0) {
           playSuccessSound?.()
         }
@@ -108,12 +108,12 @@ const BulkScanModal = ({
   if (!isOpen) return null
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       onClick={handleClose}
       onKeyDown={(e) => e.key === 'Escape' && handleClose()}
     >
-      <div 
+      <div
         className="bg-white rounded-xl shadow-2xl w-[90%] max-w-3xl max-h-[80vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -176,7 +176,7 @@ const BulkScanModal = ({
                   <p className="text-xs text-red-600">Hatalı</p>
                 </div>
               </div>
-              
+
               {/* Error Details */}
               {results.errors && results.errors.length > 0 && (
                 <div className="mt-4">

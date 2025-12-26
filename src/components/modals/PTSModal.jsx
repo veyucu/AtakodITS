@@ -11,7 +11,7 @@ import apiService from '../../services/apiService'
 const PTSModal = ({
     isOpen,
     onClose,
-    order,
+    document,
     playSuccessSound,
     playErrorSound,
     onSuccess
@@ -32,7 +32,7 @@ const PTSModal = ({
     }, [isOpen])
 
     // GLN kontrolü
-    const hasGLN = !!(order?.glnNo || order?.email)
+    const hasGLN = !!(document?.glnNo || document?.email)
 
     // Modal kapatma
     const handleClose = () => {
@@ -57,7 +57,7 @@ const PTSModal = ({
             const settings = settingsResponse.success ? settingsResponse.data : null
 
             // XML önizleme endpoint'ini çağır
-            const response = await apiService.previewPTSNotification(order.id, kullanici, note, settings)
+            const response = await apiService.previewPTSNotification(document.id, kullanici, note, settings)
 
             if (response.success) {
                 setXmlPreview(response.xmlContent)
@@ -95,7 +95,7 @@ const PTSModal = ({
             const settingsResponse = await apiService.getSettings()
             const settings = settingsResponse.success ? settingsResponse.data : null
 
-            const response = await apiService.sendPTSNotification(order.id, kullanici, settings)
+            const response = await apiService.sendPTSNotification(document.id, kullanici, settings)
 
             setResult(response)
 
@@ -149,18 +149,18 @@ const PTSModal = ({
                         <div className="flex items-center gap-2 text-slate-300">
                             <FileText className="w-4 h-4 text-slate-400" />
                             <span className="text-sm">Belge No:</span>
-                            <span className="font-bold text-slate-100">{order?.orderNo}</span>
+                            <span className="font-bold text-slate-100">{document?.documentNo}</span>
                         </div>
                         <div className="flex items-center gap-2 text-slate-300 mt-2">
                             <User className="w-4 h-4 text-slate-400" />
                             <span className="text-sm">Alıcı:</span>
-                            <span className="font-bold text-slate-100">{order?.customerName}</span>
+                            <span className="font-bold text-slate-100">{document?.customerName}</span>
                         </div>
                         <div className="flex items-center gap-2 text-slate-300 mt-2">
                             <Hash className="w-4 h-4 text-slate-400" />
                             <span className="text-sm">GLN:</span>
                             <span className={`font-bold ${hasGLN ? 'text-indigo-400' : 'text-rose-400'}`}>
-                                {order?.glnNo || order?.email || 'Tanımsız'}
+                                {document?.glnNo || document?.email || 'Tanımsız'}
                             </span>
                         </div>
                     </div>
@@ -179,7 +179,7 @@ const PTSModal = ({
                     )}
 
                     {/* Önceki PTS Gönderim Bilgileri */}
-                    {order?.ptsId && (
+                    {document?.ptsId && (
                         <div className="bg-amber-500/10 rounded-lg p-3 mb-4 border border-amber-500/30">
                             <div className="flex items-center gap-2 text-amber-400 font-bold mb-2">
                                 <AlertTriangle className="w-4 h-4" />
@@ -188,17 +188,17 @@ const PTSModal = ({
                             <div className="grid grid-cols-3 gap-2 text-sm">
                                 <div>
                                     <span className="text-slate-400">PTS ID:</span>
-                                    <span className="ml-2 font-bold text-slate-100">{order.ptsId}</span>
+                                    <span className="ml-2 font-bold text-slate-100">{document.ptsId}</span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400">Tarih:</span>
                                     <span className="ml-2 font-bold text-slate-100">
-                                        {order.ptsTarih ? new Date(order.ptsTarih).toLocaleString('tr-TR') : '-'}
+                                        {document.ptsTarih ? new Date(document.ptsTarih).toLocaleString('tr-TR') : '-'}
                                     </span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400">Kullanıcı:</span>
-                                    <span className="ml-2 font-bold text-slate-100">{order.ptsKullanici || '-'}</span>
+                                    <span className="ml-2 font-bold text-slate-100">{document.ptsKullanici || '-'}</span>
                                 </div>
                             </div>
                         </div>
@@ -307,3 +307,4 @@ const PTSModal = ({
 }
 
 export default PTSModal
+

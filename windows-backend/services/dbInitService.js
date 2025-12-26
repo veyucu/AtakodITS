@@ -413,10 +413,10 @@ async function createITSTables() {
   log('📋 TBLFATUIRS ve TBLSIPAMAS tabloları kontrol ediliyor...')
 
   const itsUtsKolonlari = [
-    { name: 'ITS_DURUM', type: 'VARCHAR(3) NULL' },
+    { name: 'ITS_BILDIRIM', type: 'VARCHAR(3) NULL' },
     { name: 'ITS_TARIH', type: 'DATETIME NULL' },
     { name: 'ITS_KULLANICI', type: 'VARCHAR(35) NULL' },
-    { name: 'UTS_DURUM', type: 'VARCHAR(3) NULL' },
+    { name: 'UTS_BILDIRIM', type: 'VARCHAR(3) NULL' },
     { name: 'UTS_TARIH', type: 'DATETIME NULL' },
     { name: 'UTS_KULLANICI', type: 'VARCHAR(35) NULL' },
     { name: 'PTS_ID', type: 'BIGINT NULL' },

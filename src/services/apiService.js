@@ -555,6 +555,24 @@ const apiService = {
     }
   },
 
+  // PTS Durum Sorgula (verify endpoint)
+  ptsSorgula: async (transferId, products, settings = null) => {
+    try {
+      log('🔍 PTS Durum Sorgulama gönderiliyor:', { transferId, productCount: products?.length })
+      const response = await apiClient.post(`/pts/${transferId}/sorgula`, {
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS Durum Sorgulama hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Sorgulama başarısız'
+      }
+    }
+  },
+
   // Veritabanından paket listesi getir (tarih filtreli)
   getPackagesFromDB: async (startDate, endDate, dateFilterType = 'created', settings = null) => {
     try {
@@ -802,6 +820,24 @@ const apiService = {
     }
   },
 
+  // ITS Durum Sorgula (check_status endpoint)
+  itsSorgula: async (documentId, products, settings = null) => {
+    try {
+      log('🔍 ITS Durum Sorgulama gönderiliyor:', { documentId, productCount: products?.length })
+      const response = await apiClient.post(`/documents/${documentId}/its-sorgula`, {
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ ITS Durum Sorgulama hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Sorgulama başarısız'
+      }
+    }
+  },
+
   // ITS Alış Bildirimi (Mal Alım) - sadece productList gönderilir
   itsAlisBildirimi: async (documentId, products, settings = null, belgeInfo = null) => {
     try {
@@ -931,12 +967,13 @@ const apiService = {
   // ==================== PTS BİLDİRİM İŞLEMLERİ ====================
 
   // PTS Alım Bildirimi (Mal Alım) - /common/app/accept
-  ptsAlimBildirimi: async (transferId, products, settings = null) => {
+  ptsAlimBildirimi: async (transferId, products, settings = null, kullanici = null) => {
     try {
       log('📥 PTS Alım Bildirimi gönderiliyor:', { transferId, productCount: products?.length })
       const response = await apiClient.post(`/pts/${transferId}/alim-bildirimi`, {
         products,
-        settings
+        settings,
+        kullanici
       })
       return response.data
     } catch (error) {
@@ -949,13 +986,14 @@ const apiService = {
   },
 
   // PTS Alım İade Bildirimi (Mal İade) - /common/app/return
-  ptsAlimIadeBildirimi: async (transferId, karsiGlnNo, products, settings = null) => {
+  ptsAlimIadeBildirimi: async (transferId, karsiGlnNo, products, settings = null, kullanici = null) => {
     try {
       log('🔴 PTS Alım İade Bildirimi gönderiliyor:', { transferId, karsiGlnNo, productCount: products?.length })
       const response = await apiClient.post(`/pts/${transferId}/alim-iade-bildirimi`, {
         karsiGlnNo,
         products,
-        settings
+        settings,
+        kullanici
       })
       return response.data
     } catch (error) {
@@ -963,6 +1001,24 @@ const apiService = {
       return {
         success: false,
         message: error.response?.data?.message || error.message || 'Alım iade bildirimi gönderilemedi'
+      }
+    }
+  },
+
+  // PTS Doğrulama - Sadece sorgulama yapar, veritabanına yazmaz
+  ptsDogrulama: async (transferId, products, settings = null) => {
+    try {
+      log('🔍 PTS Doğrulama gönderiliyor:', { transferId, productCount: products?.length })
+      const response = await apiClient.post(`/pts/${transferId}/dogrulama`, {
+        products,
+        settings
+      })
+      return response.data
+    } catch (error) {
+      console.error('❌ PTS Doğrulama hatası:', error)
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Doğrulama yapılamadı'
       }
     }
   }

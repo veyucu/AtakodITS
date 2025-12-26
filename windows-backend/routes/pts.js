@@ -210,7 +210,8 @@ router.post('/download-bulk-stream', async (req, res) => {
               skipped: results.skipped,
               failed: results.failed,
               current: i + 1,
-              message: `${transferIdStr} başarısız (${i + 1}/${transferIds.length})`
+              message: `${transferIdStr} başarısız (${i + 1}/${transferIds.length})`,
+              failedPackage: { transferId: transferIdStr, message: `Kayıt hatası: ${saveResult.message}` }
             })
           }
         } else {
@@ -229,7 +230,8 @@ router.post('/download-bulk-stream', async (req, res) => {
             skipped: results.skipped,
             failed: results.failed,
             current: i + 1,
-            message: `${transferIdStr} başarısız (${i + 1}/${transferIds.length})`
+            message: `${transferIdStr} başarısız (${i + 1}/${transferIds.length})`,
+            failedPackage: { transferId: transferIdStr, message: downloadResult.message }
           })
         }
 
@@ -249,7 +251,8 @@ router.post('/download-bulk-stream', async (req, res) => {
           skipped: results.skipped,
           failed: results.failed,
           current: i + 1,
-          message: `${String(transferId)} hata (${i + 1}/${transferIds.length})`
+          message: `${String(transferId)} hata (${i + 1}/${transferIds.length})`,
+          failedPackage: { transferId: String(transferId), message: error.message }
         })
       }
     }
@@ -586,7 +589,7 @@ router.get('/carrier-details/:transferId/:carrierLabel', async (req, res) => {
 router.post('/:transferId/alim-bildirimi', async (req, res) => {
   try {
     const { transferId } = req.params
-    const { products, settings } = req.body
+    const { products, settings, kullanici } = req.body
 
     log('📥 PTS Alım Bildirimi İsteği:', { transferId, productCount: products?.length })
 
@@ -630,7 +633,7 @@ router.post('/:transferId/alim-bildirimi', async (req, res) => {
 
       // PTS tablolarını güncelle (AKTBLPTSMAS her zaman, AKTBLPTSTRA eşleşenler için)
       try {
-        await itsApiService.updatePTSBildirimDurum(transferId, recordsToUpdate, tumBasarili)
+        await itsApiService.updatePTSBildirimDurum(transferId, recordsToUpdate, tumBasarili, kullanici)
         log('✅ PTS tabloları güncellendi')
       } catch (updateError) {
         log('❌ PTS tablo güncelleme hatası:', updateError.message)
@@ -655,7 +658,7 @@ router.post('/:transferId/alim-bildirimi', async (req, res) => {
 router.post('/:transferId/alim-iade-bildirimi', async (req, res) => {
   try {
     const { transferId } = req.params
-    const { karsiGlnNo, products, settings } = req.body
+    const { karsiGlnNo, products, settings, kullanici } = req.body
 
     log('🔴 PTS Alım İade Bildirimi İsteği:', { transferId, karsiGlnNo, productCount: products?.length })
 
@@ -702,7 +705,7 @@ router.post('/:transferId/alim-iade-bildirimi', async (req, res) => {
 
       // PTS tablolarını güncelle (AKTBLPTSMAS her zaman, AKTBLPTSTRA eşleşenler için)
       try {
-        await itsApiService.updatePTSBildirimDurum(transferId, recordsToUpdate, tumBasarili)
+        await itsApiService.updatePTSBildirimDurum(transferId, recordsToUpdate, tumBasarili, kullanici)
         log('✅ PTS tabloları güncellendi')
       } catch (updateError) {
         log('❌ PTS tablo güncelleme hatası:', updateError.message)
@@ -716,6 +719,79 @@ router.post('/:transferId/alim-iade-bildirimi', async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Alım iade bildirimi gönderilemedi'
+    })
+  }
+})
+
+/**
+ * POST /api/pts/:transferId/dogrulama
+ * PTS Doğrulama - ITS'den sorgular ama VERİTABANINA YAZMAZ
+ * Sadece sonuçları client'a döner
+ */
+router.post('/:transferId/dogrulama', async (req, res) => {
+  try {
+    const { transferId } = req.params
+    const { products, settings } = req.body
+
+    log('🔍 PTS Doğrulama İsteği:', { transferId, productCount: products?.length })
+
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Doğrulanacak ürün listesi boş'
+      })
+    }
+
+    // ITS API servisini import et
+    const itsApiService = await import('../services/itsApiService.js')
+
+    // Doğrulama yap
+    const result = await itsApiService.dogrulamaYap(products, settings)
+
+    log('📋 PTS Doğrulama Sonucu:', {
+      success: result.success,
+      dataCount: result.data?.length
+    })
+
+    // NOT: Veritabanına YAZMIYORUZ - sadece sonuçları client'a dönüyoruz
+
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ PTS Doğrulama Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Doğrulama yapılamadı'
+    })
+  }
+})
+
+/**
+ * POST /api/pts/:transferId/sorgula
+ * Transfer ID ile ürün durumlarını sorgula (verify endpoint)
+ */
+router.post('/:transferId/sorgula', async (req, res) => {
+  try {
+    const { transferId } = req.params
+    const { products, settings } = req.body
+
+    log('🔍 PTS Durum Sorgulama İsteği:', { transferId, productCount: products?.length })
+
+    if (!products || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sorgulanacak ürün listesi boş'
+      })
+    }
+
+    const result = await ptsService.durumSorgula(transferId, products, settings)
+    res.json(result)
+
+  } catch (error) {
+    console.error('❌ PTS Durum Sorgulama Hatası:', error)
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Sorgulama yapılamadı'
     })
   }
 })

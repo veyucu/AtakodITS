@@ -85,7 +85,8 @@ const PTSPage = () => {
     downloaded: 0,
     skipped: 0,
     failed: 0,
-    status: 'idle' // idle, searching, downloading, completed, error
+    status: 'idle', // idle, searching, downloading, completed, error
+    failedPackages: [] // [{transferId, message}]
   })
 
   // Dashboard'dan gelindiyse location state'ini temizle (sayfa yenilemelerinde etkilenmemesi için)
@@ -262,7 +263,8 @@ const PTSPage = () => {
         downloaded: 0,
         skipped: 0,
         failed: 0,
-        status: 'searching'
+        status: 'searching',
+        failedPackages: []
       })
 
       // Önce kaç paket var öğren
@@ -304,13 +306,21 @@ const PTSPage = () => {
         endDate,
         (progressData) => {
           // Her progress güncellemesinde state'i güncelle
-          setDownloadProgress({
-            total: progressData.total || 0,
-            current: progressData.current || 0,
-            downloaded: progressData.downloaded || 0,
-            skipped: progressData.skipped || 0,
-            failed: progressData.failed || 0,
-            status: progressData.status
+          setDownloadProgress(prev => {
+            // Eğer yeni hatalı paket varsa listeye ekle
+            let failedPackages = prev.failedPackages || []
+            if (progressData.failedPackage) {
+              failedPackages = [...failedPackages, progressData.failedPackage]
+            }
+            return {
+              total: progressData.total || 0,
+              current: progressData.current || 0,
+              downloaded: progressData.downloaded || 0,
+              skipped: progressData.skipped || 0,
+              failed: progressData.failed || 0,
+              status: progressData.status,
+              failedPackages
+            }
           })
         },
         null, // settings
@@ -344,9 +354,9 @@ const PTSPage = () => {
   const filteredData = useMemo(() => {
     let data = listData
 
-    // Bildirilenleri gizle filtresi (sadece OK olanları gizle)
+    // Bildirilenleri gizle filtresi (BILDIRIM = OK olanları gizle)
     if (hideNotified) {
-      data = data.filter(item => item.DURUM !== 'OK')
+      data = data.filter(item => item.BILDIRIM !== 'OK')
     }
 
     if (!searchText.trim()) return data
@@ -710,7 +720,7 @@ const PTSPage = () => {
       <div className="flex-1 px-2 md:px-6 py-2 md:py-4 flex flex-col min-h-0">
         {listData.length > 0 ? (
           /* Liste Görünümü */
-          <div className="ag-theme-alpine rounded-xl overflow-hidden border border-dark-700 flex-1 relative">
+          <div className="ag-theme-alpine ag-pagination-visible rounded-xl overflow-hidden border border-dark-700 flex-1 relative">
             <AgGridReact
               ref={gridRef}
               rowData={filteredData}
@@ -905,6 +915,24 @@ const PTSPage = () => {
                   <p className="text-sm text-primary-400">
                     <span className="font-semibold">💡 Not:</span> {downloadProgress.skipped} paket zaten NETSIS veritabanında mevcut olduğu için atlandı.
                   </p>
+                </div>
+              )}
+
+              {/* Hatalı Paketler Listesi */}
+              {downloadProgress.failedPackages && downloadProgress.failedPackages.length > 0 && (
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-3">
+                  <p className="text-sm text-rose-400 font-semibold mb-2">
+                    ❌ Hatalı Paketler ({downloadProgress.failedPackages.length})
+                  </p>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {downloadProgress.failedPackages.map((pkg, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-xs">
+                        <span className="font-mono text-rose-300 flex-shrink-0">{pkg.transferId}</span>
+                        <span className="text-slate-400">-</span>
+                        <span className="text-slate-300 break-all">{pkg.message}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -25,7 +25,9 @@ const DEFAULT_SETTINGS = {
   itsPaketSorguUrl: '/pts/app/search',
   itsPaketIndirUrl: '/pts/app/GetPackage',
   itsPaketGonderUrl: '/pts/app/SendPackage',
-  itsDogrulamaUrl: '/reference/app/verification'
+  itsDogrulamaUrl: '/reference/app/verification',
+  // Genel Ayarlar
+  depoAdi: 'DEPO'  // Bizim GLN'in ekrandaki gösterim adı
 }
 
 // Ayarları cache'le (her requestte localStorage okumamak için)
